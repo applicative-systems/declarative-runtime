@@ -1,0 +1,12 @@
+# Nix build outputs
+result
+result-*
+
+# Terraform/OpenTofu runtime artifacts (never committed; host state lives in /var/lib)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+
+# NixOS interactive test driver (REPL command history)
+.nixos-test-history

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> Status: the pattern is implemented. **`providers/forgejo` is the worked
+> Status: the pattern is implemented. **`services/forgejo` is the worked
 > reference pairing** — new pairings are modeled on it, and the "Provider
 > implementation contract" below is exactly what it encodes. Grafana and
 > Keycloak (see "Target pairings") are designed but not yet built; do not
@@ -10,12 +10,12 @@
 
 Make NixOS services **more declaratively configurable** than upstream Nixpkgs
 modules allow, by pairing each service with its Terraform provider and
-reconciling the service's *runtime state* once the service is up.
+reconciling the service's _runtime state_ once the service is up.
 
 Upstream NixOS modules configure a service's **static** surface — package
 version, config file, the systemd unit. They deliberately do **not** manage a
 service's **runtime** state: Grafana dashboards/datasources, a Git forge's
-orgs/repos/teams, etc. Many such services ship a Terraform provider that *does*
+orgs/repos/teams, etc. Many such services ship a Terraform provider that _does_
 manage exactly that state.
 
 This repo closes the gap: you declare the desired runtime state in Nix, and a
@@ -26,24 +26,24 @@ A pairing only makes sense when the service has **admin-declarative runtime
 state reachable through a provider** that the NixOS module cannot already
 express. Services whose entire surface is config-file-driven (and thus already
 declarative via their NixOS options) are out of scope. (Authelia is the
-canonical *non*-fit: no Terraform provider exists, and its admin surface is
+canonical _non_-fit: no Terraform provider exists, and its admin surface is
 already covered by `services.authelia.*` — so it was dropped as a pairing.)
 
 ## Settled decisions
 
-| Topic | Decision |
-|-------|----------|
-| Executor | **OpenTofu** (nixpkgs `opentofu`, MPL 2.0 / free). `terraform` is BSL 1.1 / unfree and is **not** used. |
-| Config authoring | Generate **`.tf.json`** directly from Nix (`builtins.toJSON`). No HCL, no terranix dependency. |
-| Secrets | **systemd `LoadCredential=`** is the blessed path. Generated config references the secret as a `sensitive` Terraform variable; never literal secrets. sops-nix/agenix, if used, only supply the source that feeds `LoadCredential=`. |
-| Reconciliation | **Run-once**: a `Type=oneshot` unit ordered `After=` the primary unit + readiness probe, runs `init` + `apply -auto-approve`. Re-applies on config change via `restartTriggers`. **No** drift timer. A failed apply fails *that unit* visibly (`systemctl status`) and does **not** tear down the service. |
-| State | **Local, per-host only.** Terraform state lives under the **base service's primary state directory** (e.g. `services.forgejo.stateDir` → `/var/lib/forgejo`), co-located with the service it configures. No remote backends. |
-| Module namespace | Under the base service as **`services.<svc>.runtime.*`** (e.g. `services.forgejo.runtime.repositories`), so the pairing reads as a transparent extension of the upstream `services.<svc>` module. |
-| Formatter | **treefmt** driving **nixfmt**. Formatter is the single source of layout truth — run it, never hand-format. |
-| CI | **GitHub Actions**: `nix flake check` on push + PR, Nix provided by Determinate Systems `nix-installer-action`. Workflow is Forgejo-Actions-compatible (same syntax) if hosting moves there. |
-| License | **MIT** (matches nixpkgs ecosystem norms; permissive). |
-| Toolchain pin | Flake `nixpkgs` input tracks **`nixos-unstable`** (the verified provider/service versions live there); minimum **Nix ≥ 2.18** for the stable flake CLI + `nix flake check`. |
-| Commits | **Conventional Commits**, **atomic** (one self-contained conceptual change per commit; the tree builds/passes at every commit), linear history (rebase/squash, no merge commits). VCS is the colocated `jj`/`git` checkout. |
+| Topic            | Decision                                                                                                                                                                                                                                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Executor         | **OpenTofu** (nixpkgs `opentofu`, MPL 2.0 / free). `terraform` is BSL 1.1 / unfree and is **not** used.                                                                                                                                                                                                    |
+| Config authoring | Generate **`.tf.json`** directly from Nix (`builtins.toJSON`). No HCL, no terranix dependency.                                                                                                                                                                                                             |
+| Secrets          | **systemd `LoadCredential=`** is the blessed path. Generated config references the secret as a `sensitive` Terraform variable; never literal secrets. sops-nix/agenix, if used, only supply the source that feeds `LoadCredential=`.                                                                       |
+| Reconciliation   | **Run-once**: a `Type=oneshot` unit ordered `After=` the primary unit + readiness probe, runs `init` + `apply -auto-approve`. Re-applies on config change via `restartTriggers`. **No** drift timer. A failed apply fails _that unit_ visibly (`systemctl status`) and does **not** tear down the service. |
+| State            | **Local, per-host only.** Terraform state lives under the **base service's primary state directory** (e.g. `services.forgejo.stateDir` → `/var/lib/forgejo`), co-located with the service it configures. No remote backends.                                                                               |
+| Module namespace | Under the base service as **`services.<svc>.runtime.*`** (e.g. `services.forgejo.runtime.repositories`), so the pairing reads as a transparent extension of the upstream `services.<svc>` module.                                                                                                          |
+| Formatter        | **treefmt** driving **nixfmt**. Formatter is the single source of layout truth — run it, never hand-format.                                                                                                                                                                                                |
+| CI               | **GitHub Actions**: `nix flake check` on push + PR, Nix provided by Determinate Systems `nix-installer-action`. Workflow is Forgejo-Actions-compatible (same syntax) if hosting moves there.                                                                                                               |
+| License          | **MIT** (matches nixpkgs ecosystem norms; permissive).                                                                                                                                                                                                                                                     |
+| Toolchain pin    | Flake `nixpkgs` input tracks **`nixos-unstable`** (the verified provider/service versions live there); minimum **Nix ≥ 2.18** for the stable flake CLI + `nix flake check`.                                                                                                                                |
+| Commits          | **Conventional Commits**, **atomic** (one self-contained conceptual change per commit; the tree builds/passes at every commit), linear history (rebase/squash, no merge commits). VCS is the colocated `jj`/`git` checkout.                                                                                |
 
 ## Core mechanism
 
@@ -65,24 +65,24 @@ For each enabled pairing:
 
 Provider reality verified against nixpkgs + the public registry:
 
-| Service | Provider | Source | Status |
-|---------|----------|--------|--------|
-| **Forgejo** | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `providers/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
-| **Grafana** | `grafana` (4.36.0) | `pkgs.terraform-providers.grafana` | Designed, not yet built. In-nixpkgs provider. |
-| **Keycloak** | `keycloak` (5.7.0) | `pkgs.terraform-providers.keycloak` | Designed, not yet built. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait. |
+| Service      | Provider                          | Source                                                  | Status                                                                                                                                                                                                                                                          |
+| ------------ | --------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Forgejo**  | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
+| **Grafana**  | `grafana` (4.36.0)                | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
+| **Keycloak** | `keycloak` (5.7.0)                | `pkgs.terraform-providers.keycloak`                     | Designed, not yet built. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                                                                       |
 
 ## Repository layout
 
-Each service<->provider pairing lives in its own directory under `providers/`.
-`providers/forgejo` is the worked example:
+Each service<->provider pairing lives in its own directory under `services/`.
+`services/forgejo` is the worked example:
 
 ```
-flake.nix                   # outputs: nixosModules (.default + per-pairing .<svc>), checks, formatter, devShells
+flake.nix                   # outputs: nixosModules (.default + per-pairing .<svc>), checks, formatter
 treefmt.nix                 # treefmt + nixfmt config
 modules/
   default.nix               # aggregates per-pairing modules into nixosModules.default
   lib/                      # provider-agnostic helpers: tf-label/file, run-once OpenTofu reconciler
-providers/                  # one directory per service<->provider pairing
+services/                   # one directory per service<->provider pairing
   forgejo/                  # worked example: the Forgejo <-> svalabs/forgejo pairing
     module.nix              # NixOS module: services.forgejo.runtime options + systemd wiring (reconciler + token bootstrap)
     lib.nix                 # provider specifics: wrapped OpenTofu executor + .tf.json generation (resource spec + ref resolution)
@@ -93,7 +93,7 @@ providers/                  # one directory per service<->provider pairing
 
 ## Provider implementation contract
 
-`providers/forgejo` is the template. A new pairing `providers/<svc>/` provides
+`services/forgejo` is the template. A new pairing `services/<svc>/` provides
 `module.nix`, `lib.nix`, `checks.nix`, a `README.md`, and (only when the
 provider is not in nixpkgs) `pkg.nix`. It **reuses** the provider-agnostic
 helpers in `modules/lib` and **replicates** the forgejo `lib.nix` generation
@@ -101,13 +101,13 @@ pattern. Everything below is what the forgejo pairing encodes.
 
 ### Wiring a new pairing
 
-- Export it from the flake: add `nixosModules.<svc> = ./providers/<svc>/module.nix;`,
+- Export it from the flake: add `nixosModules.<svc> = ./services/<svc>/module.nix;`,
   add the directory to `modules/default.nix`'s `imports` (so it also joins the
   aggregate `nixosModules.default`), and merge
-  `import ./providers/<svc>/checks.nix { inherit pkgs self; }` into the flake's
+  `import ./services/<svc>/checks.nix { inherit pkgs self; }` into the flake's
   `checks`.
-- Everything (`checks`, `formatter`, `devShells`) is produced for both
-  `x86_64-linux` and `aarch64-linux` via `forAllSystems`.
+- Everything (`checks`, `formatter`) is produced for both `x86_64-linux` and
+  `aarch64-linux` via `forAllSystems`.
 
 ### `lib.nix` — provider specifics
 
@@ -125,23 +125,31 @@ pattern. Everything below is what the forgejo pairing encodes.
 ### Modeling the resource surface
 
 - Enumerate every provider resource in a `resourceTypes` record:
-  `{ type = "<provider>_<resource>"; prefix; nameAttr; scope; refs; secrets; description; }`
+  `{ type = "<provider>_<resource>"; prefix; nameAttr; scope; refs; secrets; requiredSecrets; attrs; description; }`
   — `prefix` is a unique label prefix, `nameAttr` the attribute defaulted from
   the collection key (or `null`), `scope` the token scope(s) the resource needs,
-  `refs` its parent links, `secrets` its secret-valued attributes.
-- Each resource is exposed as a freeform collection:
-  `attrsOf (submodule { freeformType = attrsOf tfValue; options = <refs> ++ <attr>File; })`.
-  Any upstream attribute is set **verbatim by its exact upstream snake_case
-  name**; the attrset key becomes the Terraform label and defaults `nameAttr`.
-  The only *declared* options are reference inputs and `<attr>File` secret
-  inputs; everything else is freeform passthrough. `tfValue` is the recursive
-  bool/int/str/list/attrs value type.
+  `refs` its parent links, `secrets` its secret-valued attributes,
+  `requiredSecrets` those of them the provider requires, `attrs` the typed
+  option for every settable attribute.
+- Each resource is exposed as a **strictly typed** collection:
+  `attrsOf (submodule { options = <attrs> ++ <refs> ++ <attr>File; })` — **no
+  `freeformType`**. Every settable upstream attribute is a declared option typed
+  to what the provider accepts (string/bool/int/list/map, and `submodule` for
+  nested objects), so a wrong name, wrong type, or missing required field is an
+  eval-time error at `nix flake check`, not an apply-time one. Derive `attrs`
+  from the provider schema (`tofu providers schema -json`); omit computed /
+  output-only attributes. Required attributes are declared without a default;
+  optional ones are `nullOr T` defaulting to `null` (dropped from the generated
+  JSON when unset). The attrset key becomes the Terraform label and defaults
+  `nameAttr`. Reference inputs and `<attr>File` secret inputs are declared
+  separately (they are resolved/rerouted at generation, not passed through).
 - Parent links are named by the **key of another managed resource** and resolved
   to `${type.label.field}` interpolations — this both wires the numeric `*_id`
-  attributes a user cannot know *and* orders `tofu apply`. A `refs` entry is
-  `{ attr; targets; field; managedOnly; description; }`: `managedOnly`
+  attributes a user cannot know _and_ orders `tofu apply`. A `refs` entry is
+  `{ attr; targets; field; managedOnly; required; description; }`: `managedOnly`
   references (numeric ids) must resolve to a managed sibling (generation throws
-  otherwise); name references accept a managed key *or* a literal.
+  otherwise); name references accept a managed key _or_ a literal; `required`
+  declares the reference input as a required option.
 - `<svc>TfConfig cfg` returns `{ config; credentials; }`. `config` carries **no
   secret**: a `provider` block pointed at the local instance, plus the admin
   token and every `<attr>File` secret as `sensitive` input `variable`s fed from
@@ -151,7 +159,7 @@ pattern. Everything below is what the forgejo pairing encodes.
 
 - Mark secret attributes in `resourceTypes.<r>.secrets`. Each gets an
   `<attr>File` option taking a **host file path** (a string path resolved on the
-  target, *never* a Nix store path). When set, generation emits `${var.<id>}` +
+  target, _never_ a Nix store path). When set, generation emits `${var.<id>}` +
   a `sensitive` variable and collects an `id → host path` pair (id
   `secret_<prefix>_<key>_<attr>`); the literal `<attr>` and `<attr>File` are
   mutually exclusive. The credential map flows `<svc>TfConfig` → `module.nix` →
@@ -217,13 +225,13 @@ pattern. Everything below is what the forgejo pairing encodes.
 
 - Ship a `README.md` per pairing: Installation → Configuration examples (several
   distinct use cases) → Module options → Resources table → Security note.
-- Every `.nix` file opens with a header comment stating its role and the *why*,
-  not just the *what*.
+- Every `.nix` file opens with a header comment stating its role and the _why_,
+  not just the _what_.
 
 ## Conventions
 
 - Nix only; no parallel non-Nix config layers.
-- Options describe *desired state* in domain terms; they must not leak Terraform
+- Options describe _desired state_ in domain terms; they must not leak Terraform
   resource addresses or HCL into the user-facing API.
 - Always use **`hackme`** for any plain-text password — never invent ad-hoc test
   passwords. If the service rejects it on policy grounds (length/complexity),
@@ -245,7 +253,7 @@ nix develop                          # devshell (curl, jq)
 
 Behavior is proven with **NixOS VM integration tests**
 (`pkgs.testers.runNixOSTest`): boot a VM with the pairing enabled, wait for the
-service, let the runner apply, then assert the *runtime state* exists (query the
+service, let the runner apply, then assert the _runtime state_ exists (query the
 service, not the Terraform state). Eval-only/build-only success is **not**
 evidence the reconciliation works. Never assert behavior you did not exercise.
 
