@@ -80,6 +80,40 @@ let
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) this belongs to.";
   };
 
+  # optional refs to a managed openid_client / openid_client_scope, used by
+  # all openid protocol mappers (mutually exclusive at the provider).
+  openidClientOptionalRef = {
+    attr = "client_id";
+    targets = [
+      {
+        collection = "openid_clients";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = false;
+    description = "Optional managed OpenID client this mapper attaches to.";
+  };
+  openidClientScopeOptionalRef = {
+    attr = "client_scope_id";
+    targets = [
+      {
+        collection = "openid_client_scopes";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = false;
+    description = "Optional managed OpenID client scope this mapper attaches to.";
+  };
+  # the four common openid-mapper attrs (every mapper has at least the first 3)
+  openidMapperCommonAttrs = {
+    name = oStr "Mapper name. Defaults to the attribute key.";
+    add_to_id_token = oBool "Include in ID token?";
+    add_to_access_token = oBool "Include in access token?";
+    add_to_userinfo = oBool "Include in UserInfo?";
+  };
+
   # The full keycloak/keycloak resource surface. Per
   # resource:
   #   type            the `keycloak_*` resource type
@@ -669,6 +703,270 @@ let
       description = "Default SAML scopes auto-attached to a SAML client, keyed by an arbitrary label.";
       attrs = {
         default_scopes = oListStr "Names of SAML scopes attached by default.";
+      };
+    };
+
+    # OpenID protocol mappers: each is its own resource type, keyed by the
+    # mapper name; all share the same realm + (client | client_scope) refs.
+    openid_user_attribute_protocol_mappers = {
+      type = "keycloak_openid_user_attribute_protocol_mapper";
+      prefix = "openid_user_attribute_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "user_attribute"
+        "claim_name"
+      ];
+      description = "OpenID protocol mapper that maps a user attribute to a claim.";
+      attrs = openidMapperCommonAttrs // {
+        multivalued = oBool "Treat the attribute as multivalued?";
+        user_attribute = oStr "Name of the user attribute to map.";
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type ('String', 'long', 'int', 'boolean', 'JSON').";
+        aggregate_attributes = oBool "Aggregate multiple values into one claim?";
+      };
+    };
+
+    openid_user_property_protocol_mappers = {
+      type = "keycloak_openid_user_property_protocol_mapper";
+      prefix = "openid_user_property_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "user_property"
+        "claim_name"
+      ];
+      description = "OpenID protocol mapper that maps a built-in user property (e.g. `email`, `username`) to a claim.";
+      attrs = openidMapperCommonAttrs // {
+        user_property = oStr "Built-in user property to map (e.g. 'email', 'username').";
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type.";
+      };
+    };
+
+    openid_group_membership_protocol_mappers = {
+      type = "keycloak_openid_group_membership_protocol_mapper";
+      prefix = "openid_group_membership_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "claim_name" ];
+      description = "OpenID protocol mapper that maps group memberships to a claim.";
+      attrs = openidMapperCommonAttrs // {
+        claim_name = oStr "Name of the resulting JWT claim.";
+        full_path = oBool "Emit full group path (/parent/child) rather than just the leaf name?";
+      };
+    };
+
+    openid_full_name_protocol_mappers = {
+      type = "keycloak_openid_full_name_protocol_mapper";
+      prefix = "openid_full_name_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      description = "OpenID protocol mapper that emits the user's full name as a single claim.";
+      attrs = openidMapperCommonAttrs;
+    };
+
+    openid_sub_protocol_mappers = {
+      type = "keycloak_openid_sub_protocol_mapper";
+      prefix = "openid_sub_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      description = "OpenID protocol mapper for the `sub` claim.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        add_to_access_token = oBool "Include in access token?";
+        add_to_token_introspection = oBool "Include in token introspection?";
+      };
+    };
+
+    openid_hardcoded_claim_protocol_mappers = {
+      type = "keycloak_openid_hardcoded_claim_protocol_mapper";
+      prefix = "openid_hardcoded_claim_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "claim_name"
+        "claim_value"
+      ];
+      description = "OpenID protocol mapper that adds a hardcoded claim with a fixed value.";
+      attrs = openidMapperCommonAttrs // {
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value = oStr "Hardcoded claim value.";
+        claim_value_type = oStr "Claim value type.";
+      };
+    };
+
+    openid_audience_protocol_mappers = {
+      type = "keycloak_openid_audience_protocol_mapper";
+      prefix = "openid_audience_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      description = "OpenID protocol mapper that adds an audience to issued tokens (exactly one of `included_client_audience` / `included_custom_audience`).";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        included_client_audience = oStr "ClientId of a client to include as audience.";
+        included_custom_audience = oStr "Custom audience string to include.";
+        add_to_id_token = oBool "Include in ID token?";
+        add_to_access_token = oBool "Include in access token?";
+      };
+    };
+
+    openid_audience_resolve_protocol_mappers = {
+      type = "keycloak_openid_audience_resolve_protocol_mapper";
+      prefix = "openid_audience_resolve_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      description = "OpenID audience-resolve mapper (derives audience from client roles).";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+      };
+    };
+
+    openid_hardcoded_role_protocol_mappers = {
+      type = "keycloak_openid_hardcoded_role_protocol_mapper";
+      prefix = "openid_hardcoded_role_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "role_id" ];
+      description = "OpenID protocol mapper that adds a hardcoded role to issued tokens.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        role_id = oStr "Role UUID (or `\${keycloak_role.X.id}` reference) to hardcode.";
+      };
+    };
+
+    openid_user_realm_role_protocol_mappers = {
+      type = "keycloak_openid_user_realm_role_protocol_mapper";
+      prefix = "openid_user_realm_role_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "claim_name" ];
+      description = "OpenID protocol mapper that maps the user's realm roles to a claim.";
+      attrs = openidMapperCommonAttrs // {
+        add_to_token_introspection = oBool "Include in token introspection?";
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type.";
+        multivalued = oBool "Treat as multivalued?";
+        realm_role_prefix = oStr "Optional prefix prepended to each role name in the claim.";
+      };
+    };
+
+    openid_user_client_role_protocol_mappers = {
+      type = "keycloak_openid_user_client_role_protocol_mapper";
+      prefix = "openid_user_client_role_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "claim_name" ];
+      description = "OpenID protocol mapper that maps the user's roles on a specific client to a claim.";
+      attrs = openidMapperCommonAttrs // {
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type.";
+        multivalued = oBool "Treat as multivalued?";
+        client_id_for_role_mappings = oStr "Source clientId whose role mappings are emitted.";
+        client_role_prefix = oStr "Optional prefix prepended to each role name in the claim.";
+      };
+    };
+
+    openid_user_session_note_protocol_mappers = {
+      type = "keycloak_openid_user_session_note_protocol_mapper";
+      prefix = "openid_user_session_note_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "claim_name"
+        "session_note"
+      ];
+      description = "OpenID protocol mapper that maps a user session note to a claim.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        add_to_id_token = oBool "Include in ID token?";
+        add_to_access_token = oBool "Include in access token?";
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type.";
+        session_note = oStr "Name of the user session note to read.";
+      };
+    };
+
+    openid_script_protocol_mappers = {
+      type = "keycloak_openid_script_protocol_mapper";
+      prefix = "openid_script_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = openidClientOptionalRef;
+        client_scope = openidClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "script"
+        "claim_name"
+      ];
+      description = "OpenID protocol mapper that produces a claim from a JavaScript expression (requires the scripts feature).";
+      attrs = openidMapperCommonAttrs // {
+        multivalued = oBool "Treat as multivalued?";
+        script = oStr "JavaScript expression evaluated to produce the claim value.";
+        claim_name = oStr "Name of the resulting JWT claim.";
+        claim_value_type = oStr "Claim value type.";
       };
     };
   };

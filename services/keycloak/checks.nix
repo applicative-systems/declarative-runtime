@@ -145,6 +145,19 @@ in
                 "acme-profile"
               ];
             };
+
+            # OpenID protocol mapper attached to the acme-profile scope.
+            openid_user_attribute_protocol_mappers.team_claim = {
+              realm = "acme";
+              client_scope = "acme_profile";
+              name = "team";
+              user_attribute = "team";
+              claim_name = "team";
+              claim_value_type = "String";
+              add_to_id_token = true;
+              add_to_access_token = true;
+              add_to_userinfo = true;
+            };
           };
         };
 
@@ -238,6 +251,22 @@ in
           ))
           assert any(g["name"] == "engineering" for g in alice_groups), \
               f"engineering group missing on alice: {alice_groups}"
+
+      with subtest("protocol mapper attached to client scope"):
+          tok = admin_token()
+          scopes = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/client-scopes"
+          ))
+          s = next((x for x in scopes if x["name"] == "acme-profile"), None)
+          mappers = s.get("protocolMappers", []) if s else []
+          mapper = next((m for m in mappers if m["name"] == "team"), None)
+          assert mapper, f"team mapper missing on acme-profile: {mappers}"
+          assert mapper.get("protocolMapper") == "oidc-usermodel-attribute-mapper", \
+              f"mapper type mismatch: {mapper}"
+          cfg = mapper.get("config", {})
+          assert cfg.get("user.attribute") == "team", f"mapper config: {cfg}"
+          assert cfg.get("claim.name") == "team", f"mapper config: {cfg}"
 
       with subtest("openid client exists with declared scopes attached"):
           tok = admin_token()
