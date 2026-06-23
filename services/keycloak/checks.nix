@@ -248,6 +248,101 @@ in
                 loginAccountTitle = "ACME";
               };
             };
+
+            # realm_user_profile exercises a MaxItems:1 nested block inside a
+            # list element (attribute[].permissions); proves wrapBlocks
+            # recurses into list elements.
+            realm_user_profiles.acme = {
+              realm = "acme";
+              unmanaged_attribute_policy = "ENABLED";
+              # Keycloak refuses to drop the built-in attrs (username,
+              # email, firstName, lastName); declare them alongside the
+              # custom one. display_name uses Keycloak's `${i18n.key}`
+              # syntax which collides with Terraform interpolation, so we
+              # leave those off here.
+              attribute = [
+                {
+                  name = "username";
+                  permissions = {
+                    view = [
+                      "admin"
+                      "user"
+                    ];
+                    edit = [
+                      "admin"
+                      "user"
+                    ];
+                  };
+                  validator = [
+                    {
+                      name = "length";
+                      config = {
+                        min = "3";
+                        max = "255";
+                      };
+                    }
+                  ];
+                }
+                {
+                  name = "email";
+                  permissions = {
+                    view = [
+                      "admin"
+                      "user"
+                    ];
+                    edit = [
+                      "admin"
+                      "user"
+                    ];
+                  };
+                }
+                {
+                  name = "firstName";
+                  permissions = {
+                    view = [
+                      "admin"
+                      "user"
+                    ];
+                    edit = [
+                      "admin"
+                      "user"
+                    ];
+                  };
+                }
+                {
+                  name = "lastName";
+                  permissions = {
+                    view = [
+                      "admin"
+                      "user"
+                    ];
+                    edit = [
+                      "admin"
+                      "user"
+                    ];
+                  };
+                }
+                {
+                  name = "team";
+                  display_name = "Team";
+                  group = "metadata";
+                  permissions = {
+                    view = [
+                      "admin"
+                      "user"
+                    ];
+                    edit = [ "admin" ];
+                  };
+                }
+              ];
+              group = [
+                {
+                  name = "metadata";
+                  display_header = "Metadata";
+                  display_description = "ACME-internal user metadata";
+                }
+              ];
+            };
           };
         };
 
@@ -390,6 +485,25 @@ in
           totp = next((r for r in ras if r.get("alias") == "CONFIGURE_TOTP"), None)
           assert totp, f"CONFIGURE_TOTP not found: {[r.get('alias') for r in ras]}"
           assert totp.get("enabled") is False, f"CONFIGURE_TOTP should be disabled: {totp}"
+
+      with subtest("realm_user_profile attribute[].permissions block wrap reaches the API"):
+          tok = admin_token()
+          up = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/users/profile"
+          ))
+          attrs = {a["name"]: a for a in up.get("attributes", [])}
+          assert "team" in attrs, f"team attribute missing: {list(attrs)}"
+          team_perms = attrs["team"].get("permissions", {})
+          assert set(team_perms.get("view", [])) == {"admin", "user"}, \
+              f"team view perms: {team_perms}"
+          assert set(team_perms.get("edit", [])) == {"admin"}, \
+              f"team edit perms: {team_perms}"
+          username_validators = attrs["username"].get("validations", {})
+          assert "length" in username_validators, \
+              f"length validator missing on username: {username_validators}"
+          assert up.get("unmanagedAttributePolicy") == "ENABLED", \
+              f"unmanaged_attribute_policy: {up}"
 
       with subtest("realm localization message reaches the API"):
           tok = admin_token()

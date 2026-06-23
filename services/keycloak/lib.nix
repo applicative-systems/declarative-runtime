@@ -637,11 +637,14 @@ let
           temporary = oBool "Force the user to change the password on first login.";
         } "Initial password set at user creation.";
 
-        federated_identity = oListSub {
-          identity_provider = rStr "Alias of the federating IdP.";
-          user_id = rStr "User id on the IdP side.";
-          user_name = rStr "Username on the IdP side.";
-        } "Federated-identity links pre-bound to the user; each block is `{ identity_provider; user_id; user_name; }`.";
+        federated_identity =
+          oListSub
+            {
+              identity_provider = rStr "Alias of the federating IdP.";
+              user_id = rStr "User id on the IdP side.";
+              user_name = rStr "Username on the IdP side.";
+            }
+            "Federated-identity links pre-bound to the user; each block is `{ identity_provider; user_id; user_name; }`.";
       };
     };
 
@@ -807,12 +810,15 @@ let
         always_display_in_console = oBool "Always display the client in the user account console.";
         extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
 
-        authorization = oSub {
-          policy_enforcement_mode = rStr "Policy enforcement mode ('ENFORCING', 'PERMISSIVE', or 'DISABLED').";
-          decision_strategy = oStr "Decision strategy when multiple policies apply (default 'UNANIMOUS').";
-          allow_remote_resource_management = oBool "Allow resource management via the protection API.";
-          keep_defaults = oBool "Keep default resources / scopes / permissions Keycloak creates.";
-        } "Enables fine-grained authorization on the client (resource server). Required for openid_client_authorization_* resources.";
+        authorization =
+          oSub
+            {
+              policy_enforcement_mode = rStr "Policy enforcement mode ('ENFORCING', 'PERMISSIVE', or 'DISABLED').";
+              decision_strategy = oStr "Decision strategy when multiple policies apply (default 'UNANIMOUS').";
+              allow_remote_resource_management = oBool "Allow resource management via the protection API.";
+              keep_defaults = oBool "Keep default resources / scopes / permissions Keycloak creates.";
+            }
+            "Enables fine-grained authorization on the client (resource server). Required for openid_client_authorization_* resources.";
 
         authentication_flow_binding_overrides = oSub {
           browser_id = oStr "Authentication flow id overriding the realm's browser flow for this client.";
@@ -2797,6 +2803,52 @@ let
         provider_alias = oStr "Alias of the IdP this permission applies to.";
         policy_type = oStr "Policy type (default 'client').";
         clients = oListStr "ClientIds of clients the permission is granted to.";
+      };
+    };
+
+    realm_user_profiles = {
+      type = "keycloak_realm_user_profile";
+      prefix = "realm_user_profile";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      # `attribute[].permissions` is a MaxItems:1 nested block inside a list
+      # element; the recursive wrapBlocks walks into list elements, so the
+      # dotted path picks it up.
+      blockAttrs = [ "attribute.permissions" ];
+      description = "Per-realm user-profile schema (attribute declarations + groups). Keyed by an arbitrary label (one resource per realm).";
+      attrs = {
+        unmanaged_attribute_policy = oStr "Policy for unmanaged attributes: 'DISABLED' (default), 'ENABLED', 'ADMIN_VIEW', or 'ADMIN_EDIT'.";
+        attribute = oListSub {
+          name = rStr "Attribute name.";
+          display_name = oStr "Display name (may be an i18n key).";
+          multi_valued = oBool "Allow multiple values.";
+          group = oStr "Display group the attribute belongs to.";
+          enabled_when_scope = oListStr "Scopes that make the attribute available.";
+          required_for_roles = oListStr "Roles for which the attribute is required.";
+          required_for_scopes = oListStr "Scopes for which the attribute is required.";
+          permissions = oSub {
+            view = lib.mkOption {
+              type = ty.listOf ty.str;
+              description = "Roles that can view the attribute (e.g. \"admin\", \"user\").";
+            };
+            edit = lib.mkOption {
+              type = ty.listOf ty.str;
+              description = "Roles that can edit the attribute.";
+            };
+          } "View / edit permissions for the attribute.";
+          validator = oListSub {
+            name = rStr "Validator id (e.g. \"length\", \"pattern\").";
+            config = oAttrsStr "Validator-specific configuration.";
+          } "Validators applied to the attribute.";
+          annotations = oAttrsStr "Free-form display annotations.";
+        } "List of user-profile attribute declarations.";
+        group = oListSub {
+          name = rStr "Group name.";
+          display_header = oStr "Display header.";
+          display_description = oStr "Display description.";
+          annotations = oAttrsStr "Free-form display annotations.";
+        } "List of user-profile groups (used to cluster attributes in the UI).";
       };
     };
 
