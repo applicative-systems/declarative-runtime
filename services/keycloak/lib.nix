@@ -71,6 +71,13 @@ let
       default = null;
       inherit description;
     };
+  oSub =
+    options: description:
+    lib.mkOption {
+      type = ty.nullOr (ty.submodule { inherit options; });
+      default = null;
+      inherit description;
+    };
 
   # ref spec shared by almost every non-realm resource: realm_id is a numeric
   # id the user can't know, so it must resolve to a managed realm by key.
@@ -160,6 +167,21 @@ let
     managedOnly = true;
     required = true;
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
+  };
+
+  # LDAP mappers reference their parent federation by managed key (numeric
+  # id). Used by every keycloak_ldap_*_mapper resource.
+  ldapFederationIdRef = {
+    attr = "ldap_user_federation_id";
+    targets = [
+      {
+        collection = "ldap_user_federations";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = true;
+    description = "Key of the managed LDAP user federation (services.keycloak.runtime.ldap_user_federations.<name>) this mapper attaches to.";
   };
 
   # identity provider mappers reference an IdP by alias; the alias may
@@ -2022,6 +2044,299 @@ let
         hour_end = oStr "Hour-of-day window end.";
         minute = oStr "Minute-of-hour window start.";
         minute_end = oStr "Minute-of-hour window end.";
+      };
+    };
+
+    ldap_user_federations = {
+      type = "keycloak_ldap_user_federation";
+      prefix = "ldap_user_federation";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      secrets = [ "bind_credential" ];
+      requiredAttrs = [
+        "username_ldap_attribute"
+        "rdn_ldap_attribute"
+        "uuid_ldap_attribute"
+        "user_object_classes"
+        "connection_url"
+        "users_dn"
+      ];
+      # `kerberos` and `cache` are TypeList+MaxItems:1 nested blocks --
+      # declared as oSub here, but their JSON emission will be wrong
+      # until R1 (block-list wrapping) lands. Avoid setting them.
+      description = "LDAP user federations (per-realm), keyed by name.";
+      attrs = {
+        name = oStr "Federation name. Defaults to the attribute key.";
+        enabled = oBool "Is the federation enabled?";
+        priority = oInt "Evaluation priority (lower runs first).";
+        import_enabled = oBool "Import users from LDAP into Keycloak's local DB.";
+        edit_mode = oStr "'READ_ONLY' (default), 'WRITABLE', or 'UNSYNCED'.";
+        sync_registrations = oBool "Write new user registrations back into LDAP.";
+        vendor = oStr "LDAP vendor: 'OTHER' (default), 'EDIRECTORY', 'AD', 'RHDS', 'TIVOLI'.";
+        username_ldap_attribute = oStr "LDAP attribute carrying the username.";
+        rdn_ldap_attribute = oStr "LDAP RDN attribute.";
+        uuid_ldap_attribute = oStr "LDAP attribute carrying a stable UUID.";
+        user_object_classes = oListStr "LDAP objectClasses for users.";
+        connection_url = oStr "LDAP connection URL (ldap[s]://host:port).";
+        users_dn = oStr "Base DN under which users live.";
+        bind_dn = oStr "DN used to authenticate to LDAP (omit for anonymous bind).";
+        bind_credential = oStr "Password for bind_dn. Prefer `bind_credentialFile`.";
+        custom_user_search_filter = oStr "Extra LDAP filter applied when looking up users.";
+        krb_principal_attribute = oStr "LDAP attribute carrying the Kerberos principal.";
+        debug = oStr "Enable LDAP debug logging ('true' / 'false').";
+        search_scope = oStr "Search scope: 'ONE_LEVEL' (default) or 'SUBTREE'.";
+        start_tls = oBool "Issue STARTTLS after connecting.";
+        connection_pooling = oBool "Pool LDAP connections.";
+        use_password_modify_extended_op = oBool "Use the LDAP password modify extended operation.";
+        validate_password_policy = oBool "Validate passwords against the realm's password policy.";
+        trust_email = oBool "Trust the email returned by LDAP without verification.";
+        use_truststore_spi = oStr "Truststore SPI usage: 'ALWAYS', 'ONLY_FOR_LDAPS' (default), or 'NEVER'.";
+        connection_timeout = oStr "LDAP connection timeout (duration string).";
+        read_timeout = oStr "LDAP read timeout (duration string).";
+        pagination = oBool "Enable LDAP pagination.";
+        batch_size_for_sync = oInt "Number of users per sync batch.";
+        full_sync_period = oInt "Full sync period in seconds (-1 disables).";
+        changed_sync_period = oInt "Incremental sync period in seconds (-1 disables).";
+        delete_default_mappers = oBool "Remove the default protocol mappers shipped with the federation.";
+        kerberos = oSub {
+          kerberos_realm = oStr "Kerberos realm.";
+          server_principal = oStr "Kerberos service principal of the LDAP server.";
+          key_tab = oStr "Path to the keytab file.";
+          use_kerberos_for_password_authentication = oBool "Use Kerberos for password auth.";
+        } "Kerberos integration sub-block. Needs R1 (block-list wrapping) to emit correctly.";
+        cache = oSub {
+          policy = oStr "Cache policy ('DEFAULT', 'EVICT_DAILY', 'EVICT_WEEKLY', 'MAX_LIFESPAN', 'NO_CACHE').";
+          max_lifespan = oStr "Max lifespan (for MAX_LIFESPAN).";
+          eviction_day = oStr "Eviction day (for EVICT_WEEKLY).";
+          eviction_hour = oStr "Eviction hour.";
+          eviction_minute = oStr "Eviction minute.";
+        } "Cache configuration sub-block. Needs R1 (block-list wrapping) to emit correctly.";
+      };
+    };
+
+    ldap_user_attribute_mappers = {
+      type = "keycloak_ldap_user_attribute_mapper";
+      prefix = "ldap_user_attribute_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "user_model_attribute"
+        "ldap_attribute"
+      ];
+      description = "Maps a keycloak user attribute to an LDAP attribute.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        user_model_attribute = oStr "Keycloak-side user attribute name.";
+        ldap_attribute = oStr "LDAP attribute name.";
+        read_only = oBool "Treat LDAP as the source of truth (writes are no-ops).";
+        always_read_value_from_ldap = oBool "Re-read value from LDAP on every access.";
+        is_mandatory_in_ldap = oBool "LDAP enforces presence of the attribute.";
+        attribute_force_default = oBool "Force the default value when the LDAP attribute is missing.";
+        attribute_default_value = oStr "Default value used when LDAP returns none.";
+        is_binary_attribute = oBool "Treat the LDAP attribute as binary.";
+      };
+    };
+
+    ldap_group_mappers = {
+      type = "keycloak_ldap_group_mapper";
+      prefix = "ldap_group_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "ldap_groups_dn"
+        "group_name_ldap_attribute"
+        "group_object_classes"
+        "membership_ldap_attribute"
+        "membership_user_ldap_attribute"
+      ];
+      description = "Maps LDAP groups onto keycloak groups.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        ldap_groups_dn = oStr "Base DN under which groups live.";
+        group_name_ldap_attribute = oStr "LDAP attribute carrying the group name.";
+        group_object_classes = oListStr "LDAP objectClasses for groups.";
+        preserve_group_inheritance = oBool "Preserve nested group hierarchy.";
+        ignore_missing_groups = oBool "Ignore membership entries pointing to missing groups.";
+        membership_ldap_attribute = oStr "LDAP attribute on the group holding member references.";
+        membership_attribute_type = oStr "'DN' (default) or 'UID'.";
+        membership_user_ldap_attribute = oStr "LDAP attribute on the user that uniquely identifies them.";
+        groups_ldap_filter = oStr "Extra LDAP filter for group lookups.";
+        mode = oStr "Mapper mode: 'READ_ONLY' (default), 'LDAP_ONLY', or 'IMPORT'.";
+        user_roles_retrieve_strategy = oStr "Strategy for resolving a user's groups.";
+        memberof_ldap_attribute = oStr "LDAP attribute holding direct group memberships (memberOf-style).";
+        mapped_group_attributes = oListStr "LDAP group attributes preserved into keycloak.";
+        drop_non_existing_groups_during_sync = oBool "Delete keycloak groups missing from LDAP during sync.";
+        groups_path = oStr "Path under which mapped groups live (e.g. `/ldap-groups`).";
+      };
+    };
+
+    ldap_role_mappers = {
+      type = "keycloak_ldap_role_mapper";
+      prefix = "ldap_role_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "ldap_roles_dn"
+        "role_name_ldap_attribute"
+        "role_object_classes"
+        "membership_ldap_attribute"
+        "membership_user_ldap_attribute"
+      ];
+      description = "Maps LDAP roles onto keycloak realm or client roles.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        ldap_roles_dn = oStr "Base DN under which roles live.";
+        role_name_ldap_attribute = oStr "LDAP attribute carrying the role name.";
+        role_object_classes = oListStr "LDAP objectClasses for roles.";
+        membership_ldap_attribute = oStr "LDAP attribute on the role holding member references.";
+        membership_attribute_type = oStr "'DN' (default) or 'UID'.";
+        membership_user_ldap_attribute = oStr "LDAP attribute on the user that uniquely identifies them.";
+        roles_ldap_filter = oStr "Extra LDAP filter for role lookups.";
+        mode = oStr "Mapper mode: 'READ_ONLY' (default), 'LDAP_ONLY', or 'IMPORT'.";
+        user_roles_retrieve_strategy = oStr "Strategy for resolving a user's roles.";
+        memberof_ldap_attribute = oStr "LDAP attribute holding direct role memberships.";
+        use_realm_roles_mapping = oBool "Map onto realm roles (true) or client roles (false).";
+        client_id = oStr "ClientId roles are scoped to when `use_realm_roles_mapping = false`.";
+      };
+    };
+
+    ldap_hardcoded_role_mappers = {
+      type = "keycloak_ldap_hardcoded_role_mapper";
+      prefix = "ldap_hardcoded_role_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [ "role" ];
+      description = "Grants a hardcoded role to every LDAP-federated user.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        role = oStr "Realm or `client.role` name granted.";
+      };
+    };
+
+    ldap_hardcoded_attribute_mappers = {
+      type = "keycloak_ldap_hardcoded_attribute_mapper";
+      prefix = "ldap_hardcoded_attribute_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "attribute_name"
+        "attribute_value"
+      ];
+      description = "Sets a hardcoded user attribute on every LDAP-federated user.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        attribute_name = oStr "Name of the attribute to set.";
+        attribute_value = oStr "Value of the attribute.";
+      };
+    };
+
+    ldap_hardcoded_group_mappers = {
+      type = "keycloak_ldap_hardcoded_group_mapper";
+      prefix = "ldap_hardcoded_group_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [ "group" ];
+      description = "Adds every LDAP-federated user to a hardcoded group.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        group = oStr "Group path (e.g. `/engineering`) every federated user joins.";
+      };
+    };
+
+    ldap_msad_user_account_control_mappers = {
+      type = "keycloak_ldap_msad_user_account_control_mapper";
+      prefix = "ldap_msad_uac_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      description = "MSAD userAccountControl integration mapper (enables / disables and locks out users).";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        ldap_password_policy_hints_enabled = oBool "Forward keycloak password-policy hints to MSAD.";
+      };
+    };
+
+    ldap_msad_lds_user_account_control_mappers = {
+      type = "keycloak_ldap_msad_lds_user_account_control_mapper";
+      prefix = "ldap_msad_lds_uac_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      description = "MSAD LDS userAccountControl integration mapper.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+      };
+    };
+
+    ldap_full_name_mappers = {
+      type = "keycloak_ldap_full_name_mapper";
+      prefix = "ldap_full_name_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [ "ldap_full_name_attribute" ];
+      description = "Splits/joins a single LDAP full-name attribute into keycloak's first / last name fields.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        ldap_full_name_attribute = oStr "LDAP attribute carrying the full name.";
+        read_only = oBool "Treat LDAP as source of truth.";
+        write_only = oBool "Only push the full name back to LDAP.";
+      };
+    };
+
+    ldap_custom_mappers = {
+      type = "keycloak_ldap_custom_mapper";
+      prefix = "ldap_custom_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "provider_id"
+        "provider_type"
+      ];
+      description = "Escape hatch for an LDAP mapper implementation without a dedicated typed resource.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        provider_id = oStr "Provider-id of the mapper implementation.";
+        provider_type = oStr "SPI type the provider implements.";
+        config = oAttrsStr "Mapper-specific configuration.";
       };
     };
 
