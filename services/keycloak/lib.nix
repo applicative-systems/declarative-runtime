@@ -2340,6 +2340,48 @@ let
       };
     };
 
+    custom_user_federations = {
+      type = "keycloak_custom_user_federation";
+      prefix = "custom_user_federation";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "provider_id" ];
+      description = "Custom user federation backed by a JPA / SPI provider.";
+      attrs = {
+        name = oStr "Federation name. Defaults to the attribute key.";
+        parent_id = oStr "Optional parent federation id.";
+        provider_id = oStr "Provider-id of the federation implementation.";
+        enabled = oBool "Is the federation enabled?";
+        priority = oInt "Evaluation priority (lower runs first).";
+        cache_policy = oStr "Cache policy: 'DEFAULT', 'EVICT_DAILY', 'EVICT_WEEKLY', 'MAX_LIFESPAN', 'NO_CACHE'.";
+        full_sync_period = oInt "Full sync period in seconds (-1 disables).";
+        changed_sync_period = oInt "Incremental sync period in seconds (-1 disables).";
+        config = oAttrsStr "Provider-specific configuration map.";
+      };
+    };
+
+    hardcoded_attribute_mappers = {
+      type = "keycloak_hardcoded_attribute_mapper";
+      prefix = "hardcoded_attribute_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        ldap_user_federation = ldapFederationIdRef;
+      };
+      requiredAttrs = [
+        "attribute_name"
+        "attribute_value"
+      ];
+      description = "Sets a hardcoded user attribute on every federated user. Distinct from ldap_hardcoded_attribute_mapper and hardcoded_attribute_identity_provider_mapper.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        attribute_name = oStr "Name of the attribute to set.";
+        attribute_value = oStr "Value of the attribute.";
+      };
+    };
+
     openid_client_authorization_user_policies = {
       type = "keycloak_openid_client_authorization_user_policy";
       prefix = "openid_client_authz_user_policy";
