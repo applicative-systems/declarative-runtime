@@ -53,6 +53,21 @@ in
                 "userProfileEnabled" = "true";
               };
             };
+
+            # realm-level role + default-roles binding
+            roles.acme_engineer = {
+              realm = "acme";
+              name = "engineer";
+              description = "ACME engineering role";
+            };
+            default_roles.acme = {
+              realm = "acme";
+              default_roles = [
+                "offline_access"
+                "uma_authorization"
+                "engineer"
+              ];
+            };
           };
         };
 
@@ -102,6 +117,26 @@ in
           assert acme.get("passwordPolicy") == "length(8)", f"password_policy: {acme}"
           assert acme.get("attributes", {}).get("userProfileEnabled") == "true", \
               f"attributes: {acme}"
+
+      with subtest("realm role exists with description"):
+          tok = admin_token()
+          role = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/roles/engineer"
+          ))
+          assert role.get("description") == "ACME engineering role", f"role: {role}"
+
+      with subtest("default-roles binding includes the new role"):
+          tok = admin_token()
+          # the composite "default-roles-<realm>" role aggregates the realm's
+          # default roles; we read its composites to assert membership.
+          composites = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/roles/default-roles-acme/composites"
+          ))
+          names = {r["name"] for r in composites}
+          for r in ("offline_access", "uma_authorization", "engineer"):
+              assert r in names, f"default role {r!r} missing from {names}"
 
       with subtest("secrets did not leak"):
           tfjson = machine.succeed(
