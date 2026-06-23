@@ -19,8 +19,7 @@ step with the rest of your system.
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # This repository.
-    declarative-services.url = "github:youruser/terraform-providers";
+    declarative-services.url = "github:applicative-systems/terraform-providers";
     declarative-services.inputs.nixpkgs.follows = "nixpkgs";
   };
 

@@ -1,65 +1,22 @@
-# Keycloak-provider specifics: the keycloak-wrapped OpenTofu executor and the
-# .tf.json generation for a Keycloak pairing. The provider-agnostic helpers
-# (label/file/reconciler) live in modules/lib and are specialized here for the
-# keycloak/keycloak provider (in nixpkgs as
-# `pkgs.terraform-providers.keycloak_keycloak`).
-#
-# The first-wave resource surface is `keycloak_realm` only; follow-ups add
-# clients, scopes, roles, groups, users, identity providers, and mappers in
-# the same shape (the `resourceTypes` record is extended; the renderer is
-# already provider-agnostic).
-#
-# Two divergences from the forgejo template, forced by upstream Keycloak's
-# shape:
-#
-#   1. Auth is OAuth2 client-credentials, not a single API token. Two
-#      sensitive Terraform variables are emitted: `keycloak_client_secret`
-#      (the primary, threaded through the generic reconciler as `tokenVar`)
-#      and `keycloak_client_id` (an extra credential id flowed through the
-#      generic reconciler's `credentials` map). Both are fed from systemd
-#      `LoadCredential=` at apply time, never written to the world-readable
-#      store.
-#
-#   2. The upstream NixOS keycloak module runs as `DynamicUser=true` with no
-#      persistent state directory. The module therefore enables the new
-#      `dynamicUser`/`stateDirectory` modes of `mkReconcileService` so the
-#      reconciler is allocated the same hashed UID as `keycloak.service` and
-#      writes its Terraform state into a systemd-managed StateDirectory at
-#      `/var/lib/keycloak/declarative-terraform`.
-#
-# Imported as `import ./lib.nix { inherit pkgs; }` from the Keycloak module
-# and checks.
+# FIXME this only provisions keycloak_realm resources for now
 { pkgs }:
 let
   inherit (pkgs) lib;
   genlib = import ../../modules/lib { inherit pkgs; };
   inherit (genlib) tfLabel;
 
-  # In-nixpkgs provider; pin `required_providers` to its packaged version so
-  # the offline plugin mirror always matches the manifest.
   provider = pkgs.terraform-providers.keycloak_keycloak;
   providerVersion = provider.version;
 
-  # OAuth2 client-credentials grant: two paired sensitive variables.
-  # `tokenVar` is the primary credential flowed through the generic
-  # reconciler; `clientIdVar` is exported so module.nix can wire the matching
-  # bootstrap-produced (or operator-supplied) file into the reconciler's
-  # `credentials` map.
+  # credential names for the (less privileged) keycloak provisioner
   tokenVar = "keycloak_client_secret";
   clientIdVar = "keycloak_client_id";
 
-  # OpenTofu wrapped with the keycloak/keycloak provider. The provider binary
-  # lives in the wrapper's NIX_TERRAFORM_PLUGIN_DIR, so `tofu init`/`apply`
-  # resolve it with no registry access.
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
 
   ty = lib.types;
 
-  # Per-attribute option constructors. `o*` declare an *optional* attribute
-  # (`nullOr T`, default null -> omitted from the generated `.tf.json` when
-  # unset); `r*` declare a *required* attribute (no default -> a missing value
-  # is an eval-time error). Each carries the exact value shape the provider
-  # accepts.
+  # o* for optional
   oStr =
     description:
     lib.mkOption {
@@ -75,7 +32,7 @@ let
       inherit description;
     };
 
-  # The full keycloak/keycloak resource surface (first wave: realm only). Per
+  # The full keycloak/keycloak resource surface. Per
   # resource:
   #   type            the `keycloak_*` resource type
   #   prefix          unique Terraform label prefix
@@ -105,11 +62,7 @@ let
     };
   };
 
-  # One option collection per resource: an `attrsOf` strictly-typed submodule.
-  # The submodule's options are the resource's settable attributes, plus the
-  # reference inputs (resolved into Terraform references at generation) and
-  # one `<attr>File` input per secret. No `freeformType`: an undeclared
-  # attribute is a definition error.
+  # generate nixos options for resources from resourceTypes
   resourceOptions = lib.mapAttrs (
     _: spec:
     lib.mkOption {
@@ -150,10 +103,7 @@ let
     }
   ) resourceTypes;
 
-  # Recursively drop null-valued attributes (unset options) and the submodule
-  # bookkeeping key `_module`, so the generated JSON carries only what the
-  # user actually set -- at every nesting level, including any typed nested
-  # objects added by later resources.
+  # remove null-valued and _module attributes
   cleanNulls =
     v:
     if builtins.isAttrs v then
@@ -163,16 +113,8 @@ let
     else
       v;
 
-  # Build the Terraform JSON config for a Keycloak pairing from the module's
-  # cfg, together with the (id -> host path) credential map for any
-  # host-file-sourced secrets. Returns { config; credentials; }.
-  #
-  # Contains NO provider secret: the `client_id`/`client_secret` pair and
-  # every `<attr>File` secret are supplied at apply time as sensitive input
-  # variables fed from systemd `LoadCredential=`, never written to the store.
-  # A *literal* secret attribute (e.g. a value set directly) still lands in
-  # the world-readable store -- use the matching `<attr>File` option to avoid
-  # that.
+  # build JSON config and credential map (id -> host path)
+  # secrets are provided at apply time
   keycloakTfConfig =
     cfg:
     let
@@ -267,13 +209,8 @@ let
               null
           ) (spec.requiredAttrs or [ ]);
         in
-        # deepSeq forces the validation thunks (whose results are otherwise
-        # unused) so a violated check `throw`s here. These live in the
-        # generator, not in NixOS `config.assertions`, because assertions only
-        # fire during a full NixOS system evaluation -- whereas
-        # `keycloakTfConfig` is also called standalone (e.g. tests, `nix
-        # eval`), where assertions would be silently skipped and a malformed
-        # config would surface opaquely at `tofu apply`.
+        # use deepSeq to force evaluation of checks
+        # (these are not config.assertions so they can be used outside a nixos system build)
         lib.nameValuePair (tfLabel spec.prefix key) (
           builtins.deepSeq [ reqSecretChecks reqAttrChecks ] (
             cleanNulls (base // nameInject // refAttrs // secretAttrs)
@@ -285,8 +222,7 @@ let
         c: spec: lib.nameValuePair spec.type (lib.mapAttrs' (renderItem c spec) cfg.${c})
       ) nonEmpty;
 
-      # Every host-file-sourced secret across the config, for the sensitive
-      # input variables and the (id -> host path) credential map.
+      # combine sensitive variables with (id -> host path) credential map
       allSecrets = lib.concatLists (
         lib.mapAttrsToList (
           c: spec: lib.concatLists (lib.mapAttrsToList (key: item: itemSecrets c spec key item) cfg.${c})
@@ -345,7 +281,5 @@ in
     clientIdVar
     ;
 
-  # The generic run-once reconciler, specialized with the keycloak executor
-  # and the keycloak_client_secret credential.
   mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
 }

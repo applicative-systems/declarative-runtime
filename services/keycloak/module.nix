@@ -1,22 +1,3 @@
-# Keycloak <-> keycloak/keycloak provider pairing.
-#
-# Enables the upstream `services.keycloak` module unchanged, and adds a
-# run-once reconciler that applies declarative runtime state (realms, ...)
-# against the live Keycloak admin API once `keycloak.service` is up. Unless
-# `clientIdFile` and `clientSecretFile` are both supplied, a companion
-# oneshot (`declarative-keycloak-bootstrap.service`) mints a dedicated
-# service-account OIDC client in the `master` realm and grants it
-# `realm-admin` on the `realm-management` client; the reconciler then
-# authenticates via OAuth2 client-credentials grant. The bootstrap relies
-# on the operator providing the master-realm admin's password via
-# `bootstrapAdminPasswordFile` (read with systemd `LoadCredential=`,
-# never copied into the world-readable Nix store).
-#
-# Upstream Keycloak uses `DynamicUser=true` with no persistent state dir;
-# the reconciler enables the corresponding mode of mkReconcileService so it
-# is allocated the same hashed `keycloak` UID as `keycloak.service` and
-# writes Terraform state into `/var/lib/keycloak/declarative-terraform`
-# via systemd `StateDirectory=`.
 {
   config,
   lib,
@@ -38,8 +19,8 @@ let
 
   defaultBaseUrl = "http://localhost:${toString keycloak.settings.http-port}";
 
-  # Companion oneshot that mints the reconciler's service-account OIDC
-  # client. Only wired in when the operator does not supply their own
+  # Companion oneshot that creates the reconciler's service-account OIDC
+  # client. Only used when the operator does not supply their own
   # (clientIdFile, clientSecretFile) pair.
   bootstrapServiceName = "declarative-keycloak-bootstrap";
   bootstrapClient = cfg.clientIdFile == null;
@@ -171,7 +152,7 @@ in
           pkgs.coreutils
         ];
         environment = {
-          # kcadm.sh stashes its token cache under $HOME/.keycloak; under
+          # kcadm.sh places its token cache under $HOME/.keycloak; under
           # DynamicUser there is no real home, so direct it into the
           # StateDirectory (writable and owned by the same hashed UID).
           HOME = "/var/lib/${bootstrapServiceName}";
@@ -193,16 +174,13 @@ in
           client_id_file="$STATE_DIRECTORY/client_id"
           client_secret_file="$STATE_DIRECTORY/client_secret"
 
-          # Mint-once: the persisted credential pair is the "already
-          # bootstrapped" marker. /var/lib survives reboots, so this oneshot
-          # is no-op on every boot after the first successful run.
+          # the persisted credential pair is the "already bootstrapped" marker.
+          # /var/lib survives reboots, so this won't run on every boot after the first successful run
           if [ -s "$client_id_file" ] && [ -s "$client_secret_file" ]; then
             exit 0
           fi
 
-          # `After=keycloak.service` waits for the Type=notify ready flag,
-          # but Quarkus keeps initialising for tens of seconds past that;
-          # poll the admin endpoint explicitly before talking to kcadm.
+          # poll max 3 minutes until keycloak has fully booted
           for _ in $(seq 1 90); do
             if curl -fsS -o /dev/null "${cfg.baseUrl}/realms/master"; then
               break
@@ -238,9 +216,8 @@ in
           sa_uid="$(kcadm.sh get clients/$client_uuid/service-account-user -r master \
             | jq -r .id)"
 
-          # The master realm's realm-level `admin` is a composite role that
-          # grants global admin across every realm; assigning it to the
-          # service-account user gives the reconciler full reach.
+          # The master realm's `admin` grants global admin across every realm;
+          # assigning it to the service-account user gives the reconciler full access.
           # Idempotent: kcadm tolerates re-grant.
           kcadm.sh add-roles -r master \
             --uid "$sa_uid" \
