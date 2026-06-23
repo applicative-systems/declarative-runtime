@@ -2782,6 +2782,55 @@ let
         };
     };
 
+    openid_client_permissions = {
+      type = "keycloak_openid_client_permissions";
+      prefix = "openid_client_permissions";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = {
+          attr = "client_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client these fine-grained permissions apply to.";
+        };
+      };
+      blockAttrs = [
+        "view_scope"
+        "manage_scope"
+        "configure_scope"
+        "map_roles_scope"
+        "map_roles_client_scope_scope"
+        "map_roles_composite_scope"
+        "token_exchange_scope"
+      ];
+      description = "Fine-grained authorization permissions on an openid_client; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
+      attrs =
+        let
+          scopePerm = oSub {
+            policies = oListStr "Names / ids of policies that apply to this scope.";
+            description = oStr "Description.";
+            decision_strategy = oStr "Decision strategy ('UNANIMOUS', 'AFFIRMATIVE', 'CONSENSUS').";
+          };
+        in
+        {
+          view_scope = scopePerm "View-scope permission block.";
+          manage_scope = scopePerm "Manage-scope permission block.";
+          configure_scope = scopePerm "Configure-scope permission block.";
+          map_roles_scope = scopePerm "Map-roles-scope permission block.";
+          map_roles_client_scope_scope = scopePerm "Map-roles-client-scope-scope permission block.";
+          map_roles_composite_scope = scopePerm "Map-roles-composite-scope permission block.";
+          token_exchange_scope = scopePerm "Token-exchange-scope permission block.";
+        };
+    };
+
     users_permissions = {
       type = "keycloak_users_permissions";
       prefix = "users_permissions";
