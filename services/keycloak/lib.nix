@@ -378,6 +378,39 @@ let
         exhaustive = oBool "If true, only the listed groups remain joined; otherwise the listed groups are added without removing others.";
       };
     };
+
+    openid_client_scopes = {
+      type = "keycloak_openid_client_scope";
+      prefix = "openid_client_scope";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      description = "OpenID client scopes (per-realm), keyed by scope name.";
+      attrs = {
+        name = oStr "Scope name. Defaults to the attribute key.";
+        description = oStr "Scope description.";
+        consent_screen_text = oStr "Text shown on the consent screen.";
+        include_in_token_scope = oBool "Include the scope name in the issued token's `scope` claim?";
+        gui_order = oInt "Display order in the admin UI.";
+        extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
+      };
+    };
+
+    saml_client_scopes = {
+      type = "keycloak_saml_client_scope";
+      prefix = "saml_client_scope";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      description = "SAML client scopes (per-realm), keyed by scope name.";
+      attrs = {
+        name = oStr "Scope name. Defaults to the attribute key.";
+        description = oStr "Scope description.";
+        consent_screen_text = oStr "Text shown on the consent screen.";
+        gui_order = oInt "Display order in the admin UI.";
+        extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes

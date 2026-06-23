@@ -111,6 +111,15 @@ in
               group_ids = [ "\${keycloak_group.group_acme_eng.id}" ];
               exhaustive = false;
             };
+
+            openid_client_scopes.acme_profile = {
+              realm = "acme";
+              name = "acme-profile";
+              description = "ACME profile scope";
+              consent_screen_text = "Access your ACME profile";
+              include_in_token_scope = true;
+              gui_order = 10;
+            };
           };
         };
 
@@ -204,6 +213,18 @@ in
           ))
           assert any(g["name"] == "engineering" for g in alice_groups), \
               f"engineering group missing on alice: {alice_groups}"
+
+      with subtest("openid client scope exists with declared attrs"):
+          tok = admin_token()
+          scopes = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/client-scopes"
+          ))
+          s = next((x for x in scopes if x["name"] == "acme-profile"), None)
+          assert s, f"acme-profile scope missing: {[x['name'] for x in scopes]}"
+          assert s.get("description") == "ACME profile scope", f"scope: {s}"
+          assert s.get("attributes", {}).get("consent.screen.text") == "Access your ACME profile", \
+              f"consent_screen_text: {s}"
 
       with subtest("group hierarchy + role assignment"):
           tok = admin_token()
