@@ -176,6 +176,13 @@ in
               user_attribute = "email";
               claim_name = "email";
             };
+
+            # Top-level authentication flow.
+            authentication_flows.acme_passkey = {
+              realm = "acme";
+              alias = "acme-passkey";
+              description = "Passkey login flow";
+            };
           };
         };
 
@@ -286,6 +293,16 @@ in
               "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
           )
           assert "fakesecret" not in tfjson, "google IdP client_secret leaked into .tf.json"
+
+      with subtest("authentication flow exists"):
+          tok = admin_token()
+          flows = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/authentication/flows"
+          ))
+          flow = next((f for f in flows if f.get("alias") == "acme-passkey"), None)
+          assert flow, f"acme-passkey flow missing: {[f.get('alias') for f in flows]}"
+          assert flow.get("description") == "Passkey login flow", f"flow: {flow}"
 
       with subtest("IdP mapper attached to google via managed alias ref"):
           tok = admin_token()

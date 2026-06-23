@@ -1535,6 +1535,134 @@ let
         identity_provider_mapper = oStr "Provider-id of the mapper implementation.";
       };
     };
+
+    authentication_flows = {
+      type = "keycloak_authentication_flow";
+      prefix = "authentication_flow";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmRef;
+      description = "Top-level authentication flows (per-realm), keyed by alias.";
+      attrs = {
+        alias = oStr "Flow alias. Defaults to the attribute key.";
+        provider_id = oStr "Flow implementation: 'basic-flow' (default) or 'client-flow'.";
+        description = oStr "Flow description.";
+      };
+    };
+
+    authentication_subflows = {
+      type = "keycloak_authentication_subflow";
+      prefix = "authentication_subflow";
+      nameAttr = "alias";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        parent_flow = {
+          attr = "parent_flow_alias";
+          targets = [
+            {
+              collection = "authentication_flows";
+              field = "alias";
+            }
+            {
+              collection = "authentication_subflows";
+              field = "alias";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          description = "Alias of the parent flow (managed key or literal alias).";
+        };
+      };
+      description = "Authentication subflows nested under a parent flow, keyed by alias.";
+      attrs = {
+        alias = oStr "Subflow alias. Defaults to the attribute key.";
+        provider_id = oStr "Subflow implementation: 'basic-flow' (default), 'form-flow', or 'client-flow'.";
+        description = oStr "Subflow description.";
+        authenticator = oStr "Authenticator id (for form / conditional subflows).";
+        requirement = oStr "Execution requirement ('REQUIRED', 'ALTERNATIVE', 'OPTIONAL', 'CONDITIONAL', 'DISABLED').";
+        priority = oInt "Display / evaluation order within the parent flow.";
+      };
+    };
+
+    authentication_executions = {
+      type = "keycloak_authentication_execution";
+      prefix = "authentication_execution";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        parent_flow = {
+          attr = "parent_flow_alias";
+          targets = [
+            {
+              collection = "authentication_flows";
+              field = "alias";
+            }
+            {
+              collection = "authentication_subflows";
+              field = "alias";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          description = "Alias of the parent flow / subflow (managed key or literal alias).";
+        };
+      };
+      requiredAttrs = [ "authenticator" ];
+      description = "Authentication executions inside a flow / subflow, keyed by an arbitrary label.";
+      attrs = {
+        authenticator = oStr "Authenticator provider id (e.g. 'auth-username-password-form').";
+        requirement = oStr "Execution requirement ('REQUIRED', 'ALTERNATIVE', 'OPTIONAL', 'CONDITIONAL', 'DISABLED').";
+        priority = oInt "Display / evaluation order within the parent flow.";
+      };
+    };
+
+    authentication_execution_configs = {
+      type = "keycloak_authentication_execution_config";
+      prefix = "authentication_execution_config";
+      nameAttr = "alias";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        execution = {
+          attr = "execution_id";
+          targets = [
+            {
+              collection = "authentication_executions";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed authentication_execution (services.keycloak.runtime.authentication_executions.<name>) this config attaches to.";
+        };
+      };
+      requiredAttrs = [ "config" ];
+      description = "Per-execution configuration map, keyed by config alias.";
+      attrs = {
+        alias = oStr "Config alias. Defaults to the attribute key.";
+        config = oAttrsStr "Execution config key/value pairs.";
+      };
+    };
+
+    authentication_bindings = {
+      type = "keycloak_authentication_bindings";
+      prefix = "authentication_bindings";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      description = "Realm-level authentication flow bindings (browser / registration / direct grant / etc.), keyed by an arbitrary label.";
+      attrs = {
+        browser_flow = oStr "Alias of the flow bound to the browser flow.";
+        registration_flow = oStr "Alias of the flow bound to the registration flow.";
+        direct_grant_flow = oStr "Alias of the flow bound to the direct-grant flow.";
+        reset_credentials_flow = oStr "Alias of the flow bound to the reset-credentials flow.";
+        client_authentication_flow = oStr "Alias of the flow bound to the client-auth flow.";
+        docker_authentication_flow = oStr "Alias of the flow bound to the docker-auth flow.";
+        first_broker_login_flow = oStr "Alias of the flow bound to the first-broker-login flow.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
