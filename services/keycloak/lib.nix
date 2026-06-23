@@ -202,6 +202,104 @@ let
         default_roles = oListStr "Role names auto-granted to every new user of the realm.";
       };
     };
+
+    groups = {
+      type = "keycloak_group";
+      prefix = "group";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        parent = {
+          attr = "parent_id";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = false;
+          description = "Optional parent group (key of another managed group) for nested groups.";
+        };
+      };
+      description = "Keycloak groups, keyed by group name.";
+      attrs = {
+        name = oStr "Group name. Defaults to the attribute key.";
+        description = oStr "Group description.";
+        attributes = oAttrsStr "Free-form group attribute map.";
+      };
+    };
+
+    default_groups = {
+      type = "keycloak_default_groups";
+      prefix = "default_groups";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "group_ids" ];
+      description = "Realm-level default groups auto-joined by new users, keyed by an arbitrary label.";
+      attrs = {
+        # opaque list: users supply group UUIDs or ${keycloak_group.X.id}
+        # interpolations directly. Managed list-refs land later.
+        group_ids = oListStr "Group UUIDs (or `\${keycloak_group.X.id}` refs) new users auto-join.";
+      };
+    };
+
+    group_memberships = {
+      type = "keycloak_group_memberships";
+      prefix = "group_membership";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        group = {
+          attr = "group_id";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed group (services.keycloak.runtime.groups.<name>) the members are added to.";
+        };
+      };
+      requiredAttrs = [ "members" ];
+      description = "Keycloak group memberships, keyed by an arbitrary label.";
+      attrs = {
+        members = oListStr "Usernames of users to add to the group.";
+      };
+    };
+
+    group_roles = {
+      type = "keycloak_group_roles";
+      prefix = "group_roles";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        group = {
+          attr = "group_id";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed group (services.keycloak.runtime.groups.<name>) to assign roles to.";
+        };
+      };
+      requiredAttrs = [ "role_ids" ];
+      description = "Role assignments for a group, keyed by an arbitrary label.";
+      attrs = {
+        role_ids = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) granted to the group.";
+        exhaustive = oBool "If true, only the listed roles remain assigned; if false, listed roles are added without removing others.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
