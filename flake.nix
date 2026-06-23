@@ -34,11 +34,13 @@
       # runtime state via OpenTofu after the primary unit starts.
       nixosModules.default = ./modules;
       nixosModules.forgejo = ./services/forgejo/module.nix;
+      nixosModules.keycloak = ./services/keycloak/module.nix;
 
       checks = forAllSystems (
         { pkgs, system }:
         # Per-service checks (one attrset per pairing under ./services/<svc>).
         (import ./services/forgejo/checks.nix { inherit pkgs self; })
+        // (import ./services/keycloak/checks.nix { inherit pkgs self; })
         // {
           formatting = treefmtEval.${system}.config.build.check self;
         }
