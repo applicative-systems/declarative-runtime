@@ -300,6 +300,84 @@ let
         exhaustive = oBool "If true, only the listed roles remain assigned; if false, listed roles are added without removing others.";
       };
     };
+
+    users = {
+      type = "keycloak_user";
+      prefix = "user";
+      nameAttr = "username";
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "username" ];
+      # initial_password / federated_identity are nested blocks with a Sensitive
+      # `value`; they need <attr>File support for nested attrs and land later.
+      description = "Keycloak users, keyed by username (must be lowercase).";
+      attrs = {
+        username = oStr "Username (lowercase). Defaults to the attribute key.";
+        email = oStr "Email address.";
+        email_verified = oBool "Has the user verified their email?";
+        first_name = oStr "First name.";
+        last_name = oStr "Last name.";
+        enabled = oBool "Is the user enabled?";
+        attributes = oAttrsStr "Free-form user attribute map.";
+        required_actions = oListStr "Required actions on next login (e.g. \"VERIFY_EMAIL\", \"UPDATE_PASSWORD\").";
+      };
+    };
+
+    user_roles = {
+      type = "keycloak_user_roles";
+      prefix = "user_roles";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        user = {
+          attr = "user_id";
+          targets = [
+            {
+              collection = "users";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed user (services.keycloak.runtime.users.<name>) to assign roles to.";
+        };
+      };
+      requiredAttrs = [ "role_ids" ];
+      description = "Role assignments for a user, keyed by an arbitrary label.";
+      attrs = {
+        role_ids = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) granted to the user.";
+        exhaustive = oBool "If true, only the listed roles remain assigned; otherwise the listed roles are added without removing others.";
+      };
+    };
+
+    user_groups = {
+      type = "keycloak_user_groups";
+      prefix = "user_groups";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        user = {
+          attr = "user_id";
+          targets = [
+            {
+              collection = "users";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed user (services.keycloak.runtime.users.<name>) to add to groups.";
+        };
+      };
+      requiredAttrs = [ "group_ids" ];
+      description = "Group memberships for a user, keyed by an arbitrary label.";
+      attrs = {
+        group_ids = oListStr "Group UUIDs (or `\${keycloak_group.X.id}` refs) the user joins.";
+        exhaustive = oBool "If true, only the listed groups remain joined; otherwise the listed groups are added without removing others.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
