@@ -68,6 +68,25 @@ in
                 "engineer"
               ];
             };
+
+            # group hierarchy: parent_id resolves to a managed group
+            groups.acme_eng = {
+              realm = "acme";
+              name = "engineering";
+              attributes."team" = "infra";
+            };
+            groups.acme_eng_backend = {
+              realm = "acme";
+              name = "backend";
+              parent = "acme_eng";
+            };
+            group_roles.acme_eng_admins = {
+              realm = "acme";
+              group = "acme_eng";
+              # raw role id reference: managed list-refs not yet supported.
+              role_ids = [ "\${keycloak_role.role_acme_engineer.id}" ];
+              exhaustive = true;
+            };
           };
         };
 
@@ -137,6 +156,29 @@ in
           names = {r["name"] for r in composites}
           for r in ("offline_access", "uma_authorization", "engineer"):
               assert r in names, f"default role {r!r} missing from {names}"
+
+      with subtest("group hierarchy + role assignment"):
+          tok = admin_token()
+          groups = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/groups"
+          ))
+          eng = next((g for g in groups if g["name"] == "engineering"), None)
+          assert eng, f"engineering group missing: {groups}"
+          # KC 26 returns subGroupCount but a paginated `subGroups` (empty by
+          # default); the /children endpoint gives the actual subgroup list.
+          children = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              f"http://localhost:8080/admin/realms/acme/groups/{eng['id']}/children"
+          ))
+          assert any(c["name"] == "backend" for c in children), \
+              f"backend subgroup missing under engineering: {children}"
+          eng_roles = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              f"http://localhost:8080/admin/realms/acme/groups/{eng['id']}/role-mappings/realm"
+          ))
+          assert any(r["name"] == "engineer" for r in eng_roles), \
+              f"engineer role not assigned to engineering group: {eng_roles}"
 
       with subtest("secrets did not leak"):
           tfjson = machine.succeed(
