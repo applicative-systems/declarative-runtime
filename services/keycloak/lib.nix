@@ -65,6 +65,21 @@ let
       inherit description;
     };
 
+  # ref spec shared by almost every non-realm resource: realm_id is a numeric
+  # id the user can't know, so it must resolve to a managed realm by key.
+  realmRef = {
+    attr = "realm_id";
+    targets = [
+      {
+        collection = "realms";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = true;
+    description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) this belongs to.";
+  };
+
   # The full keycloak/keycloak resource surface. Per
   # resource:
   #   type            the `keycloak_*` resource type
@@ -154,6 +169,37 @@ let
         # default client scopes (referenced by name)
         default_default_client_scopes = oListStr "Default client scopes auto-granted to new clients.";
         default_optional_client_scopes = oListStr "Optional client scopes available to new clients.";
+      };
+    };
+
+    roles = {
+      type = "keycloak_role";
+      prefix = "role";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      # client_id ref (-> keycloak_openid_client) lands when openid_clients do.
+      description = "Keycloak roles (realm-level by default), keyed by role name.";
+      attrs = {
+        name = oStr "Role name. Defaults to the attribute key.";
+        description = oStr "Role description.";
+        # opaque list: users supply role UUIDs or ${keycloak_role.X.id}
+        # interpolations directly. Managed list-refs land later.
+        composite_roles = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) the composite includes.";
+        attributes = oAttrsStr "Free-form role attribute map.";
+      };
+    };
+
+    default_roles = {
+      type = "keycloak_default_roles";
+      prefix = "default_roles";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "default_roles" ];
+      description = "Realm-level default roles auto-granted to new users, keyed by an arbitrary label.";
+      attrs = {
+        default_roles = oListStr "Role names auto-granted to every new user of the realm.";
       };
     };
   };
