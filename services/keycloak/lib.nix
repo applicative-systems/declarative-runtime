@@ -586,6 +586,91 @@ let
         role = oStr "Name of the realm-level role granted.";
       };
     };
+
+    saml_clients = {
+      type = "keycloak_saml_client";
+      prefix = "saml_client";
+      nameAttr = "client_id";
+      scope = null;
+      refs.realm = realmRef;
+      # signing_private_key isn't marked Sensitive by the provider but is a
+      # private key in practice; expose <attr>File so operators can keep it
+      # out of the world-readable store.
+      secrets = [ "signing_private_key" ];
+      description = "SAML clients (per-realm), keyed by clientId.";
+      attrs = {
+        client_id = oStr "SAML clientId. Defaults to the attribute key.";
+        name = oStr "Display name.";
+        description = oStr "Client description.";
+        enabled = oBool "Is the client enabled?";
+
+        include_authn_statement = oBool "Include the AuthnStatement in assertions.";
+        sign_documents = oBool "Sign SAML documents.";
+        sign_assertions = oBool "Sign SAML assertions.";
+        encrypt_assertions = oBool "Encrypt assertions.";
+        encryption_algorithm = oStr "Assertion encryption algorithm.";
+        encryption_key_algorithm = oStr "Assertion encryption key algorithm.";
+        encryption_digest_method = oStr "Assertion encryption digest method.";
+        encryption_mask_generation_function = oStr "Assertion encryption MGF.";
+        client_signature_required = oBool "Require the client to sign requests.";
+        force_post_binding = oBool "Force POST binding.";
+        consent_required = oBool "Require consent on first use.";
+        front_channel_logout = oBool "Use front-channel logout.";
+        force_name_id_format = oBool "Force the configured name_id_format.";
+        signature_algorithm = oStr "SAML signature algorithm.";
+        signature_key_name = oStr "SAML signature key name.";
+        canonicalization_method = oStr "SAML canonicalization method URI.";
+        name_id_format = oStr "SAML NameID format.";
+        full_scope_allowed = oBool "Grant the full scope by default.";
+
+        root_url = oStr "Root URL.";
+        valid_redirect_uris = oListStr "Valid redirect URIs.";
+        base_url = oStr "Base URL.";
+        login_theme = oStr "Per-client login theme.";
+        master_saml_processing_url = oStr "Master SAML processing URL.";
+
+        encryption_certificate = oStr "Encryption certificate (PEM).";
+        signing_certificate = oStr "Signing certificate (PEM).";
+        signing_private_key = oStr "Signing private key (PEM). Prefer `signing_private_keyFile`.";
+
+        idp_initiated_sso_url_name = oStr "IdP-initiated SSO URL name.";
+        idp_initiated_sso_relay_state = oStr "IdP-initiated SSO RelayState.";
+        assertion_consumer_post_url = oStr "Assertion consumer service POST URL.";
+        assertion_consumer_redirect_url = oStr "Assertion consumer service Redirect URL.";
+        logout_service_post_binding_url = oStr "SAML logout service POST binding URL.";
+        logout_service_redirect_binding_url = oStr "SAML logout service Redirect binding URL.";
+
+        always_display_in_console = oBool "Always display the client in the user account console.";
+        extra_config = oAttrsStr "Free-form extra config entries.";
+      };
+    };
+
+    saml_client_default_scopes = {
+      type = "keycloak_saml_client_default_scopes";
+      prefix = "saml_client_default_scopes";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = {
+          attr = "client_id";
+          targets = [
+            {
+              collection = "saml_clients";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed SAML client (services.keycloak.runtime.saml_clients.<name>) the scope binding applies to.";
+        };
+      };
+      requiredAttrs = [ "default_scopes" ];
+      description = "Default SAML scopes auto-attached to a SAML client, keyed by an arbitrary label.";
+      attrs = {
+        default_scopes = oListStr "Names of SAML scopes attached by default.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
