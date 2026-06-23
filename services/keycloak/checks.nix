@@ -53,6 +53,24 @@ in
               attributes = {
                 "userProfileEnabled" = "true";
               };
+              # nested block; renderer wraps as `[{...}]` via blockAttrs.
+              # Internationalisation has no nested secret -- safe to set fully.
+              internationalization = {
+                supported_locales = [
+                  "en"
+                  "de"
+                ];
+                default_locale = "en";
+              };
+              # smtp_server is a nested block too; flat fields only here
+              # (no auth -- the nested-Sensitive auth.password / token_auth.
+              # client_secret aren't yet protected by <attr>File).
+              smtp_server = {
+                host = "smtp.example.com";
+                from = "noreply@example.com";
+                port = "25";
+                from_display_name = "ACME";
+              };
             };
 
             # realm-level role + default-roles binding
@@ -241,6 +259,17 @@ in
           assert acme.get("passwordPolicy") == "length(8)", f"password_policy: {acme}"
           assert acme.get("attributes", {}).get("userProfileEnabled") == "true", \
               f"attributes: {acme}"
+
+      with subtest("realm nested blocks (smtp_server + internationalization) applied"):
+          smtp = acme.get("smtpServer", {})
+          assert smtp.get("host") == "smtp.example.com", f"smtp.host: {smtp}"
+          assert smtp.get("from") == "noreply@example.com", f"smtp.from: {smtp}"
+          assert smtp.get("fromDisplayName") == "ACME", f"smtp.from_display_name: {smtp}"
+          assert acme.get("internationalizationEnabled") is True, \
+              f"i18n not enabled: {acme}"
+          locales = set(acme.get("supportedLocales", []))
+          assert {"en", "de"}.issubset(locales), f"supported_locales: {locales}"
+          assert acme.get("defaultLocale") == "en", f"default_locale: {acme}"
 
       with subtest("realm role exists with description"):
           tok = admin_token()

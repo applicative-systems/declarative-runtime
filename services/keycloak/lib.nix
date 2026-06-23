@@ -302,6 +302,10 @@ let
       nameAttr = "realm";
       scope = null;
       refs = { };
+      blockAttrs = [
+        "smtp_server"
+        "internationalization"
+      ];
       description = "Keycloak realms, keyed by realm name.";
       attrs = {
         realm = oStr "Realm name. Defaults to the attribute key.";
@@ -371,6 +375,42 @@ let
         # default client scopes (referenced by name)
         default_default_client_scopes = oListStr "Default client scopes auto-granted to new clients.";
         default_optional_client_scopes = oListStr "Optional client scopes available to new clients.";
+
+        # nested blocks: rendered as [{ ... }] via the `blockAttrs` markup.
+        # Nested-sensitive fields (smtp_server.auth.password,
+        # smtp_server.token_auth.client_secret) don't yet have <attr>File
+        # support; supplying a literal lands in the world-readable store.
+        smtp_server = oSub {
+          host = rStr "SMTP host.";
+          from = rStr "From address.";
+          port = oStr "SMTP port (string -- matches the provider schema).";
+          starttls = oBool "Use STARTTLS.";
+          ssl = oBool "Use SSL/TLS.";
+          allow_utf8 = oBool "Allow UTF-8 in addresses.";
+          from_display_name = oStr "Display name shown on the From: line.";
+          reply_to = oStr "Reply-to address.";
+          reply_to_display_name = oStr "Reply-to display name.";
+          envelope_from = oStr "Envelope From address.";
+          auth = oSub {
+            username = rStr "SMTP auth username.";
+            password = rStr "SMTP auth password (LITERAL -- nested <attr>File support not yet implemented).";
+          } "SMTP basic-auth credentials (mutually exclusive with token_auth).";
+          token_auth = oSub {
+            username = rStr "OAuth2 token-auth username.";
+            url = rStr "OAuth2 token endpoint.";
+            client_id = rStr "OAuth2 client_id.";
+            client_secret = rStr "OAuth2 client_secret (LITERAL -- nested <attr>File support not yet implemented).";
+            scope = rStr "OAuth2 scope.";
+          } "SMTP OAuth2 token credentials (mutually exclusive with auth).";
+        } "SMTP server configuration.";
+
+        internationalization = oSub {
+          supported_locales = lib.mkOption {
+            type = ty.listOf ty.str;
+            description = "Locales the realm supports.";
+          };
+          default_locale = rStr "Default locale.";
+        } "Realm internationalization settings.";
       };
     };
 
@@ -2691,12 +2731,20 @@ let
             else
               null
           ) (spec.requiredAttrs or [ ]);
+          # wrap TypeList+MaxItems:1 nested blocks in [ obj ] so Terraform JSON
+          # gets block syntax. spec.blockAttrs lists the attrs that need it.
+          wrapBlocks =
+            v:
+            lib.mapAttrs (
+              k: x:
+              if builtins.elem k (spec.blockAttrs or [ ]) && builtins.isAttrs x then [ x ] else x
+            ) v;
         in
         # use deepSeq to force evaluation of checks
         # (these are not config.assertions so they can be used outside a nixos system build)
         lib.nameValuePair (tfLabel spec.prefix key) (
           builtins.deepSeq [ reqSecretChecks reqAttrChecks ] (
-            cleanNulls (base // nameInject // refAttrs // secretAttrs)
+            wrapBlocks (cleanNulls (base // nameInject // refAttrs // secretAttrs))
           )
         );
 
