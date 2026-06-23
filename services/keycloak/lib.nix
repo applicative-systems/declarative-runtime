@@ -2583,6 +2583,121 @@ let
         users = oListStr "User ids the policy applies to.";
       };
     };
+
+    required_actions = {
+      type = "keycloak_required_action";
+      prefix = "required_action";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmRef;
+      description = "Realm required actions (per-realm), keyed by alias.";
+      attrs = {
+        alias = oStr "Required action alias (e.g. 'CONFIGURE_TOTP'). Defaults to the attribute key.";
+        name = oStr "Display name shown to the user.";
+        enabled = oBool "Is the required action enabled?";
+        default_action = oBool "Is the action set as a default for new users?";
+        priority = oInt "Display / evaluation order.";
+        config = oAttrsStr "Action-specific configuration.";
+      };
+    };
+
+    realm_events = {
+      type = "keycloak_realm_events";
+      prefix = "realm_events";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      description = "Per-realm event logging configuration, keyed by an arbitrary label.";
+      attrs = {
+        admin_events_details_enabled = oBool "Log admin event representation details.";
+        admin_events_enabled = oBool "Log admin events.";
+        enabled_event_types = oListStr "Event types to log (empty list = all).";
+        events_enabled = oBool "Log user events.";
+        events_expiration = oInt "User-event retention period in seconds (0 = forever).";
+        events_listeners = oListStr "SPI listeners receiving events (e.g. [\"jboss-logging\"]).";
+      };
+    };
+
+    realm_localizations = {
+      type = "keycloak_realm_localization";
+      prefix = "realm_localization";
+      nameAttr = "locale";
+      scope = null;
+      refs.realm = realmRef;
+      description = "Per-realm i18n message bundle, keyed by locale.";
+      attrs = {
+        locale = oStr "BCP-47 locale tag (e.g. 'en'). Defaults to the attribute key.";
+        texts = oAttrsStr "Message-key to translation map.";
+      };
+    };
+
+    realm_default_client_scopes = {
+      type = "keycloak_realm_default_client_scopes";
+      prefix = "realm_default_client_scopes";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "default_scopes" ];
+      description = "Realm-wide default client-scope binding (set of scope names), keyed by an arbitrary label. Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
+      attrs = {
+        default_scopes = oListStr "Names of scopes auto-attached as default to every new client.";
+      };
+    };
+
+    realm_optional_client_scopes = {
+      type = "keycloak_realm_optional_client_scopes";
+      prefix = "realm_optional_client_scopes";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "optional_scopes" ];
+      description = "Realm-wide optional client-scope binding (set of scope names), keyed by an arbitrary label.";
+      attrs = {
+        optional_scopes = oListStr "Names of scopes available as optional to every new client.";
+      };
+    };
+
+    organizations = {
+      type = "keycloak_organization";
+      prefix = "organization";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmAliasRef;
+      description = "Keycloak organizations (per-realm, requires the organizations feature), keyed by name.";
+      attrs = {
+        name = oStr "Organization name. Defaults to the attribute key.";
+        alias = oStr "Stable alias (defaults to a normalised form of the name).";
+        enabled = oBool "Is the organization enabled?";
+        description = oStr "Organization description.";
+        redirect_url = oStr "Optional redirect URL for organization-aware flows.";
+        # domain is TypeSet of nested blocks; user provides a list of objects
+        # and the renderer emits as a JSON array unchanged (no blockAttrs
+        # wrap needed because it's already a list).
+        domain = oListSub {
+          name = rStr "Domain name (e.g. acme.example).";
+          verified = oBool "Has the domain been verified?";
+        } "List of `{ name; verified; }` domains owned by the organization.";
+        attributes = oAttrsStr "Free-form organization attribute map.";
+      };
+    };
+
+    identity_provider_token_exchange_scope_permissions = {
+      type = "keycloak_identity_provider_token_exchange_scope_permission";
+      prefix = "idp_token_exchange_perm";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [
+        "provider_alias"
+        "clients"
+      ];
+      description = "Per-IdP token-exchange permission policy granting a set of clients access to the IdP's token-exchange scope.";
+      attrs = {
+        provider_alias = oStr "Alias of the IdP this permission applies to.";
+        policy_type = oStr "Policy type (default 'client').";
+        clients = oListStr "ClientIds of clients the permission is granted to.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
@@ -2736,8 +2851,7 @@ let
           wrapBlocks =
             v:
             lib.mapAttrs (
-              k: x:
-              if builtins.elem k (spec.blockAttrs or [ ]) && builtins.isAttrs x then [ x ] else x
+              k: x: if builtins.elem k (spec.blockAttrs or [ ]) && builtins.isAttrs x then [ x ] else x
             ) v;
         in
         # use deepSeq to force evaluation of checks

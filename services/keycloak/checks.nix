@@ -210,6 +210,23 @@ in
               key_size = 2048;
               priority = 50;
             };
+
+            # built-in required action toggle.
+            required_actions.acme_configure_totp = {
+              realm = "acme";
+              alias = "CONFIGURE_TOTP";
+              enabled = false;
+              default_action = false;
+            };
+
+            # custom realm localization texts.
+            realm_localizations.acme_en = {
+              realm = "acme";
+              locale = "en";
+              texts = {
+                loginAccountTitle = "ACME";
+              };
+            };
           };
         };
 
@@ -331,6 +348,24 @@ in
               "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
           )
           assert "fakesecret" not in tfjson, "google IdP client_secret leaked into .tf.json"
+
+      with subtest("required_action CONFIGURE_TOTP is disabled"):
+          tok = admin_token()
+          ras = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/authentication/required-actions"
+          ))
+          totp = next((r for r in ras if r.get("alias") == "CONFIGURE_TOTP"), None)
+          assert totp, f"CONFIGURE_TOTP not found: {[r.get('alias') for r in ras]}"
+          assert totp.get("enabled") is False, f"CONFIGURE_TOTP should be disabled: {totp}"
+
+      with subtest("realm localization message reaches the API"):
+          tok = admin_token()
+          texts = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/localization/en"
+          ))
+          assert texts.get("loginAccountTitle") == "ACME", f"localization texts: {texts}"
 
       with subtest("realm RSA keystore appears in the keys endpoint"):
           tok = admin_token()
