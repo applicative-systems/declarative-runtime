@@ -87,6 +87,30 @@ in
               role_ids = [ "\${keycloak_role.role_acme_engineer.id}" ];
               exhaustive = true;
             };
+
+            # user + bindings; initial_password is a nested-block secret that
+            # needs renderer extension, so we set a required_action instead.
+            users.acme_alice = {
+              realm = "acme";
+              username = "alice";
+              email = "alice@acme.example";
+              first_name = "Alice";
+              last_name = "Anderson";
+              email_verified = true;
+              required_actions = [ "UPDATE_PASSWORD" ];
+            };
+            user_roles.acme_alice = {
+              realm = "acme";
+              user = "acme_alice";
+              role_ids = [ "\${keycloak_role.role_acme_engineer.id}" ];
+              exhaustive = false;
+            };
+            user_groups.acme_alice = {
+              realm = "acme";
+              user = "acme_alice";
+              group_ids = [ "\${keycloak_group.group_acme_eng.id}" ];
+              exhaustive = false;
+            };
           };
         };
 
@@ -156,6 +180,30 @@ in
           names = {r["name"] for r in composites}
           for r in ("offline_access", "uma_authorization", "engineer"):
               assert r in names, f"default role {r!r} missing from {names}"
+
+      with subtest("user exists with attributes, roles, and group membership"):
+          tok = admin_token()
+          users = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/users?username=alice"
+          ))
+          alice = next((u for u in users if u["username"] == "alice"), None)
+          assert alice, f"alice missing: {users}"
+          assert alice.get("email") == "alice@acme.example", f"alice: {alice}"
+          assert alice.get("firstName") == "Alice", f"alice: {alice}"
+          assert "UPDATE_PASSWORD" in alice.get("requiredActions", []), f"alice: {alice}"
+          alice_roles = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              f"http://localhost:8080/admin/realms/acme/users/{alice['id']}/role-mappings/realm"
+          ))
+          assert any(r["name"] == "engineer" for r in alice_roles), \
+              f"engineer role missing on alice: {alice_roles}"
+          alice_groups = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              f"http://localhost:8080/admin/realms/acme/users/{alice['id']}/groups"
+          ))
+          assert any(g["name"] == "engineering" for g in alice_groups), \
+              f"engineering group missing on alice: {alice_groups}"
 
       with subtest("group hierarchy + role assignment"):
           tok = admin_token()
