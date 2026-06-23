@@ -64,6 +64,13 @@ let
       type = ty.bool;
       inherit description;
     };
+  oListSub =
+    options: description:
+    lib.mkOption {
+      type = ty.nullOr (ty.listOf (ty.submodule { inherit options; }));
+      default = null;
+      inherit description;
+    };
 
   # ref spec shared by almost every non-realm resource: realm_id is a numeric
   # id the user can't know, so it must resolve to a managed realm by key.
@@ -1661,6 +1668,394 @@ let
         client_authentication_flow = oStr "Alias of the flow bound to the client-auth flow.";
         docker_authentication_flow = oStr "Alias of the flow bound to the docker-auth flow.";
         first_broker_login_flow = oStr "Alias of the flow bound to the first-broker-login flow.";
+      };
+    };
+
+    openid_client_authorization_resources = {
+      type = "keycloak_openid_client_authorization_resource";
+      prefix = "openid_client_authz_resource";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client (with authorization enabled) hosting this resource.";
+        };
+      };
+      description = "Authorization resources hosted on an openid_client's resource server.";
+      attrs = {
+        name = oStr "Resource name. Defaults to the attribute key.";
+        display_name = oStr "Human-friendly display name.";
+        uris = oListStr "URIs the resource represents.";
+        icon_uri = oStr "Optional icon URI.";
+        owner_managed_access = oBool "Allow the owner to manage access to this resource.";
+        scopes = oListStr "Names of authorization scopes available on the resource.";
+        type = oStr "Optional resource type discriminator.";
+        attributes = oAttrsStr "Free-form attribute map.";
+      };
+    };
+
+    openid_client_authorization_scopes = {
+      type = "keycloak_openid_client_authorization_scope";
+      prefix = "openid_client_authz_scope";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client (with authorization enabled) hosting this scope.";
+        };
+      };
+      description = "Authorization scopes on an openid_client's resource server.";
+      attrs = {
+        name = oStr "Scope name. Defaults to the attribute key.";
+        display_name = oStr "Human-friendly display name.";
+        icon_uri = oStr "Optional icon URI.";
+      };
+    };
+
+    openid_client_authorization_permissions = {
+      type = "keycloak_openid_client_authorization_permission";
+      prefix = "openid_client_authz_permission";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client (with authorization enabled) hosting this permission.";
+        };
+      };
+      description = "Authorization permissions tying resources/scopes to policies.";
+      attrs = {
+        name = oStr "Permission name. Defaults to the attribute key.";
+        description = oStr "Permission description.";
+        decision_strategy = oStr "Decision strategy ('UNANIMOUS', 'AFFIRMATIVE', 'CONSENSUS'; default 'UNANIMOUS').";
+        policies = oListStr "Names / ids of policies that apply.";
+        resources = oListStr "Resource names this permission covers (conflicts with resource_type).";
+        resource_type = oStr "Single resource type this permission covers (conflicts with resources).";
+        scopes = oListStr "Scope names this permission covers.";
+        type = oStr "Permission type ('resource' [default] or 'scope').";
+      };
+    };
+
+    openid_client_authorization_aggregate_policies = {
+      type = "keycloak_openid_client_authorization_aggregate_policy";
+      prefix = "openid_client_authz_aggregate_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this aggregate policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "policies"
+      ];
+      description = "Aggregate policy combining other policies under a decision strategy.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy ('UNANIMOUS', 'AFFIRMATIVE', 'CONSENSUS').";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        policies = oListStr "Names / ids of policies aggregated by this policy.";
+      };
+    };
+
+    openid_client_authorization_client_policies = {
+      type = "keycloak_openid_client_authorization_client_policy";
+      prefix = "openid_client_authz_client_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "clients"
+      ];
+      description = "Policy granting access to a specific set of clients.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        clients = oListStr "ClientIds of clients the policy applies to.";
+      };
+    };
+
+    openid_client_authorization_client_scope_policies = {
+      type = "keycloak_openid_client_authorization_client_scope_policy";
+      prefix = "openid_client_authz_client_scope_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "scope"
+      ];
+      description = "Policy granting access by client scope membership; each scope block is `{ id; required = false; }`.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        scope = oListSub {
+          id = rStr "Client scope id.";
+          required = oBool "Treat the scope as required (vs optional).";
+        } "List of `{ id; required; }` blocks naming client scopes the policy applies to.";
+      };
+    };
+
+    openid_client_authorization_group_policies = {
+      type = "keycloak_openid_client_authorization_group_policy";
+      prefix = "openid_client_authz_group_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "groups"
+      ];
+      description = "Policy granting access by group membership; each group block is `{ id; path; extend_children; }`.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        groups_claim = oStr "Optional JWT claim whose value carries the group path.";
+        groups = oListSub {
+          id = rStr "Group id.";
+          path = oStr "Group path (read from the API).";
+          extend_children = oBool "Match descendants of the group as well.";
+        } "List of `{ id; path; extend_children; }` blocks naming groups the policy applies to.";
+      };
+    };
+
+    openid_client_authorization_js_policies = {
+      type = "keycloak_openid_client_authorization_js_policy";
+      prefix = "openid_client_authz_js_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "code"
+      ];
+      description = "Policy implemented in JavaScript (requires the scripts feature).";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        type = oStr "Policy type discriminator ('js').";
+        code = oStr "JavaScript source.";
+      };
+    };
+
+    openid_client_authorization_role_policies = {
+      type = "keycloak_openid_client_authorization_role_policy";
+      prefix = "openid_client_authz_role_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "role"
+      ];
+      description = "Policy granting access by realm or client role membership; each role block is `{ id; required = false; }`.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        type = oStr "Policy type discriminator.";
+        fetch_roles = oBool "Fetch role information on policy evaluation.";
+        role = oListSub {
+          id = rStr "Role id.";
+          required = oBool "Treat the role as required (vs optional).";
+        } "List of `{ id; required; }` blocks naming roles the policy applies to.";
+      };
+    };
+
+    openid_client_authorization_time_policies = {
+      type = "keycloak_openid_client_authorization_time_policy";
+      prefix = "openid_client_authz_time_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [ "decision_strategy" ];
+      description = "Policy granting access within a time window.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        not_before = oStr "Date-time before which access is denied (`YYYY-MM-DD HH:MM:SS`).";
+        not_on_or_after = oStr "Date-time on or after which access is denied.";
+        day_month = oStr "Day-of-month window start.";
+        day_month_end = oStr "Day-of-month window end.";
+        month = oStr "Month window start.";
+        month_end = oStr "Month window end.";
+        year = oStr "Year window start.";
+        year_end = oStr "Year window end.";
+        hour = oStr "Hour-of-day window start.";
+        hour_end = oStr "Hour-of-day window end.";
+        minute = oStr "Minute-of-hour window start.";
+        minute_end = oStr "Minute-of-hour window end.";
+      };
+    };
+
+    openid_client_authorization_user_policies = {
+      type = "keycloak_openid_client_authorization_user_policy";
+      prefix = "openid_client_authz_user_policy";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        resource_server = {
+          attr = "resource_server_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "resource_server_id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed openid_client hosting this policy.";
+        };
+      };
+      requiredAttrs = [
+        "decision_strategy"
+        "users"
+      ];
+      description = "Policy granting access to a specific set of users.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        decision_strategy = oStr "Decision strategy.";
+        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
+        users = oListStr "User ids the policy applies to.";
       };
     };
   };
