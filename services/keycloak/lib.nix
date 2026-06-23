@@ -411,6 +411,181 @@ let
         extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
       };
     };
+
+    openid_clients = {
+      type = "keycloak_openid_client";
+      prefix = "openid_client";
+      nameAttr = "client_id";
+      scope = null;
+      refs.realm = realmRef;
+      secrets = [ "client_secret" ];
+      # Skips nested blocks (authorization, authentication_flow_binding_overrides)
+      # and write-only secret variants (client_secret_wo) -- those need
+      # nested-block / write-only renderer extensions and land separately.
+      description = "OpenID Connect clients (per-realm), keyed by clientId.";
+      attrs = {
+        client_id = oStr "OAuth2 clientId. Defaults to the attribute key.";
+        name = oStr "Display name.";
+        description = oStr "Client description.";
+        enabled = oBool "Is the client enabled?";
+        access_type = oStr "Access type: 'CONFIDENTIAL', 'PUBLIC', or 'BEARER-ONLY'.";
+
+        client_secret = oStr "Client secret. Prefer `client_secretFile` to keep it out of the world-readable store.";
+        client_authenticator_type = oStr "Client authenticator type (default 'client-secret').";
+
+        standard_flow_enabled = oBool "Enable the standard (authorization code) flow.";
+        implicit_flow_enabled = oBool "Enable the implicit flow.";
+        direct_access_grants_enabled = oBool "Enable direct-access (password) grants.";
+        service_accounts_enabled = oBool "Enable a service account for client-credentials grants.";
+        frontchannel_logout_enabled = oBool "Enable front-channel logout.";
+
+        valid_redirect_uris = oListStr "Valid redirect URIs (sets/wildcards allowed).";
+        valid_post_logout_redirect_uris = oListStr "Valid post-logout redirect URIs.";
+        web_origins = oListStr "Allowed CORS origins.";
+
+        root_url = oStr "Root URL.";
+        admin_url = oStr "Admin URL.";
+        base_url = oStr "Base URL.";
+        login_theme = oStr "Per-client login theme.";
+
+        pkce_code_challenge_method = oStr "PKCE code-challenge method (e.g. 'S256').";
+        require_dpop_bound_tokens = oBool "Require DPoP-bound tokens.";
+
+        access_token_lifespan = oStr "Override realm-level access token lifespan.";
+        client_offline_session_idle_timeout = oStr "Override realm-level offline-session idle timeout.";
+        client_offline_session_max_lifespan = oStr "Override realm-level offline-session max lifespan.";
+        client_session_idle_timeout = oStr "Override realm-level client-session idle timeout.";
+        client_session_max_lifespan = oStr "Override realm-level client-session max lifespan.";
+
+        exclude_session_state_from_auth_response = oBool "Exclude session_state from auth responses.";
+        exclude_issuer_from_auth_response = oBool "Exclude issuer from auth responses.";
+
+        full_scope_allowed = oBool "Grant the full scope by default.";
+        consent_required = oBool "Require consent on first use.";
+        display_on_consent_screen = oBool "Display the client on the consent screen.";
+        consent_screen_text = oStr "Text shown on the consent screen.";
+
+        use_refresh_tokens = oBool "Issue refresh tokens.";
+        use_refresh_tokens_client_credentials = oBool "Issue refresh tokens for client-credentials grants.";
+        standard_token_exchange_enabled = oBool "Enable standard token exchange.";
+        allow_refresh_token_in_standard_token_exchange = oStr "Refresh-token policy for standard token exchange ('NO', 'SAME_SESSION', 'YES').";
+
+        frontchannel_logout_url = oStr "Front-channel logout URL.";
+        backchannel_logout_url = oStr "Back-channel logout URL.";
+        backchannel_logout_session_required = oBool "Include session_id in back-channel logout requests.";
+        backchannel_logout_revoke_offline_sessions = oBool "Revoke offline sessions on back-channel logout.";
+
+        oauth2_device_authorization_grant_enabled = oBool "Enable the OAuth2 device authorization grant.";
+        oauth2_device_code_lifespan = oStr "Device code lifespan.";
+        oauth2_device_polling_interval = oStr "Device polling interval.";
+
+        always_display_in_console = oBool "Always display the client in the user account console.";
+        extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
+      };
+    };
+
+    openid_client_default_scopes = {
+      type = "keycloak_openid_client_default_scopes";
+      prefix = "openid_client_default_scopes";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = {
+          attr = "client_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
+        };
+      };
+      requiredAttrs = [ "default_scopes" ];
+      description = "Default OAuth2 scopes auto-attached to a client, keyed by an arbitrary label.";
+      attrs = {
+        default_scopes = oListStr "Names of scopes attached by default.";
+      };
+    };
+
+    openid_client_optional_scopes = {
+      type = "keycloak_openid_client_optional_scopes";
+      prefix = "openid_client_optional_scopes";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = {
+          attr = "client_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
+        };
+      };
+      requiredAttrs = [ "optional_scopes" ];
+      description = "Optional OAuth2 scopes available to a client, keyed by an arbitrary label.";
+      attrs = {
+        optional_scopes = oListStr "Names of optionally-attached scopes.";
+      };
+    };
+
+    openid_client_service_account_roles = {
+      type = "keycloak_openid_client_service_account_role";
+      prefix = "openid_client_sa_role";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = {
+          attr = "client_id";
+          targets = [
+            {
+              collection = "openid_clients";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed target client whose role is granted.";
+        };
+      };
+      requiredAttrs = [
+        "service_account_user_id"
+        "role"
+      ];
+      description = "Grant a per-client role to a service-account user, keyed by an arbitrary label.";
+      attrs = {
+        # Computed from the source client (`${keycloak_openid_client.X.service_account_user_id}`).
+        service_account_user_id = oStr "Service-account user id (typically `\${keycloak_openid_client.X.service_account_user_id}`).";
+        role = oStr "Name of the role granted (must exist on the target client).";
+      };
+    };
+
+    openid_client_service_account_realm_roles = {
+      type = "keycloak_openid_client_service_account_realm_role";
+      prefix = "openid_client_sa_realm_role";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [
+        "service_account_user_id"
+        "role"
+      ];
+      description = "Grant a realm-level role to a service-account user, keyed by an arbitrary label.";
+      attrs = {
+        service_account_user_id = oStr "Service-account user id (typically `\${keycloak_openid_client.X.service_account_user_id}`).";
+        role = oStr "Name of the realm-level role granted.";
+      };
+    };
   };
 
   # generate nixos options for resources from resourceTypes

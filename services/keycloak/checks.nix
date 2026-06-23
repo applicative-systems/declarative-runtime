@@ -120,6 +120,31 @@ in
               include_in_token_scope = true;
               gui_order = 10;
             };
+
+            # OpenID client with a literal secret + scope bindings.
+            openid_clients.acme_app = {
+              realm = "acme";
+              client_id = "acme-app";
+              name = "ACME App";
+              access_type = "CONFIDENTIAL";
+              client_secret = "topsecret";
+              standard_flow_enabled = true;
+              direct_access_grants_enabled = true;
+              service_accounts_enabled = true;
+              valid_redirect_uris = [ "https://app.acme.example/*" ];
+              web_origins = [ "https://app.acme.example" ];
+              consent_required = false;
+              full_scope_allowed = true;
+            };
+            openid_client_default_scopes.acme_app = {
+              realm = "acme";
+              client = "acme_app";
+              default_scopes = [
+                "profile"
+                "email"
+                "acme-profile"
+              ];
+            };
           };
         };
 
@@ -213,6 +238,22 @@ in
           ))
           assert any(g["name"] == "engineering" for g in alice_groups), \
               f"engineering group missing on alice: {alice_groups}"
+
+      with subtest("openid client exists with declared scopes attached"):
+          tok = admin_token()
+          clients = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/clients?clientId=acme-app"
+          ))
+          app = clients[0]
+          assert app["clientId"] == "acme-app", f"app: {app}"
+          assert app["enabled"] is True, f"app: {app}"
+          default_scopes = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              f"http://localhost:8080/admin/realms/acme/clients/{app['id']}/default-client-scopes"
+          ))
+          names = {s["name"] for s in default_scopes}
+          assert "acme-profile" in names, f"acme-profile not bound as default scope: {names}"
 
       with subtest("openid client scope exists with declared attrs"):
           tok = admin_token()
