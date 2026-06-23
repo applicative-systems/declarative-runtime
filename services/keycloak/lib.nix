@@ -305,6 +305,12 @@ let
       blockAttrs = [
         "smtp_server"
         "internationalization"
+        "security_defenses"
+        "security_defenses.headers"
+        "security_defenses.brute_force_detection"
+        "otp_policy"
+        "web_authn_policy"
+        "web_authn_passwordless_policy"
       ];
       description = "Keycloak realms, keyed by realm name.";
       attrs = {
@@ -411,6 +417,66 @@ let
           };
           default_locale = rStr "Default locale.";
         } "Realm internationalization settings.";
+
+        security_defenses = oSub {
+          headers = oSub {
+            x_frame_options = oStr "X-Frame-Options header value.";
+            content_security_policy = oStr "Content-Security-Policy header value.";
+            content_security_policy_report_only = oStr "Content-Security-Policy-Report-Only header value.";
+            x_content_type_options = oStr "X-Content-Type-Options header value.";
+            x_robots_tag = oStr "X-Robots-Tag header value.";
+            x_xss_protection = oStr "X-XSS-Protection header value.";
+            strict_transport_security = oStr "Strict-Transport-Security header value.";
+            referrer_policy = oStr "Referrer-Policy header value.";
+          } "Response-header defaults Keycloak applies to admin/account endpoints.";
+          brute_force_detection = oSub {
+            permanent_lockout = oBool "Permanently lock accounts after too many failures.";
+            max_temporary_lockouts = oInt "Max number of temporary lockouts before a permanent one.";
+            max_login_failures = oInt "Number of failures triggering a lockout.";
+            wait_increment_seconds = oInt "Lockout duration increment.";
+            quick_login_check_milli_seconds = oInt "Quick-login check window (ms).";
+            minimum_quick_login_wait_seconds = oInt "Minimum wait after a quick-login failure.";
+            max_failure_wait_seconds = oInt "Maximum lockout duration.";
+            failure_reset_time_seconds = oInt "Failure counter reset window.";
+          } "Brute-force-protection settings.";
+        } "Security defenses (response headers + brute-force protection).";
+
+        otp_policy = oSub {
+          type = oStr "OTP type: 'totp' (default) or 'hotp'.";
+          algorithm = oStr "HMAC algorithm: 'HmacSHA1' (default), 'HmacSHA256', or 'HmacSHA512'.";
+          digits = oInt "Number of OTP digits (6 or 8).";
+          initial_counter = oInt "Initial counter (HOTP).";
+          look_ahead_window = oInt "Look-ahead window size.";
+          period = oInt "Time-step (TOTP) in seconds.";
+        } "Realm OTP policy.";
+
+        web_authn_policy = oSub {
+          acceptable_aaguids = oListStr "Accepted authenticator AAGUIDs (empty = any).";
+          extra_origins = oListStr "Extra trusted origins for WebAuthn registration / login.";
+          attestation_conveyance_preference = oStr "Attestation conveyance preference ('not specified', 'none', 'indirect', 'direct').";
+          authenticator_attachment = oStr "Authenticator attachment ('not specified', 'platform', 'cross-platform').";
+          avoid_same_authenticator_register = oBool "Refuse to register an already-registered authenticator.";
+          create_timeout = oInt "Registration ceremony timeout in seconds.";
+          require_resident_key = oStr "Require a resident key ('not specified', 'Yes', 'No').";
+          relying_party_entity_name = oStr "Relying-Party entity name.";
+          relying_party_id = oStr "Relying-Party id.";
+          signature_algorithms = oListStr "COSEAlgorithmIdentifiers accepted.";
+          user_verification_requirement = oStr "User verification requirement ('not specified', 'required', 'preferred', 'discouraged').";
+        } "Realm WebAuthn (second-factor) policy.";
+
+        web_authn_passwordless_policy = oSub {
+          acceptable_aaguids = oListStr "Accepted authenticator AAGUIDs (empty = any).";
+          extra_origins = oListStr "Extra trusted origins for WebAuthn registration / login.";
+          attestation_conveyance_preference = oStr "Attestation conveyance preference.";
+          authenticator_attachment = oStr "Authenticator attachment.";
+          avoid_same_authenticator_register = oBool "Refuse to register an already-registered authenticator.";
+          create_timeout = oInt "Registration ceremony timeout in seconds.";
+          require_resident_key = oStr "Require a resident key.";
+          relying_party_entity_name = oStr "Relying-Party entity name.";
+          relying_party_id = oStr "Relying-Party id.";
+          signature_algorithms = oListStr "COSEAlgorithmIdentifiers accepted.";
+          user_verification_requirement = oStr "User verification requirement.";
+        } "Realm WebAuthn passwordless policy.";
       };
     };
 
@@ -550,8 +616,11 @@ let
       scope = null;
       refs.realm = realmRef;
       requiredAttrs = [ "username" ];
-      # initial_password / federated_identity are nested blocks with a Sensitive
-      # `value`; they need <attr>File support for nested attrs and land later.
+      blockAttrs = [ "initial_password" ];
+      # initial_password.value is Sensitive but supplied LITERAL today
+      # (nested-<attr>File support is a follow-up); avoid setting a real
+      # password until that lands. federated_identity is a TypeSet of
+      # nested blocks -- renders as a JSON array directly, no wrap needed.
       description = "Keycloak users, keyed by username (must be lowercase).";
       attrs = {
         username = oStr "Username (lowercase). Defaults to the attribute key.";
@@ -562,6 +631,17 @@ let
         enabled = oBool "Is the user enabled?";
         attributes = oAttrsStr "Free-form user attribute map.";
         required_actions = oListStr "Required actions on next login (e.g. \"VERIFY_EMAIL\", \"UPDATE_PASSWORD\").";
+
+        initial_password = oSub {
+          value = rStr "Initial password (LITERAL -- nested <attr>File support not yet implemented).";
+          temporary = oBool "Force the user to change the password on first login.";
+        } "Initial password set at user creation.";
+
+        federated_identity = oListSub {
+          identity_provider = rStr "Alias of the federating IdP.";
+          user_id = rStr "User id on the IdP side.";
+          user_name = rStr "Username on the IdP side.";
+        } "Federated-identity links pre-bound to the user; each block is `{ identity_provider; user_id; user_name; }`.";
       };
     };
 
@@ -661,9 +741,12 @@ let
       scope = null;
       refs.realm = realmRef;
       secrets = [ "client_secret" ];
-      # Skips nested blocks (authorization, authentication_flow_binding_overrides)
-      # and write-only secret variants (client_secret_wo) -- those need
-      # nested-block / write-only renderer extensions and land separately.
+      blockAttrs = [
+        "authorization"
+        "authentication_flow_binding_overrides"
+      ];
+      # Skips the write-only secret variants (client_secret_wo /
+      # client_secret_wo_version) -- those need a write-only renderer mode.
       description = "OpenID Connect clients (per-realm), keyed by clientId.";
       attrs = {
         client_id = oStr "OAuth2 clientId. Defaults to the attribute key.";
@@ -723,6 +806,18 @@ let
 
         always_display_in_console = oBool "Always display the client in the user account console.";
         extra_config = oAttrsStr "Free-form extra config entries the upstream attribute set does not cover.";
+
+        authorization = oSub {
+          policy_enforcement_mode = rStr "Policy enforcement mode ('ENFORCING', 'PERMISSIVE', or 'DISABLED').";
+          decision_strategy = oStr "Decision strategy when multiple policies apply (default 'UNANIMOUS').";
+          allow_remote_resource_management = oBool "Allow resource management via the protection API.";
+          keep_defaults = oBool "Keep default resources / scopes / permissions Keycloak creates.";
+        } "Enables fine-grained authorization on the client (resource server). Required for openid_client_authorization_* resources.";
+
+        authentication_flow_binding_overrides = oSub {
+          browser_id = oStr "Authentication flow id overriding the realm's browser flow for this client.";
+          direct_grant_id = oStr "Authentication flow id overriding the realm's direct-grant flow for this client.";
+        } "Per-client authentication flow overrides.";
       };
     };
 
@@ -839,6 +934,7 @@ let
       # private key in practice; expose <attr>File so operators can keep it
       # out of the world-readable store.
       secrets = [ "signing_private_key" ];
+      blockAttrs = [ "authentication_flow_binding_overrides" ];
       description = "SAML clients (per-realm), keyed by clientId.";
       attrs = {
         client_id = oStr "SAML clientId. Defaults to the attribute key.";
@@ -884,6 +980,11 @@ let
 
         always_display_in_console = oBool "Always display the client in the user account console.";
         extra_config = oAttrsStr "Free-form extra config entries.";
+
+        authentication_flow_binding_overrides = oSub {
+          browser_id = oStr "Authentication flow id overriding the realm's browser flow for this client.";
+          direct_grant_id = oStr "Authentication flow id overriding the realm's direct-grant flow for this client.";
+        } "Per-client authentication flow overrides.";
       };
     };
 
@@ -3011,19 +3112,36 @@ let
             else
               null
           ) (spec.requiredAttrs or [ ]);
-          # wrap TypeList+MaxItems:1 nested blocks in [ obj ] so Terraform JSON
-          # gets block syntax. spec.blockAttrs lists the attrs that need it.
+          # wrap TypeList+MaxItems:1 nested blocks in [ obj ] so Terraform
+          # JSON gets block syntax. spec.blockAttrs lists dotted paths
+          # (e.g. "smtp_server", "security_defenses.headers",
+          # "attribute.permissions"); recursion walks into both attrsets
+          # and list elements -- so a nested block inside a list element
+          # (like realm_user_profile.attribute[].permissions) is wrapped.
           wrapBlocks =
-            v:
-            lib.mapAttrs (
-              k: x: if builtins.elem k (spec.blockAttrs or [ ]) && builtins.isAttrs x then [ x ] else x
-            ) v;
+            path: v:
+            if builtins.isAttrs v then
+              lib.mapAttrs (
+                k: x:
+                let
+                  childPath = if path == "" then k else "${path}.${k}";
+                  wrapped = wrapBlocks childPath x;
+                in
+                if builtins.elem childPath (spec.blockAttrs or [ ]) && builtins.isAttrs wrapped then
+                  [ wrapped ]
+                else
+                  wrapped
+              ) v
+            else if builtins.isList v then
+              map (wrapBlocks path) v
+            else
+              v;
         in
         # use deepSeq to force evaluation of checks
         # (these are not config.assertions so they can be used outside a nixos system build)
         lib.nameValuePair (tfLabel spec.prefix key) (
           builtins.deepSeq [ reqSecretChecks reqAttrChecks ] (
-            wrapBlocks (cleanNulls (base // nameInject // refAttrs // secretAttrs))
+            wrapBlocks "" (cleanNulls (base // nameInject // refAttrs // secretAttrs))
           )
         );
 
