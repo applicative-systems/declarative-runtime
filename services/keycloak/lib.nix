@@ -2698,6 +2698,122 @@ let
         clients = oListStr "ClientIds of clients the permission is granted to.";
       };
     };
+
+    realm_client_policy_profiles = {
+      type = "keycloak_realm_client_policy_profile";
+      prefix = "realm_client_policy_profile";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      description = "Realm client-policy profile, listing executors that enforce a client policy.";
+      attrs = {
+        name = oStr "Profile name. Defaults to the attribute key.";
+        description = oStr "Profile description.";
+        executor = oListSub {
+          name = rStr "Executor provider-id (e.g. 'secure-client-uris').";
+          configuration = oAttrsStr "Executor-specific configuration.";
+        } "List of executors run on policy evaluation.";
+      };
+    };
+
+    realm_client_policy_profile_policies = {
+      type = "keycloak_realm_client_policy_profile_policy";
+      prefix = "realm_client_policy_profile_policy";
+      nameAttr = "name";
+      scope = null;
+      refs.realm = realmRef;
+      requiredAttrs = [ "profiles" ];
+      description = "Realm client-policy policy binding a set of profiles to a set of conditions.";
+      attrs = {
+        name = oStr "Policy name. Defaults to the attribute key.";
+        description = oStr "Policy description.";
+        enabled = oBool "Is the policy enabled?";
+        condition = oListSub {
+          name = rStr "Condition provider-id (e.g. 'client-roles').";
+          configuration = oAttrsStr "Condition-specific configuration.";
+        } "List of conditions; the policy applies when all conditions match.";
+        profiles = oListStr "Names of client-policy profiles this policy applies.";
+      };
+    };
+
+    group_permissions = {
+      type = "keycloak_group_permissions";
+      prefix = "group_permissions";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        group = {
+          attr = "group_id";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = true;
+          required = true;
+          description = "Key of the managed group these fine-grained permissions apply to.";
+        };
+      };
+      # every scope_* attr is a MaxItems:1 nested block per scopePermissionsSchema().
+      blockAttrs = [
+        "view_scope"
+        "manage_scope"
+        "view_members_scope"
+        "manage_members_scope"
+        "manage_membership_scope"
+      ];
+      description = "Fine-grained authorization permissions for a group; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
+      attrs =
+        let
+          scopePerm = oSub {
+            policies = oListStr "Names / ids of policies that apply to this scope.";
+            description = oStr "Description.";
+            decision_strategy = oStr "Decision strategy ('UNANIMOUS', 'AFFIRMATIVE', 'CONSENSUS').";
+          };
+        in
+        {
+          view_scope = scopePerm "View-scope permission block.";
+          manage_scope = scopePerm "Manage-scope permission block.";
+          view_members_scope = scopePerm "View-members-scope permission block.";
+          manage_members_scope = scopePerm "Manage-members-scope permission block.";
+          manage_membership_scope = scopePerm "Manage-membership-scope permission block.";
+        };
+    };
+
+    users_permissions = {
+      type = "keycloak_users_permissions";
+      prefix = "users_permissions";
+      nameAttr = null;
+      scope = null;
+      refs.realm = realmRef;
+      blockAttrs = [
+        "view_scope"
+        "manage_scope"
+        "map_roles_scope"
+        "manage_group_membership_scope"
+        "impersonate_scope"
+        "user_impersonated_scope"
+      ];
+      description = "Fine-grained authorization permissions on the realm's users collection; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
+      attrs =
+        let
+          scopePerm = oSub {
+            policies = oListStr "Names / ids of policies that apply to this scope.";
+            description = oStr "Description.";
+            decision_strategy = oStr "Decision strategy ('UNANIMOUS', 'AFFIRMATIVE', 'CONSENSUS').";
+          };
+        in
+        {
+          view_scope = scopePerm "View-scope permission block.";
+          manage_scope = scopePerm "Manage-scope permission block.";
+          map_roles_scope = scopePerm "Map-roles-scope permission block.";
+          manage_group_membership_scope = scopePerm "Manage-group-membership-scope permission block.";
+          impersonate_scope = scopePerm "Impersonate-scope permission block.";
+          user_impersonated_scope = scopePerm "User-impersonated-scope permission block.";
+        };
+    };
   };
 
   # generate nixos options for resources from resourceTypes
