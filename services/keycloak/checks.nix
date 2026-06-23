@@ -167,6 +167,15 @@ in
               client_id = "fake-client-id";
               client_secretFile = "/etc/acme-google-secret";
             };
+
+            # IdP mapper exercises idpAliasRequiredRef across IdP collections.
+            attribute_importer_identity_provider_mappers.google_email = {
+              realm = "acme";
+              identity_provider = "acme_google";
+              name = "google-email";
+              user_attribute = "email";
+              claim_name = "email";
+            };
           };
         };
 
@@ -277,6 +286,20 @@ in
               "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
           )
           assert "fakesecret" not in tfjson, "google IdP client_secret leaked into .tf.json"
+
+      with subtest("IdP mapper attached to google via managed alias ref"):
+          tok = admin_token()
+          mappers = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/identity-provider/instances/acme_google/mappers"
+          ))
+          m = next((x for x in mappers if x["name"] == "google-email"), None)
+          assert m, f"google-email mapper missing: {mappers}"
+          # provider picks the right mapper type for the IdP variant
+          # (here `google-user-attribute-mapper`); just assert config reached it.
+          assert m.get("identityProviderAlias") == "acme_google", f"mapper: {m}"
+          cfg = m.get("config", {})
+          assert cfg.get("user.attribute") == "email", f"mapper config: {cfg}"
 
       with subtest("protocol mapper attached to client scope"):
           tok = admin_token()
