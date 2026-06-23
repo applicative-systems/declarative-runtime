@@ -43,6 +43,15 @@ in
             realms.acme = {
               display_name = "ACME Corp.";
               display_name_html = "<b>ACME</b> Corp.";
+              # exercises a representative cross-section of typed attrs
+              registration_allowed = true;
+              login_theme = "keycloak";
+              ssl_required = "external";
+              access_token_lifespan = "10m";
+              password_policy = "length(8)";
+              attributes = {
+                "userProfileEnabled" = "true";
+              };
             };
           };
         };
@@ -84,6 +93,15 @@ in
           assert acme.get("displayName") == "ACME Corp.", f"display_name not applied: {acme}"
           assert acme.get("displayNameHtml") == "<b>ACME</b> Corp.", \
               f"display_name_html not applied: {acme}"
+
+      with subtest("extended realm attrs reach the API"):
+          assert acme.get("registrationAllowed") is True, f"registration_allowed: {acme}"
+          assert acme.get("loginTheme") == "keycloak", f"login_theme: {acme}"
+          assert acme.get("sslRequired") == "external", f"ssl_required: {acme}"
+          assert acme.get("accessTokenLifespan") == 600, f"access_token_lifespan: {acme}"
+          assert acme.get("passwordPolicy") == "length(8)", f"password_policy: {acme}"
+          assert acme.get("attributes", {}).get("userProfileEnabled") == "true", \
+              f"attributes: {acme}"
 
       with subtest("secrets did not leak"):
           tfjson = machine.succeed(
