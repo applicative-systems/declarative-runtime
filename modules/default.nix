@@ -3,5 +3,6 @@
 {
   imports = [
     ../services/forgejo/module.nix
+    ../services/keycloak/module.nix
   ];
 }
