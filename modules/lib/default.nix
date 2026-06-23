@@ -36,6 +36,14 @@ rec {
   #   user/group the base service's user/group the reconciler runs as
   #   stateDir   the base service's primary state dir; Terraform state lives in
   #              a `declarative-terraform` subdir of it, co-located with the service
+  #   dynamicUser  set when the base service runs as systemd DynamicUser (so the
+  #                `User=` name only exists per-unit). Pairs with `stateDirectory`
+  #                so the reconciler is allocated the same hashed UID as the
+  #                primary unit and writes state into a managed StateDirectory.
+  #   stateDirectory  relative path under /var/lib used as `StateDirectory=` when
+  #                   `dynamicUser` is set. Must match `stateDir` (e.g. stateDir
+  #                   `/var/lib/keycloak` with stateDirectory `keycloak/...`), so
+  #                   the script's absolute path resolves to systemd's managed dir.
   mkReconcileService =
     {
       name,
@@ -49,6 +57,8 @@ rec {
       group,
       stateDir,
       credentials ? { },
+      dynamicUser ? false,
+      stateDirectory ? null,
     }:
     let
       confFile = tfJsonFile name tfConfig;
@@ -87,6 +97,14 @@ rec {
         Group = group;
         # Secrets stay out of the store: read from the credentials dir at runtime.
         LoadCredential = lib.mapAttrsToList (id: path: "${id}:${path}") allCredentials;
+      }
+      // lib.optionalAttrs dynamicUser {
+        # Bases like Keycloak ship no persistent state dir and run as
+        # systemd DynamicUser=true; the `User=` name is hashed to a stable UID
+        # that's reused across units, and systemd creates/owns the state dir.
+        DynamicUser = true;
+        StateDirectory = stateDirectory;
+        StateDirectoryMode = "0700";
       };
       script = ''
         set -euo pipefail
