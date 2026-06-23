@@ -114,6 +114,68 @@ let
     add_to_userinfo = oBool "Include in UserInfo?";
   };
 
+  # SAML mapper attachment refs (analogous to the openid pair above).
+  samlClientOptionalRef = {
+    attr = "client_id";
+    targets = [
+      {
+        collection = "saml_clients";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = false;
+    description = "Optional managed SAML client this mapper attaches to.";
+  };
+  samlClientScopeOptionalRef = {
+    attr = "client_scope_id";
+    targets = [
+      {
+        collection = "saml_client_scopes";
+        field = "id";
+      }
+    ];
+    managedOnly = true;
+    required = false;
+    description = "Optional managed SAML client scope this mapper attaches to.";
+  };
+
+  # generic mappers / role mappers attach to either an openid or a SAML
+  # client/scope; multi-target so a managed key from either collection
+  # resolves, and a literal id string falls through.
+  anyClientOptionalRef = {
+    attr = "client_id";
+    targets = [
+      {
+        collection = "openid_clients";
+        field = "id";
+      }
+      {
+        collection = "saml_clients";
+        field = "id";
+      }
+    ];
+    managedOnly = false;
+    required = false;
+    description = "Optional managed client (openid or saml) this mapper attaches to.";
+  };
+  anyClientScopeOptionalRef = {
+    attr = "client_scope_id";
+    targets = [
+      {
+        collection = "openid_client_scopes";
+        field = "id";
+      }
+      {
+        collection = "saml_client_scopes";
+        field = "id";
+      }
+    ];
+    managedOnly = false;
+    required = false;
+    description = "Optional managed client scope (openid or saml) this mapper attaches to.";
+  };
+
   # The full keycloak/keycloak resource surface. Per
   # resource:
   #   type            the `keycloak_*` resource type
@@ -967,6 +1029,162 @@ let
         script = oStr "JavaScript expression evaluated to produce the claim value.";
         claim_name = oStr "Name of the resulting JWT claim.";
         claim_value_type = oStr "Claim value type.";
+      };
+    };
+
+    saml_user_attribute_protocol_mappers = {
+      type = "keycloak_saml_user_attribute_protocol_mapper";
+      prefix = "saml_user_attribute_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = samlClientOptionalRef;
+        client_scope = samlClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "user_attribute"
+        "saml_attribute_name"
+      ];
+      description = "SAML mapper that exposes a user attribute as a SAML attribute.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        user_attribute = oStr "Source user attribute.";
+        friendly_name = oStr "Optional SAML friendlyName.";
+        saml_attribute_name = oStr "SAML attribute name.";
+        saml_attribute_name_format = oStr "SAML attribute name format ('Basic', 'URI Reference', 'Unspecified').";
+        aggregate_attributes = oBool "Aggregate multivalued attributes into one SAML attribute?";
+      };
+    };
+
+    saml_user_property_protocol_mappers = {
+      type = "keycloak_saml_user_property_protocol_mapper";
+      prefix = "saml_user_property_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = samlClientOptionalRef;
+        client_scope = samlClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "user_property"
+        "saml_attribute_name"
+      ];
+      description = "SAML mapper that exposes a built-in user property as a SAML attribute.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        user_property = oStr "Built-in user property (e.g. 'email', 'username').";
+        friendly_name = oStr "Optional SAML friendlyName.";
+        saml_attribute_name = oStr "SAML attribute name.";
+        saml_attribute_name_format = oStr "SAML attribute name format.";
+      };
+    };
+
+    saml_script_protocol_mappers = {
+      type = "keycloak_saml_script_protocol_mapper";
+      prefix = "saml_script_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = samlClientOptionalRef;
+        client_scope = samlClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "script"
+        "saml_attribute_name"
+      ];
+      description = "SAML mapper that produces a SAML attribute from a JavaScript expression.";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        single_value_attribute = oBool "Emit as a single-value attribute?";
+        script = oStr "JavaScript expression evaluated to produce the SAML attribute value.";
+        friendly_name = oStr "Optional SAML friendlyName.";
+        saml_attribute_name = oStr "SAML attribute name.";
+        saml_attribute_name_format = oStr "SAML attribute name format.";
+      };
+    };
+
+    generic_protocol_mappers = {
+      type = "keycloak_generic_protocol_mapper";
+      prefix = "generic_protocol_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = anyClientOptionalRef;
+        client_scope = anyClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "protocol"
+        "protocol_mapper"
+        "config"
+      ];
+      description = "Generic protocol mapper escape hatch (for mappers without a dedicated typed resource).";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        protocol = oStr "Protocol ('openid-connect' or 'saml').";
+        protocol_mapper = oStr "Provider-id of the mapper implementation (e.g. 'oidc-usermodel-attribute-mapper').";
+        config = oAttrsStr "Mapper configuration (provider-specific key/value pairs).";
+      };
+    };
+
+    generic_client_protocol_mappers = {
+      type = "keycloak_generic_client_protocol_mapper";
+      prefix = "generic_client_protocol_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = anyClientOptionalRef;
+        client_scope = anyClientScopeOptionalRef;
+      };
+      requiredAttrs = [
+        "protocol"
+        "protocol_mapper"
+        "config"
+      ];
+      description = "Generic protocol mapper attached to a specific client (without a dedicated typed resource).";
+      attrs = {
+        name = oStr "Mapper name. Defaults to the attribute key.";
+        protocol = oStr "Protocol ('openid-connect' or 'saml').";
+        protocol_mapper = oStr "Provider-id of the mapper implementation.";
+        config = oAttrsStr "Mapper configuration (provider-specific key/value pairs).";
+      };
+    };
+
+    generic_role_mappers = {
+      type = "keycloak_generic_role_mapper";
+      prefix = "generic_role_mapper";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = anyClientOptionalRef;
+        client_scope = anyClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "role_id" ];
+      description = "Generic role-scope mapper that attaches a role to a client / client scope, keyed by an arbitrary label.";
+      attrs = {
+        role_id = oStr "Role UUID (or `\${keycloak_role.X.id}` reference) to attach.";
+      };
+    };
+
+    generic_client_role_mappers = {
+      type = "keycloak_generic_client_role_mapper";
+      prefix = "generic_client_role_mapper";
+      nameAttr = null;
+      scope = null;
+      refs = {
+        realm = realmRef;
+        client = anyClientOptionalRef;
+        client_scope = anyClientScopeOptionalRef;
+      };
+      requiredAttrs = [ "role_id" ];
+      description = "Generic role-scope mapper attached to a specific client (deprecated alias kept for completeness).";
+      attrs = {
+        role_id = oStr "Role UUID (or `\${keycloak_role.X.id}` reference) to attach.";
       };
     };
   };
