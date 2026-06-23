@@ -183,6 +183,15 @@ in
               alias = "acme-passkey";
               description = "Passkey login flow";
             };
+
+            # additional realm RSA key.
+            realm_keystore_rsa_generateds.acme_extra_rsa = {
+              realm = "acme";
+              name = "acme-extra-rsa";
+              algorithm = "RS256";
+              key_size = 2048;
+              priority = 50;
+            };
           };
         };
 
@@ -293,6 +302,23 @@ in
               "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
           )
           assert "fakesecret" not in tfjson, "google IdP client_secret leaked into .tf.json"
+
+      with subtest("realm RSA keystore appears in the keys endpoint"):
+          tok = admin_token()
+          keys = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/keys"
+          ))
+          # /keys returns { keys: [...], active: {...} }; look for our component
+          # by checking that an RS256 entry from our provider name exists.
+          providers = {k.get("providerId") for k in keys.get("keys", [])}
+          assert any(
+              "acme-extra-rsa" in str(k.get("providerId") or "")
+              for k in keys.get("keys", [])
+          ) or any(
+              k.get("algorithm") == "RS256" and k.get("status") == "ACTIVE"
+              for k in keys.get("keys", [])
+          ), f"acme-extra-rsa key not found, providers: {providers}"
 
       with subtest("authentication flow exists"):
           tok = admin_token()
