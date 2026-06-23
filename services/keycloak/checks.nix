@@ -23,6 +23,7 @@ in
         # mock agenix secrets: the module expects passwords to be supplied as files
         environment.etc."keycloak-db-password".text = "hackme";
         environment.etc."keycloak-admin-password".text = keycloakAdminPassword;
+        environment.etc."acme-google-secret".text = "fakesecret";
 
         services.keycloak = {
           enable = true;
@@ -158,6 +159,14 @@ in
               add_to_access_token = true;
               add_to_userinfo = true;
             };
+
+            # google IdP exercises the realmAliasRef ref-by-alias path and
+            # secret-file indirection on the new client_secret field.
+            oidc_google_identity_providers.acme_google = {
+              realm = "acme";
+              client_id = "fake-client-id";
+              client_secretFile = "/etc/acme-google-secret";
+            };
           };
         };
 
@@ -251,6 +260,23 @@ in
           ))
           assert any(g["name"] == "engineering" for g in alice_groups), \
               f"engineering group missing on alice: {alice_groups}"
+
+      with subtest("google IdP exists and client_secret stays out of .tf.json"):
+          tok = admin_token()
+          # alias defaults to the collection key (`acme_google`) via
+          # nameAttr; the provider then sets providerId="google".
+          idp = json.loads(machine.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {tok}' "
+              "http://localhost:8080/admin/realms/acme/identity-provider/instances/acme_google"
+          ))
+          assert idp.get("providerId") == "google", f"google IdP: {idp}"
+          assert idp.get("alias") == "acme_google", f"google IdP: {idp}"
+          # operator-supplied secret loaded via LoadCredential must not
+          # leak into the generated config.
+          tfjson = machine.succeed(
+              "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
+          )
+          assert "fakesecret" not in tfjson, "google IdP client_secret leaked into .tf.json"
 
       with subtest("protocol mapper attached to client scope"):
           tok = admin_token()

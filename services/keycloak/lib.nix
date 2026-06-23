@@ -140,6 +140,42 @@ let
     description = "Optional managed SAML client scope this mapper attaches to.";
   };
 
+  # identity providers reference the realm by its alias (name), not by id;
+  # `realm = "<alias>"` is how the provider wires them.
+  realmAliasRef = {
+    attr = "realm";
+    targets = [
+      {
+        collection = "realms";
+        field = "realm";
+      }
+    ];
+    managedOnly = true;
+    required = true;
+    description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
+  };
+
+  # shared attrs every keycloak identity provider exposes (alias is the IdP
+  # key, display_name is human-readable, enabled toggles, etc.).
+  commonIdpAttrs = {
+    alias = oStr "Provider alias. Defaults to the attribute key.";
+    display_name = oStr "Human-readable name shown on the login page.";
+    enabled = oBool "Is the identity provider enabled?";
+    store_token = oBool "Persist tokens obtained from the IdP.";
+    add_read_token_role_on_create = oBool "Grant the read-token role to newly federated users.";
+    authenticate_by_default = oBool "Use this IdP as the default authenticator.";
+    link_only = oBool "Don't allow new login -- only link existing accounts.";
+    trust_email = oBool "Trust the email returned by the IdP (skip verification).";
+    first_broker_login_flow_alias = oStr "Alias of the first-broker-login flow used.";
+    post_broker_login_flow_alias = oStr "Alias of the post-broker-login flow used.";
+    organization_id = oStr "Optional organization id this IdP belongs to.";
+    extra_config = oAttrsStr "Free-form extra IdP config entries.";
+    gui_order = oStr "Display order in the admin UI (string).";
+    sync_mode = oStr "Sync mode: 'IMPORT', 'LEGACY', or 'FORCE'.";
+    org_redirect_mode_email_matches = oBool "Redirect users whose email matches an organization's domain to this IdP.";
+    org_domain = oStr "Organization domain matched against the user's email.";
+  };
+
   # generic mappers / role mappers attach to either an openid or a SAML
   # client/scope; multi-target so a managed key from either collection
   # resolves, and a literal id string falls through.
@@ -1185,6 +1221,158 @@ let
       description = "Generic role-scope mapper attached to a specific client (deprecated alias kept for completeness).";
       attrs = {
         role_id = oStr "Role UUID (or `\${keycloak_role.X.id}` reference) to attach.";
+      };
+    };
+
+    oidc_identity_providers = {
+      type = "keycloak_oidc_identity_provider";
+      prefix = "oidc_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      secrets = [ "client_secret" ];
+      requiredAttrs = [
+        "authorization_url"
+        "client_id"
+        "token_url"
+      ];
+      description = "Generic OIDC identity providers (per-realm), keyed by alias.";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'oidc').";
+        backchannel_supported = oBool "Does the IdP support back-channel logout?";
+        validate_signature = oBool "Validate the IdP's token signature.";
+        authorization_url = oStr "OIDC authorization endpoint.";
+        client_id = oStr "OIDC client id.";
+        client_secret = oStr "OIDC client secret. Prefer `client_secretFile`.";
+        user_info_url = oStr "OIDC userinfo endpoint.";
+        jwks_url = oStr "OIDC JWKS endpoint.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
+        token_url = oStr "OIDC token endpoint.";
+        logout_url = oStr "OIDC logout endpoint.";
+        login_hint = oBool "Pass `login_hint` query parameter to the IdP.";
+        ui_locales = oBool "Pass `ui_locales` query parameter to the IdP.";
+        default_scopes = oStr "Space-separated default scopes to request.";
+        accepts_prompt_none_forward_from_client = oBool "Forward `prompt=none` requests to this IdP.";
+        disable_user_info = oBool "Don't call the userinfo endpoint.";
+        issuer = oStr "Expected `iss` claim value.";
+        disable_type_claim_check = oBool "Skip the typ-claim check on returned tokens.";
+      };
+    };
+
+    saml_identity_providers = {
+      type = "keycloak_saml_identity_provider";
+      prefix = "saml_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      requiredAttrs = [
+        "entity_id"
+        "single_sign_on_service_url"
+      ];
+      description = "SAML identity providers (per-realm), keyed by alias.";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'saml').";
+        backchannel_supported = oBool "Does the IdP support back-channel logout?";
+        validate_signature = oBool "Validate SAML signatures.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
+        name_id_policy_format = oStr "Default name_id_policy_format URN.";
+        single_logout_service_url = oStr "SAML SLO endpoint URL.";
+        entity_id = oStr "Entity ID expected from the IdP.";
+        single_sign_on_service_url = oStr "SAML SSO endpoint URL.";
+        signing_certificate = oStr "IdP signing certificate (PEM).";
+        signature_algorithm = oStr "Signature algorithm.";
+        xml_sign_key_info_key_name_transformer = oStr "KeyInfo KeyName transformer.";
+        post_binding_authn_request = oBool "Use POST binding for AuthnRequests.";
+        post_binding_response = oBool "Use POST binding for Responses.";
+        post_binding_logout = oBool "Use POST binding for Logout.";
+        force_authn = oBool "Force re-authentication on every login.";
+        login_hint = oBool "Pass login_hint to the IdP.";
+        want_assertions_signed = oBool "Require signed assertions.";
+        want_assertions_encrypted = oBool "Require encrypted assertions.";
+        want_authn_requests_signed = oBool "Require signed AuthnRequests.";
+        principal_type = oStr "How to derive the user principal ('SUBJECT', 'ATTRIBUTE', 'FRIENDLY_ATTRIBUTE').";
+        principal_attribute = oStr "Attribute name when principal_type is ATTRIBUTE or FRIENDLY_ATTRIBUTE.";
+        authn_context_class_refs = oListStr "AuthnContext class refs requested in AuthnRequests.";
+        authn_context_decl_refs = oListStr "AuthnContext declaration refs requested in AuthnRequests.";
+        authn_context_comparison_type = oStr "AuthnContext comparison type ('exact', 'minimum', 'maximum', 'better').";
+      };
+    };
+
+    oidc_google_identity_providers = {
+      type = "keycloak_oidc_google_identity_provider";
+      prefix = "oidc_google_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      secrets = [ "client_secret" ];
+      requiredSecrets = [ "client_secret" ];
+      requiredAttrs = [ "client_id" ];
+      description = "Google OIDC identity providers (per-realm), keyed by alias (defaults to 'google').";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'google').";
+        client_id = oStr "Google OAuth2 client id.";
+        client_secret = oStr "Google OAuth2 client secret. Prefer `client_secretFile`.";
+        hosted_domain = oStr "Restrict to a Google Workspace hosted domain (or `*`).";
+        use_user_ip_param = oBool "Forward the user's IP to Google's UserInfo service.";
+        request_refresh_token = oBool "Request a refresh token (`access_type=offline`).";
+        default_scopes = oStr "Space-separated default scopes (default 'openid profile email').";
+        accepts_prompt_none_forward_from_client = oBool "Forward `prompt=none` requests.";
+        disable_user_info = oBool "Don't call the UserInfo service.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
+      };
+    };
+
+    oidc_facebook_identity_providers = {
+      type = "keycloak_oidc_facebook_identity_provider";
+      prefix = "oidc_facebook_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      secrets = [ "client_secret" ];
+      requiredSecrets = [ "client_secret" ];
+      requiredAttrs = [ "client_id" ];
+      description = "Facebook OIDC identity providers (per-realm), keyed by alias (defaults to 'facebook').";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'facebook').";
+        client_id = oStr "Facebook app id.";
+        client_secret = oStr "Facebook app secret. Prefer `client_secretFile`.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
+      };
+    };
+
+    oidc_github_identity_providers = {
+      type = "keycloak_oidc_github_identity_provider";
+      prefix = "oidc_github_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      secrets = [ "client_secret" ];
+      requiredSecrets = [ "client_secret" ];
+      requiredAttrs = [ "client_id" ];
+      description = "GitHub OIDC identity providers (per-realm), keyed by alias (defaults to 'github').";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'github').";
+        client_id = oStr "GitHub OAuth app client id.";
+        client_secret = oStr "GitHub OAuth app client secret. Prefer `client_secretFile`.";
+        base_url = oStr "Override the GitHub Enterprise base URL.";
+        api_url = oStr "Override the GitHub Enterprise API URL.";
+        github_json_format = oBool "Use GitHub's JSON content type.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
+      };
+    };
+
+    kubernetes_identity_providers = {
+      type = "keycloak_kubernetes_identity_provider";
+      prefix = "kubernetes_idp";
+      nameAttr = "alias";
+      scope = null;
+      refs.realm = realmAliasRef;
+      requiredAttrs = [ "issuer" ];
+      description = "Kubernetes OIDC identity providers (per-realm), keyed by alias.";
+      attrs = commonIdpAttrs // {
+        provider_id = oStr "Provider id (defaults to 'kubernetes').";
+        issuer = oStr "Kubernetes API server issuer URL.";
+        hide_on_login_page = oBool "Hide this IdP on the login page.";
       };
     };
   };
