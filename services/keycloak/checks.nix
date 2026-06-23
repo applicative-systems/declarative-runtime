@@ -71,6 +71,27 @@ in
                 port = "25";
                 from_display_name = "ACME";
               };
+              # exercises the nested-in-nested block-list wrapping (the
+              # security_defenses outer block and its inner headers /
+              # brute_force_detection sub-blocks each need [{...}] wrap).
+              security_defenses = {
+                headers = {
+                  x_frame_options = "DENY";
+                  strict_transport_security = "max-age=63072000; includeSubDomains; preload";
+                };
+                brute_force_detection = {
+                  permanent_lockout = false;
+                  max_login_failures = 5;
+                };
+              };
+              otp_policy = {
+                type = "totp";
+                algorithm = "HmacSHA256";
+                digits = 6;
+                period = 30;
+                initial_counter = 0;
+                look_ahead_window = 1;
+              };
             };
 
             # realm-level role + default-roles binding
@@ -287,6 +308,17 @@ in
           locales = set(acme.get("supportedLocales", []))
           assert {"en", "de"}.issubset(locales), f"supported_locales: {locales}"
           assert acme.get("defaultLocale") == "en", f"default_locale: {acme}"
+
+      with subtest("nested-in-nested blocks (security_defenses.headers + brute_force_detection) applied"):
+          headers = acme.get("browserSecurityHeaders", {})
+          assert headers.get("xFrameOptions") == "DENY", f"headers: {headers}"
+          assert headers.get("strictTransportSecurity", "").startswith("max-age=63072000"), \
+              f"headers: {headers}"
+          # brute-force settings land at realm top-level under camelCase names.
+          assert acme.get("failureFactor") == 5, f"max_login_failures: {acme.get('failureFactor')}"
+          # otp_policy fields also flatten to the realm representation.
+          assert acme.get("otpPolicyAlgorithm") == "HmacSHA256", \
+              f"otp algorithm: {acme.get('otpPolicyAlgorithm')}"
 
       with subtest("realm role exists with description"):
           tok = admin_token()
