@@ -155,6 +155,47 @@ let
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
   };
 
+  # identity provider mappers reference an IdP by alias; the alias may
+  # belong to any of the six IdP variants we model.
+  idpAliasRequiredRef = {
+    attr = "identity_provider_alias";
+    targets = [
+      {
+        collection = "oidc_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "saml_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "oidc_google_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "oidc_facebook_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "oidc_github_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "kubernetes_identity_providers";
+        field = "alias";
+      }
+    ];
+    managedOnly = false;
+    required = true;
+    description = "Alias of the managed identity provider (in any IdP collection) this mapper attaches to, or a literal alias.";
+  };
+
+  # common attrs every IdP mapper carries.
+  commonIdpMapperAttrs = {
+    name = oStr "Mapper name. Defaults to the attribute key.";
+    extra_config = oAttrsStr "Free-form extra mapper config entries.";
+  };
+
   # shared attrs every keycloak identity provider exposes (alias is the IdP
   # key, display_name is human-readable, enabled toggles, etc.).
   commonIdpAttrs = {
@@ -1373,6 +1414,125 @@ let
         provider_id = oStr "Provider id (defaults to 'kubernetes').";
         issuer = oStr "Kubernetes API server issuer URL.";
         hide_on_login_page = oBool "Hide this IdP on the login page.";
+      };
+    };
+
+    hardcoded_attribute_identity_provider_mappers = {
+      type = "keycloak_hardcoded_attribute_identity_provider_mapper";
+      prefix = "hardcoded_attribute_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      requiredAttrs = [ "user_session" ];
+      description = "Sets a hardcoded user (or session-note) attribute on every federated user.";
+      attrs = commonIdpMapperAttrs // {
+        attribute_name = oStr "Name of the attribute / session note to set.";
+        attribute_value = oStr "Value of the attribute / session note.";
+        user_session = oBool "If true, set as a session note; if false, as a user attribute.";
+      };
+    };
+
+    hardcoded_group_identity_provider_mappers = {
+      type = "keycloak_hardcoded_group_identity_provider_mapper";
+      prefix = "hardcoded_group_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      description = "Adds every federated user to a hardcoded group.";
+      attrs = commonIdpMapperAttrs // {
+        group = oStr "Group path (e.g. `/engineering/backend`) every federated user joins.";
+      };
+    };
+
+    hardcoded_role_identity_provider_mappers = {
+      type = "keycloak_hardcoded_role_identity_provider_mapper";
+      prefix = "hardcoded_role_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      description = "Grants a hardcoded role to every federated user.";
+      attrs = commonIdpMapperAttrs // {
+        role = oStr "Realm or `client.role` name granted to every federated user.";
+      };
+    };
+
+    attribute_importer_identity_provider_mappers = {
+      type = "keycloak_attribute_importer_identity_provider_mapper";
+      prefix = "attribute_importer_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      requiredAttrs = [ "user_attribute" ];
+      description = "Imports an attribute / claim from the IdP onto the federated user.";
+      attrs = commonIdpMapperAttrs // {
+        user_attribute = oStr "Destination user attribute on the keycloak side.";
+        attribute_name = oStr "Source SAML attribute name (SAML IdPs; conflicts with attribute_friendly_name).";
+        attribute_friendly_name = oStr "Source SAML attribute friendly name (SAML IdPs; conflicts with attribute_name).";
+        claim_name = oStr "Source OIDC claim name (OIDC IdPs).";
+      };
+    };
+
+    attribute_to_role_identity_provider_mappers = {
+      type = "keycloak_attribute_to_role_identity_provider_mapper";
+      prefix = "attribute_to_role_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      requiredAttrs = [ "role" ];
+      description = "Grants a role to federated users whose IdP attribute / claim matches a value.";
+      attrs = commonIdpMapperAttrs // {
+        attribute_name = oStr "SAML attribute name to match (conflicts with attribute_friendly_name).";
+        attribute_value = oStr "Value the SAML attribute must equal.";
+        attribute_friendly_name = oStr "SAML friendly name to match (conflicts with attribute_name).";
+        claim_name = oStr "OIDC claim name to match.";
+        claim_value = oStr "Value the OIDC claim must equal.";
+        role = oStr "Realm or `client.role` name granted on match.";
+      };
+    };
+
+    user_template_importer_identity_provider_mappers = {
+      type = "keycloak_user_template_importer_identity_provider_mapper";
+      prefix = "user_template_importer_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      description = "Derives the federated user's username from a Mustache-style template over IdP claims.";
+      attrs = commonIdpMapperAttrs // {
+        template = oStr "Username template (e.g. `\${CLAIM.preferred_username}@example`).";
+      };
+    };
+
+    custom_identity_provider_mappers = {
+      type = "keycloak_custom_identity_provider_mapper";
+      prefix = "custom_idp_mapper";
+      nameAttr = "name";
+      scope = null;
+      refs = {
+        realm = realmAliasRef;
+        identity_provider = idpAliasRequiredRef;
+      };
+      requiredAttrs = [ "identity_provider_mapper" ];
+      description = "Escape hatch for an IdP mapper implementation without a dedicated typed resource.";
+      attrs = commonIdpMapperAttrs // {
+        identity_provider_mapper = oStr "Provider-id of the mapper implementation.";
       };
     };
   };
