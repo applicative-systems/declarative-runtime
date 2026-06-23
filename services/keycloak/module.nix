@@ -152,10 +152,10 @@ in
         group = "keycloak";
         # Upstream keycloak runs as DynamicUser=true with no persistent
         # state dir; allocate a dedicated one owned by the same hashed UID
-        # via systemd StateDirectory=.
+        # via systemd StateDirectory= (derived by mkReconcileService from
+        # stateDir, which must live under /var/lib for that derivation).
         stateDir = "/var/lib/keycloak";
         dynamicUser = true;
-        stateDirectory = "keycloak/declarative-terraform";
       };
     }
     // lib.optionalAttrs bootstrapClient {

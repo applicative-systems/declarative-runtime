@@ -36,14 +36,13 @@ rec {
   #   user/group the base service's user/group the reconciler runs as
   #   stateDir   the base service's primary state dir; Terraform state lives in
   #              a `declarative-terraform` subdir of it, co-located with the service
-  #   dynamicUser  set when the base service runs as systemd DynamicUser (so the
-  #                `User=` name only exists per-unit). Pairs with `stateDirectory`
-  #                so the reconciler is allocated the same hashed UID as the
-  #                primary unit and writes state into a managed StateDirectory.
-  #   stateDirectory  relative path under /var/lib used as `StateDirectory=` when
-  #                   `dynamicUser` is set. Must match `stateDir` (e.g. stateDir
-  #                   `/var/lib/keycloak` with stateDirectory `keycloak/...`), so
-  #                   the script's absolute path resolves to systemd's managed dir.
+  #   dynamicUser  set when the base service runs as systemd DynamicUser (so
+  #                the `User=` name only exists per-unit). The reconciler then
+  #                runs with `DynamicUser=true` too, so systemd allocates the
+  #                same hashed UID as the primary unit, and the work dir is
+  #                created via `StateDirectory=` (derived from `stateDir`)
+  #                rather than `mkdir`. Requires `stateDir` to live under
+  #                `/var/lib`; enforced at eval time.
   mkReconcileService =
     {
       name,
@@ -58,7 +57,6 @@ rec {
       stateDir,
       credentials ? { },
       dynamicUser ? false,
-      stateDirectory ? null,
     }:
     let
       confFile = tfJsonFile name tfConfig;
@@ -71,7 +69,14 @@ rec {
       # Terraform state is co-located with the base service: a subdir of its
       # primary state directory, created and owned by the service user.
       workDir = "${stateDir}/declarative-terraform";
+      # Under DynamicUser= the absolute work dir is also expressed as a
+      # relative `StateDirectory=` so systemd creates and owns it. Deriving
+      # both from `stateDir` is the single source of truth: the path the
+      # script `cd`s into and the path the unit declares can never drift.
+      stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
     in
+    assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
+      "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
     {
       description = "Declarative reconciliation for ${name} (OpenTofu)";
       after = afterUnits;
@@ -103,7 +108,7 @@ rec {
         # systemd DynamicUser=true; the `User=` name is hashed to a stable UID
         # that's reused across units, and systemd creates/owns the state dir.
         DynamicUser = true;
-        StateDirectory = stateDirectory;
+        StateDirectory = stateDirectoryRelative;
         StateDirectoryMode = "0700";
       };
       script = ''
