@@ -16,7 +16,7 @@ let
 
   ty = lib.types;
 
-  # o* for optional
+  # o* for optional, r* for required
   oStr =
     description:
     lib.mkOption {
@@ -29,6 +29,39 @@ let
     lib.mkOption {
       type = ty.nullOr ty.bool;
       default = null;
+      inherit description;
+    };
+  oInt =
+    description:
+    lib.mkOption {
+      type = ty.nullOr ty.int;
+      default = null;
+      inherit description;
+    };
+  oListStr =
+    description:
+    lib.mkOption {
+      type = ty.nullOr (ty.listOf ty.str);
+      default = null;
+      inherit description;
+    };
+  oAttrsStr =
+    description:
+    lib.mkOption {
+      type = ty.nullOr (ty.attrsOf ty.str);
+      default = null;
+      inherit description;
+    };
+  rStr =
+    description:
+    lib.mkOption {
+      type = ty.str;
+      inherit description;
+    };
+  rBool =
+    description:
+    lib.mkOption {
+      type = ty.bool;
       inherit description;
     };
 
@@ -58,6 +91,69 @@ let
         enabled = oBool "Is the realm enabled?";
         display_name = oStr "User-facing display name.";
         display_name_html = oStr "HTML-formatted display name.";
+
+        # general
+        user_managed_access = oBool "Enable user-managed access.";
+        organizations_enabled = oBool "Enable the organizations feature.";
+        admin_permissions_enabled = oBool "Enable the v2 admin permissions feature.";
+        terraform_deletion_protection = oBool "Refuse to destroy the realm on `tofu destroy`.";
+        attributes = oAttrsStr "Free-form realm attribute map.";
+
+        # login config
+        registration_allowed = oBool "Allow self-registration.";
+        registration_email_as_username = oBool "Use email as username on registration.";
+        edit_username_allowed = oBool "Allow users to edit their username.";
+        reset_password_allowed = oBool "Allow users to reset their password.";
+        remember_me = oBool "Offer the \"Remember Me\" checkbox on login.";
+        verify_email = oBool "Require email verification.";
+        login_with_email_allowed = oBool "Allow login with email.";
+        duplicate_emails_allowed = oBool "Allow duplicate emails across users.";
+        ssl_required = oStr "SSL required: 'none', 'external' (default), or 'all'.";
+
+        # themes
+        login_theme = oStr "Login theme.";
+        account_theme = oStr "Account console theme.";
+        admin_theme = oStr "Admin console theme.";
+        email_theme = oStr "Email theme.";
+
+        # tokens
+        default_signature_algorithm = oStr "Default JWS signing algorithm.";
+        revoke_refresh_token = oBool "Revoke refresh tokens on use.";
+        refresh_token_max_reuse = oInt "Max number of times a refresh token can be reused.";
+        sso_session_idle_timeout = oStr "SSO session idle timeout (duration string, e.g. \"30m\").";
+        sso_session_idle_timeout_remember_me = oStr "SSO session idle timeout for \"Remember Me\" sessions.";
+        sso_session_max_lifespan = oStr "SSO session max lifespan.";
+        sso_session_max_lifespan_remember_me = oStr "SSO session max lifespan for \"Remember Me\" sessions.";
+        offline_session_idle_timeout = oStr "Offline session idle timeout.";
+        offline_session_max_lifespan = oStr "Offline session max lifespan.";
+        offline_session_max_lifespan_enabled = oBool "Cap offline sessions to `offline_session_max_lifespan`.";
+        client_session_idle_timeout = oStr "Client session idle timeout (falls back to SSO idle).";
+        client_session_max_lifespan = oStr "Client session max lifespan (falls back to SSO max).";
+        access_token_lifespan = oStr "Access token lifespan.";
+        access_token_lifespan_for_implicit_flow = oStr "Access token lifespan for the implicit flow.";
+        access_code_lifespan = oStr "Auth code lifespan.";
+        access_code_lifespan_login = oStr "Login-action code lifespan.";
+        access_code_lifespan_user_action = oStr "User-action code lifespan.";
+        action_token_generated_by_user_lifespan = oStr "Lifespan of user-generated action tokens.";
+        action_token_generated_by_admin_lifespan = oStr "Lifespan of admin-generated action tokens.";
+        oauth2_device_code_lifespan = oStr "OAuth2 device-code lifespan.";
+        oauth2_device_polling_interval = oInt "OAuth2 device-code polling interval (seconds).";
+
+        # authentication
+        password_policy = oStr "Password policy string (e.g. \"upperCase(1) and length(8) and notUsername(undefined)\").";
+
+        # authentication flow bindings (alias of a flow defined in the realm)
+        browser_flow = oStr "Authentication flow alias bound to the browser flow.";
+        registration_flow = oStr "Authentication flow alias bound to the registration flow.";
+        direct_grant_flow = oStr "Authentication flow alias bound to the direct-grant flow.";
+        reset_credentials_flow = oStr "Authentication flow alias bound to the reset-credentials flow.";
+        client_authentication_flow = oStr "Authentication flow alias bound to the client-auth flow.";
+        docker_authentication_flow = oStr "Authentication flow alias bound to the docker-auth flow.";
+        first_broker_login_flow = oStr "Authentication flow alias bound to the first-broker-login flow.";
+
+        # default client scopes (referenced by name)
+        default_default_client_scopes = oListStr "Default client scopes auto-granted to new clients.";
+        default_optional_client_scopes = oListStr "Optional client scopes available to new clients.";
       };
     };
   };
