@@ -20,17 +20,17 @@ step with the rest of your system.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # This repository.
-    declarative-services.url = "github:youruser/terraform-providers";
-    declarative-services.inputs.nixpkgs.follows = "nixpkgs";
+    declarative-runtime.url = "github:youruser/declarative-runtime";
+    declarative-runtime.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
-    { nixpkgs, declarative-services, ... }:
+    { nixpkgs, declarative-runtime, ... }:
     {
       nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
-          declarative-services.nixosModules.forgejo
+          declarative-runtime.nixosModules.forgejo
           ./host.nix
         ];
       };

@@ -19,17 +19,17 @@ step with the rest of your system.
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    declarative-services.url = "github:applicative-systems/terraform-providers";
-    declarative-services.inputs.nixpkgs.follows = "nixpkgs";
+    declarative-runtime.url = "github:applicative-systems/declarative-runtime";
+    declarative-runtime.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
-    { nixpkgs, declarative-services, ... }:
+    { nixpkgs, declarative-runtime, ... }:
     {
       nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
-          declarative-services.nixosModules.keycloak
+          declarative-runtime.nixosModules.keycloak
           ./host.nix
         ];
       };

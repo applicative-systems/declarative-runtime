@@ -1,5 +1,5 @@
 {
-  description = "Declarative NixOS service configuration via paired Terraform providers";
+  description = "declarative-runtime: declarative NixOS service runtime config via paired OpenTofu providers";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
