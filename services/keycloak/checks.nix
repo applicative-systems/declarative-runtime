@@ -129,8 +129,7 @@ in
             group_roles.acme_eng_admins = {
               realm = "acme";
               group = "acme_eng";
-              # raw role id reference: managed list-refs not yet supported.
-              role_ids = [ "\${keycloak_role.role_acme_engineer.id}" ];
+              role_ids = [ "acme_engineer" ]; # managed role key, resolved to .id
               exhaustive = true;
             };
 
@@ -148,13 +147,13 @@ in
             user_roles.acme_alice = {
               realm = "acme";
               user = "acme_alice";
-              role_ids = [ "\${keycloak_role.role_acme_engineer.id}" ];
+              role_ids = [ "acme_engineer" ]; # managed role key
               exhaustive = false;
             };
             user_groups.acme_alice = {
               realm = "acme";
               user = "acme_alice";
-              group_ids = [ "\${keycloak_group.group_acme_eng.id}" ];
+              group_ids = [ "acme_eng" ]; # managed group key
               exhaustive = false;
             };
 

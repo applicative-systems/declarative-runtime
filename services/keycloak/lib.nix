@@ -489,15 +489,26 @@ let
       prefix = "role";
       nameAttr = "name";
       scope = null;
-      refs.realm = realmRef;
-      # client_id ref (-> keycloak_openid_client) lands when openid_clients do.
+      refs = {
+        realm = realmRef;
+        composite_roles = {
+          attr = "composite_roles";
+          targets = [
+            {
+              collection = "roles";
+              field = "id";
+            }
+          ];
+          managedOnly = false;
+          required = false;
+          list = true;
+          description = "Roles composited into this role. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
+        };
+      };
       description = "Keycloak roles (realm-level by default), keyed by role name.";
       attrs = {
         name = oStr "Role name. Defaults to the attribute key.";
         description = oStr "Role description.";
-        # opaque list: users supply role UUIDs or ${keycloak_role.X.id}
-        # interpolations directly. Managed list-refs land later.
-        composite_roles = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) the composite includes.";
         attributes = oAttrsStr "Free-form role attribute map.";
       };
     };
@@ -507,12 +518,24 @@ let
       prefix = "default_roles";
       nameAttr = null;
       scope = null;
-      refs.realm = realmRef;
-      requiredAttrs = [ "default_roles" ];
-      description = "Realm-level default roles auto-granted to new users, keyed by an arbitrary label.";
-      attrs = {
-        default_roles = oListStr "Role names auto-granted to every new user of the realm.";
+      refs = {
+        realm = realmRef;
+        default_roles = {
+          attr = "default_roles";
+          targets = [
+            {
+              collection = "roles";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Role names auto-granted to every new user. Each entry is a managed role key (resolved to its name) or a literal role name (built-ins like 'offline_access' work as literals).";
+        };
       };
+      description = "Realm-level default roles auto-granted to new users, keyed by an arbitrary label.";
+      attrs = { };
     };
 
     groups = {
@@ -548,14 +571,24 @@ let
       prefix = "default_groups";
       nameAttr = null;
       scope = null;
-      refs.realm = realmRef;
-      requiredAttrs = [ "group_ids" ];
-      description = "Realm-level default groups auto-joined by new users, keyed by an arbitrary label.";
-      attrs = {
-        # opaque list: users supply group UUIDs or ${keycloak_group.X.id}
-        # interpolations directly. Managed list-refs land later.
-        group_ids = oListStr "Group UUIDs (or `\${keycloak_group.X.id}` refs) new users auto-join.";
+      refs = {
+        realm = realmRef;
+        group_ids = {
+          attr = "group_ids";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Groups new users auto-join. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
+        };
       };
+      description = "Realm-level default groups auto-joined by new users, keyed by an arbitrary label.";
+      attrs = { };
     };
 
     group_memberships = {
@@ -577,12 +610,22 @@ let
           required = true;
           description = "Key of the managed group (services.keycloak.runtime.groups.<name>) the members are added to.";
         };
+        members = {
+          attr = "members";
+          targets = [
+            {
+              collection = "users";
+              field = "username";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Users to add to the group. Each entry is a managed user key (resolved to its username) or a literal username.";
+        };
       };
-      requiredAttrs = [ "members" ];
       description = "Keycloak group memberships, keyed by an arbitrary label.";
-      attrs = {
-        members = oListStr "Usernames of users to add to the group.";
-      };
+      attrs = { };
     };
 
     group_roles = {
@@ -604,11 +647,22 @@ let
           required = true;
           description = "Key of the managed group (services.keycloak.runtime.groups.<name>) to assign roles to.";
         };
+        role_ids = {
+          attr = "role_ids";
+          targets = [
+            {
+              collection = "roles";
+              field = "id";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Roles granted to the group. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
+        };
       };
-      requiredAttrs = [ "role_ids" ];
       description = "Role assignments for a group, keyed by an arbitrary label.";
       attrs = {
-        role_ids = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) granted to the group.";
         exhaustive = oBool "If true, only the listed roles remain assigned; if false, listed roles are added without removing others.";
       };
     };
@@ -672,11 +726,22 @@ let
           required = true;
           description = "Key of the managed user (services.keycloak.runtime.users.<name>) to assign roles to.";
         };
+        role_ids = {
+          attr = "role_ids";
+          targets = [
+            {
+              collection = "roles";
+              field = "id";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Roles granted to the user. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
+        };
       };
-      requiredAttrs = [ "role_ids" ];
       description = "Role assignments for a user, keyed by an arbitrary label.";
       attrs = {
-        role_ids = oListStr "Role UUIDs (or `\${keycloak_role.X.id}` refs) granted to the user.";
         exhaustive = oBool "If true, only the listed roles remain assigned; otherwise the listed roles are added without removing others.";
       };
     };
@@ -700,11 +765,22 @@ let
           required = true;
           description = "Key of the managed user (services.keycloak.runtime.users.<name>) to add to groups.";
         };
+        group_ids = {
+          attr = "group_ids";
+          targets = [
+            {
+              collection = "groups";
+              field = "id";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Groups the user joins. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
+        };
       };
-      requiredAttrs = [ "group_ids" ];
       description = "Group memberships for a user, keyed by an arbitrary label.";
       attrs = {
-        group_ids = oListStr "Group UUIDs (or `\${keycloak_group.X.id}` refs) the user joins.";
         exhaustive = oBool "If true, only the listed groups remain joined; otherwise the listed groups are added without removing others.";
       };
     };
@@ -851,12 +927,22 @@ let
           required = true;
           description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
         };
+        default_scopes = {
+          attr = "default_scopes";
+          targets = [
+            {
+              collection = "openid_client_scopes";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Scopes attached by default. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name (built-ins like 'profile' / 'email' work as literals).";
+        };
       };
-      requiredAttrs = [ "default_scopes" ];
       description = "Default OAuth2 scopes auto-attached to a client, keyed by an arbitrary label.";
-      attrs = {
-        default_scopes = oListStr "Names of scopes attached by default.";
-      };
+      attrs = { };
     };
 
     openid_client_optional_scopes = {
@@ -878,12 +964,22 @@ let
           required = true;
           description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
         };
+        optional_scopes = {
+          attr = "optional_scopes";
+          targets = [
+            {
+              collection = "openid_client_scopes";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Optionally-attached scopes. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name.";
+        };
       };
-      requiredAttrs = [ "optional_scopes" ];
       description = "Optional OAuth2 scopes available to a client, keyed by an arbitrary label.";
-      attrs = {
-        optional_scopes = oListStr "Names of optionally-attached scopes.";
-      };
+      attrs = { };
     };
 
     openid_client_service_account_roles = {
@@ -1018,12 +1114,22 @@ let
           required = true;
           description = "Key of the managed SAML client (services.keycloak.runtime.saml_clients.<name>) the scope binding applies to.";
         };
+        default_scopes = {
+          attr = "default_scopes";
+          targets = [
+            {
+              collection = "saml_client_scopes";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "SAML scopes attached by default. Each entry is a managed saml_client_scope key (resolved to its name) or a literal scope name.";
+        };
       };
-      requiredAttrs = [ "default_scopes" ];
       description = "Default SAML scopes auto-attached to a SAML client, keyed by an arbitrary label.";
-      attrs = {
-        default_scopes = oListStr "Names of SAML scopes attached by default.";
-      };
+      attrs = { };
     };
 
     # OpenID protocol mappers: each is its own resource type, keyed by the
@@ -2748,12 +2854,28 @@ let
       prefix = "realm_default_client_scopes";
       nameAttr = null;
       scope = null;
-      refs.realm = realmRef;
-      requiredAttrs = [ "default_scopes" ];
-      description = "Realm-wide default client-scope binding (set of scope names), keyed by an arbitrary label. Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
-      attrs = {
-        default_scopes = oListStr "Names of scopes auto-attached as default to every new client.";
+      refs = {
+        realm = realmRef;
+        default_scopes = {
+          attr = "default_scopes";
+          targets = [
+            {
+              collection = "openid_client_scopes";
+              field = "name";
+            }
+            {
+              collection = "saml_client_scopes";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Scope names auto-attached as default to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
+        };
       };
+      description = "Realm-wide default client-scope binding (set of scope names), keyed by an arbitrary label. Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
+      attrs = { };
     };
 
     realm_optional_client_scopes = {
@@ -2761,12 +2883,28 @@ let
       prefix = "realm_optional_client_scopes";
       nameAttr = null;
       scope = null;
-      refs.realm = realmRef;
-      requiredAttrs = [ "optional_scopes" ];
-      description = "Realm-wide optional client-scope binding (set of scope names), keyed by an arbitrary label.";
-      attrs = {
-        optional_scopes = oListStr "Names of scopes available as optional to every new client.";
+      refs = {
+        realm = realmRef;
+        optional_scopes = {
+          attr = "optional_scopes";
+          targets = [
+            {
+              collection = "openid_client_scopes";
+              field = "name";
+            }
+            {
+              collection = "saml_client_scopes";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Scope names available as optional to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
+        };
       };
+      description = "Realm-wide optional client-scope binding (set of scope names), keyed by an arbitrary label.";
+      attrs = { };
     };
 
     organizations = {
@@ -2879,8 +3017,22 @@ let
       prefix = "realm_client_policy_profile_policy";
       nameAttr = "name";
       scope = null;
-      refs.realm = realmRef;
-      requiredAttrs = [ "profiles" ];
+      refs = {
+        realm = realmRef;
+        profiles = {
+          attr = "profiles";
+          targets = [
+            {
+              collection = "realm_client_policy_profiles";
+              field = "name";
+            }
+          ];
+          managedOnly = false;
+          required = true;
+          list = true;
+          description = "Names of client-policy profiles this policy applies. Each entry is a managed realm_client_policy_profile key (resolved to its name) or a literal profile name.";
+        };
+      };
       description = "Realm client-policy policy binding a set of profiles to a set of conditions.";
       attrs = {
         name = oStr "Policy name. Defaults to the attribute key.";
@@ -2890,7 +3042,6 @@ let
           name = rStr "Condition provider-id (e.g. 'client-roles').";
           configuration = oAttrsStr "Condition-specific configuration.";
         } "List of conditions; the policy applies when all conditions match.";
-        profiles = oListStr "Names of client-policy profiles this policy applies.";
       };
     };
 
@@ -3033,14 +3184,17 @@ let
             (spec.attrs or { })
             // lib.mapAttrs (
               _: refSpec:
+              let
+                base = if refSpec.list or false then lib.types.listOf lib.types.str else lib.types.str;
+              in
               if refSpec.required or false then
                 lib.mkOption {
-                  type = lib.types.str;
+                  type = base;
                   description = refSpec.description;
                 }
               else
                 lib.mkOption {
-                  type = lib.types.nullOr lib.types.str;
+                  type = lib.types.nullOr base;
                   default = null;
                   description = refSpec.description;
                 }
@@ -3213,8 +3367,12 @@ let
           };
           refAttrs = lib.concatMapAttrs (
             refName: refSpec:
-            lib.optionalAttrs (item.${refName} or null != null) {
-              ${refSpec.attr} = resolveRef refSpec item.${refName};
+            let
+              v = item.${refName} or null;
+            in
+            lib.optionalAttrs (v != null) {
+              ${refSpec.attr} =
+                if refSpec.list or false then map (resolveRef refSpec) v else resolveRef refSpec v;
             }
           ) spec.refs;
           # A required secret must be supplied via either the literal or its file.
