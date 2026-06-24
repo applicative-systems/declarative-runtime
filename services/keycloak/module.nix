@@ -182,12 +182,6 @@ in
           client_id_file="$STATE_DIRECTORY/client_id"
           client_secret_file="$STATE_DIRECTORY/client_secret"
 
-          # the saved credential pair is the "already bootstrapped"
-          # marker. /var/lib persists across reboots.
-          if [ -s "$client_id_file" ] && [ -s "$client_secret_file" ]; then
-            exit 0
-          fi
-
           # wait up to 3 minutes for keycloak to come up.
           for _ in $(seq 1 90); do
             if curl -fsS -o /dev/null "${cfg.baseUrl}/realms/master"; then
@@ -195,6 +189,23 @@ in
             fi
             sleep 2
           done
+
+          # saved credential pair exists -- probe it against the token
+          # endpoint. valid means already-bootstrapped; otherwise the
+          # secret has been rotated server-side and we fall through to
+          # re-fetch the current one (same client, same id).
+          if [ -s "$client_id_file" ] && [ -s "$client_secret_file" ]; then
+            saved_id="$(cat "$client_id_file")"
+            saved_secret="$(cat "$client_secret_file")"
+            if curl -fsS -o /dev/null -X POST \
+                 ${lib.escapeShellArg "${cfg.baseUrl}/realms/master/protocol/openid-connect/token"} \
+                 --data-urlencode 'grant_type=client_credentials' \
+                 --data-urlencode "client_id=$saved_id" \
+                 --data-urlencode "client_secret=$saved_secret"; then
+              exit 0
+            fi
+            echo "saved service-account credentials no longer accepted; refreshing from keycloak admin." >&2
+          fi
 
           kcadm.sh config credentials \
             --server ${lib.escapeShellArg cfg.baseUrl} \
