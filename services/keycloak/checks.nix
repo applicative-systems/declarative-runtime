@@ -25,6 +25,16 @@ let
         ))
     def get_realm(m, realm):
         return admin_get(m, realm)
+    def assert_noop_apply(m, unit):
+        # last "Apply complete!" line in the unit's journal must report
+        # 0 added / 0 changed / 0 destroyed -- otherwise the reconciler
+        # is not idempotent under an unchanged config.
+        lines = m.succeed(
+            f"journalctl -u {unit} --no-pager --output=cat | grep 'Apply complete'"
+        ).strip().splitlines()
+        assert lines, f"no 'Apply complete!' line in journal for {unit}"
+        assert "0 added, 0 changed, 0 destroyed" in lines[-1], \
+            f"reapply was not a no-op: {lines[-1]}"
   '';
 
   # shared keycloak host config. `runtime` is the per-test fixture;
@@ -126,6 +136,7 @@ in
 
       with subtest("reapplying the same config is a no-op"):
           machine.succeed("systemctl restart declarative-keycloak.service")
+          assert_noop_apply(machine, "declarative-keycloak.service")
 
       with subtest("new realm is applied on config switch"):
           machine.succeed(

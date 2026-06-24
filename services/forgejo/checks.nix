@@ -134,8 +134,16 @@
       owner = machine.succeed("stat -c %U /var/lib/forgejo/declarative-terraform/terraform.tfstate").strip()
       assert owner == "forgejo", f"tfstate not under forgejo's state dir / not forgejo-owned: {owner}"
 
-      # Re-applying must be idempotent (a second run must also succeed).
+      # Re-applying must be idempotent: a second run must succeed *and*
+      # report 0/0/0 (the last 'Apply complete!' line in the journal).
       machine.succeed("systemctl restart declarative-forgejo.service")
+      apply_lines = machine.succeed(
+          "journalctl -u declarative-forgejo.service --no-pager --output=cat "
+          "| grep 'Apply complete'"
+      ).strip().splitlines()
+      assert apply_lines, "no 'Apply complete!' line in journal"
+      assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
+          f"reapply was not a no-op: {apply_lines[-1]}"
 
       # Adding an admin-scoped resource (a user needs write:admin + read:user)
       # mus work because the scopen is the maximal "all" token
