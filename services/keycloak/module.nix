@@ -44,6 +44,18 @@ in
       description = "Base URL of the local keycloak admin API.";
     };
 
+    adminRealm = mkOption {
+      type = types.str;
+      default = "master";
+      description = ''
+        Realm the reconciler's service-account client lives in. The
+        provider block authenticates against this realm. Defaults to
+        `master`; the self-bootstrap flow only supports `master`, so
+        when overriding this you must also supply `clientIdFile` /
+        `clientSecretFile` for a client you've provisioned yourself.
+      '';
+    };
+
     bootstrapAdminPasswordFile = mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -108,6 +120,10 @@ in
         assertion = (cfg.clientIdFile != null) || (cfg.bootstrapAdminPasswordFile != null);
         message = "services.keycloak.runtime: when no client credentials are supplied, bootstrapAdminPasswordFile is required to mint them.";
       }
+      {
+        assertion = cfg.adminRealm == "master" || cfg.clientIdFile != null;
+        message = "services.keycloak.runtime: adminRealm != \"master\" requires operator-supplied clientIdFile/clientSecretFile (the self-bootstrap flow assumes master).";
+      }
     ];
 
     systemd.services = {
@@ -121,7 +137,7 @@ in
           "keycloak.service"
         ]
         ++ lib.optional bootstrapClient "${bootstrapServiceName}.service";
-        healthUrl = "${cfg.baseUrl}/realms/master";
+        healthUrl = "${cfg.baseUrl}/realms/${cfg.adminRealm}";
         tokenFile = effectiveClientSecretFile;
         user = "keycloak";
         group = "keycloak";
