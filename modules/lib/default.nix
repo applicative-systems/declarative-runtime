@@ -351,6 +351,22 @@ rec {
             else
               null
           ) (spec.requiredAttrs or [ ]);
+          # exactly-one-of ref groups: each entry is a list of ref names of
+          # which exactly one must be set (provider rejects zero or two).
+          oneOfChecks = map (
+            group:
+            let
+              setRefs = builtins.filter (refName: (item.${refName} or null) != null) group;
+              n = builtins.length setRefs;
+              joined = lib.concatStringsSep ", " group;
+            in
+            if n == 0 then
+              throw "${runtimePrefix}.${c}.${key}: exactly one of [${joined}] must be set"
+            else if n > 1 then
+              throw "${runtimePrefix}.${c}.${key}: [${joined}] are mutually exclusive; set exactly one"
+            else
+              null
+          ) (spec.oneOfRefs or [ ]);
           # wrap nested MaxItems:1 blocks in `[ obj ]` so terraform reads
           # them as blocks. spec.blockAttrs lists dotted paths; recurses
           # through attrsets and list elements.
@@ -379,7 +395,7 @@ rec {
         # deepSeq forces the checks to run.
         # (they're not nixos assertions because we generate the .tf.json
         # outside a full system build too.)
-        builtins.deepSeq [ reqSecretChecks reqAttrChecks ] {
+        builtins.deepSeq [ reqSecretChecks reqAttrChecks oneOfChecks ] {
           label = tfLabel spec.prefix key;
           value = wrapped;
           inherit (substituted) secrets;
