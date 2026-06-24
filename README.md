@@ -5,8 +5,17 @@ Make NixOS services **more declaratively configurable** than upstream Nixpkgs
 modules allow, by pairing each service with its Terraform provider and
 reconciling the service's _runtime state_ once it is up.
 
-> **Status:** the pattern is implemented and the **Forgejo pairing is the
-> worked reference** (see [`services/forgejo`](services/forgejo/README.md)).
+> **Status:** two pairings implemented.
+>
+> - **[Forgejo](services/forgejo/README.md)** — 15 resource types
+>   (organizations, users, repositories, teams, action secrets/variables,
+>   webhooks, branch protection, SSH/GPG/deploy keys, collaborators).
+> - **[Keycloak](services/keycloak/README.md)** — ~95 resource types
+>   (realms, clients, scopes, ~20 protocol mappers, identity providers,
+>   IdP mappers, roles, groups, users, authentication flows, fine-grained
+>   authorization + policies, LDAP federation + mappers, realm keystores,
+>   realm-level config). Includes a service-account bootstrap and nested
+>   `<attr>File` indirection for every secret attribute at any depth.
 
 ## The gap this closes
 
@@ -32,6 +41,24 @@ services.forgejo = {
     };
   };
 };
+
+services.keycloak = {
+  enable = true;
+  initialAdminPassword = "REPLACE_ME";
+  database.passwordFile = "/run/secrets/keycloak-db-password";
+  runtime = {
+    enable = true;
+    bootstrapAdminPasswordFile = "/run/secrets/keycloak-admin-password";
+    realms.staff.display_name = "Staff SSO";
+    openid_clients.app = {
+      realm = "staff";
+      client_id = "app";
+      access_type = "CONFIDENTIAL";
+      client_secretFile = "/run/secrets/staff-app-client-secret";
+      valid_redirect_uris = [ "https://app.example.com/*" ];
+    };
+  };
+};
 ```
 
 A pairing only makes sense when a service has **admin-declarative runtime state
@@ -54,11 +81,15 @@ unit_ visibly (`systemctl status`) without tearing down the service.
 ## Usage
 
 Add this flake as an input and import the pairing's NixOS module
-(`nixosModules.forgejo`, or `nixosModules.default` for all pairings). Full
-installation, configuration examples, the option reference, the resource table,
-and the secrets guide live in the per-pairing README:
+(`nixosModules.forgejo`, `nixosModules.keycloak`, or
+`nixosModules.default` for all pairings). Full installation, configuration
+examples, the option reference, the resource table, and the secrets guide
+live in the per-pairing README:
 
 - [Forgejo pairing](services/forgejo/README.md)
+- [Keycloak pairing](services/keycloak/README.md) — includes the
+  service-account bootstrap flow and the operator-supplied client
+  override.
 
 ### Secrets
 
@@ -72,18 +103,23 @@ path — prefer it over the literal for any real secret.
 ## Repository layout
 
 ```
-flake.nix          # outputs: nixosModules, checks, formatter
-treefmt.nix        # treefmt + nixfmt config
+flake.nix              # outputs: nixosModules, checks, formatter
+treefmt.nix            # treefmt + nixfmt config
 modules/
-  default.nix      # aggregates per-pairing modules into nixosModules.default
-  lib/             # provider-agnostic helpers: tf-label/file, run-once reconciler
-services/          # one directory per service<->provider pairing
-  forgejo/         # the worked Forgejo <-> svalabs/forgejo pairing
-    module.nix     #   NixOS module: services.forgejo.runtime + systemd wiring
-    lib.nix        #   provider specifics: wrapped executor + .tf.json generation
-    pkg.nix        #   vendor the provider (not in nixpkgs)
-    checks.nix     #   NixOS VM test
-    README.md      #   usage docs
+  default.nix          # aggregates per-pairing modules into nixosModules.default
+  lib/                 # shared helpers: tf-label/file, run-once reconciler
+services/              # one directory per service<->provider pairing
+  forgejo/             # Forgejo <-> svalabs/forgejo
+    module.nix         #   NixOS module: services.forgejo.runtime + systemd wiring
+    lib.nix            #   provider specifics: wrapped executor + .tf.json generation
+    pkg.nix            #   vendor the provider (not in nixpkgs)
+    checks.nix         #   NixOS VM test
+    README.md          #   usage docs
+  keycloak/            # Keycloak <-> keycloak/keycloak (in nixpkgs)
+    module.nix         #   services.keycloak.runtime + reconciler + bootstrap unit
+    lib.nix            #   ~95 typed resourceTypes + the value-tree renderer
+    checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
+    README.md          #   usage docs
 ```
 
 ## Development
