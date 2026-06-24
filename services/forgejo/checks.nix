@@ -24,9 +24,10 @@
         # curl drives the post-convergence API assertions.
         environment.systemPackages = [ pkgs.curl ];
 
-        # Stand-in for an operator-managed secret file (sops/agenix in production):
-        # bob's password, fed to the reconciler via LoadCredential, never the store.
+        # mock agenix secrets: passwords supplied as host files, fed to the
+        # reconciler via LoadCredential and never the world-readable store.
         environment.etc."forgejo-bob-password".text = "hackme";
+        environment.etc."forgejo-alice-password".text = "hackme";
 
         services.forgejo = {
           enable = true;
@@ -98,7 +99,7 @@
         specialisation.widenScope.configuration = {
           services.forgejo.runtime.users.alice = {
             email = "alice@localhost.localdomain";
-            password = "hackme";
+            passwordFile = "/etc/forgejo-alice-password";
             must_change_password = false;
           };
         };

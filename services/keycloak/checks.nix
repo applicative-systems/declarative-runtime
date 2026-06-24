@@ -247,6 +247,7 @@ in
     name = "declarative-keycloak-clients";
 
     containers.keycloak = mkHost {
+      extraEtc."acme-app-client-secret".text = "topsecret";
       runtime = {
         realms.acme.display_name = "ACME";
 
@@ -264,7 +265,7 @@ in
           client_id = "acme-app";
           name = "ACME App";
           access_type = "CONFIDENTIAL";
-          client_secret = "topsecret";
+          client_secretFile = "/etc/acme-app-client-secret";
           standard_flow_enabled = true;
           direct_access_grants_enabled = true;
           service_accounts_enabled = true;
@@ -319,6 +320,13 @@ in
           names = {b["name"] for b in bindings}
           assert "acme-profile" in names, \
               f"acme-profile not bound as default scope: {names}"
+
+      with subtest("client_secret was supplied via <attr>File, never written to .tf.json"):
+          tfjson = keycloak.succeed(
+              "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
+          )
+          assert "topsecret" not in tfjson, \
+              "openid_clients.acme_app.client_secret leaked into .tf.json"
 
       with subtest("protocol mapper attached to client scope"):
           # protocolMappers ride along on the client-scope representation.
