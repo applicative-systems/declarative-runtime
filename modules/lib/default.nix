@@ -340,9 +340,11 @@ rec {
           reqAttrChecks = map (
             attr:
             let
-              v = item.${attr} or null;
+              # nameAttr inherits the collection key when the user omits it,
+              # so check the post-injection value -- not the raw item.
+              v = (item // nameInject).${attr} or null;
             in
-            if v == null || v == { } || v == [ ] then
+            if v == null || v == { } || v == [ ] || v == "" then
               throw "${runtimePrefix}.${c}.${key}: '${attr}' is required and must be non-empty"
             else
               null
