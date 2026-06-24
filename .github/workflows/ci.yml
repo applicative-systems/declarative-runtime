@@ -11,6 +11,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          # nspawn container tests need auto-allocate-uids + cgroups.
+          extra-conf: |
+            extra-experimental-features = auto-allocate-uids cgroups
+            auto-allocate-uids = true
+            use-cgroups = true
 
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
