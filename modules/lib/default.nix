@@ -224,7 +224,7 @@ rec {
       # works at any depth (top-level attrs, nested submodules, list
       # elements). throws if both `<attr>` and `<attr>File` are set.
       substituteSecrets =
-        spec: key:
+        c: spec: key:
         let
           mkId = pathParts: secretId spec key (varSafe (lib.concatStringsSep "_" pathParts));
           go =
@@ -280,7 +280,7 @@ rec {
                 );
               in
               if conflict != [ ] then
-                throw "${runtimePrefix}.${spec.prefix}.${key}: set either '${
+                throw "${runtimePrefix}.${c}.${key}: set either '${
                   lib.concatStringsSep "." (pathParts ++ [ (builtins.head conflict).attr ])
                 }' or '${
                   lib.concatStringsSep "." (pathParts ++ [ ((builtins.head conflict).attr + "File") ])
@@ -292,7 +292,9 @@ rec {
                 }
             else if builtins.isList v then
               let
-                mapped = map (e: go pathParts e) v;
+                # include the list index in the path so two elements with
+                # the same `<attr>File` key don't collide on credential id.
+                mapped = lib.imap0 (i: e: go (pathParts ++ [ (toString i) ]) e) v;
               in
               {
                 value = map (m: m.value) mapped;
@@ -371,7 +373,7 @@ rec {
             else
               v;
           cleaned = cleanNulls (base // nameInject // refAttrs);
-          substituted = substituteSecrets spec key cleaned;
+          substituted = substituteSecrets c spec key cleaned;
           wrapped = wrapBlocks "" substituted.value;
         in
         # deepSeq forces the checks to run.
