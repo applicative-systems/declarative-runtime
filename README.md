@@ -1,5 +1,6 @@
-# Declarative NixOS services via paired Terraform providers
+# declarative-runtime
 
+**Declarative NixOS service runtime config via paired OpenTofu providers.**
 Make NixOS services **more declaratively configurable** than upstream Nixpkgs
 modules allow, by pairing each service with its Terraform provider and
 reconciling the service's _runtime state_ once it is up.
