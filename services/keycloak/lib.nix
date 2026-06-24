@@ -3117,7 +3117,7 @@ let
     extraSensitiveVars = [ clientIdVar ];
     providerBlock = cfg: {
       url = cfg.baseUrl;
-      realm = "master";
+      realm = cfg.adminRealm;
       client_id = "\${var.${clientIdVar}}";
       client_secret = "\${var.${tokenVar}}";
     };
