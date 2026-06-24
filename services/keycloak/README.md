@@ -347,14 +347,14 @@ collection, multi-target with literal fallback):
 | `openid_client_authorization_resources`             | `openid_client_authorization_resource`            | `name`       |
 | `openid_client_authorization_scopes`                | `openid_client_authorization_scope`               | `name`       |
 | `openid_client_authorization_permissions`           | `openid_client_authorization_permission`          | `name`       |
-| `openid_client_authorization_aggregate_policies`    | `openid_client_authorization_aggregate_policy`    | `name`       |
-| `openid_client_authorization_client_policies`       | `openid_client_authorization_client_policy`       | `name`       |
+| `openid_client_aggregate_policies`                  | `openid_client_aggregate_policy`                  | `name`       |
+| `openid_client_client_policies`                     | `openid_client_client_policy`                     | `name`       |
 | `openid_client_authorization_client_scope_policies` | `openid_client_authorization_client_scope_policy` | `name`       |
-| `openid_client_authorization_group_policies`        | `openid_client_authorization_group_policy`        | `name`       |
-| `openid_client_authorization_js_policies`           | `openid_client_authorization_js_policy`           | `name`       |
-| `openid_client_authorization_role_policies`         | `openid_client_authorization_role_policy`         | `name`       |
-| `openid_client_authorization_time_policies`         | `openid_client_authorization_time_policy`         | `name`       |
-| `openid_client_authorization_user_policies`         | `openid_client_authorization_user_policy`         | `name`       |
+| `openid_client_group_policies`                      | `openid_client_group_policy`                      | `name`       |
+| `openid_client_js_policies`                         | `openid_client_js_policy`                         | `name`       |
+| `openid_client_role_policies`                       | `openid_client_role_policy`                       | `name`       |
+| `openid_client_time_policies`                       | `openid_client_time_policy`                       | `name`       |
+| `openid_client_user_policies`                       | `openid_client_user_policy`                       | `name`       |
 
 All authz resources share `realm` + `resource_server` → openid_clients
 (the latter resolves to the client's computed `resource_server_id`,

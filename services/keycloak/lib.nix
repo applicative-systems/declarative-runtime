@@ -1983,9 +1983,9 @@ let
       };
     };
 
-    openid_client_authorization_aggregate_policies = {
-      type = "keycloak_openid_client_authorization_aggregate_policy";
-      prefix = "openid_client_authz_aggregate_policy";
+    openid_client_aggregate_policies = {
+      type = "keycloak_openid_client_aggregate_policy";
+      prefix = "openid_client_aggregate_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2017,9 +2017,9 @@ let
       };
     };
 
-    openid_client_authorization_client_policies = {
-      type = "keycloak_openid_client_authorization_client_policy";
-      prefix = "openid_client_authz_client_policy";
+    openid_client_client_policies = {
+      type = "keycloak_openid_client_client_policy";
+      prefix = "openid_client_client_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2088,9 +2088,9 @@ let
       };
     };
 
-    openid_client_authorization_group_policies = {
-      type = "keycloak_openid_client_authorization_group_policy";
-      prefix = "openid_client_authz_group_policy";
+    openid_client_group_policies = {
+      type = "keycloak_openid_client_group_policy";
+      prefix = "openid_client_group_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2127,9 +2127,9 @@ let
       };
     };
 
-    openid_client_authorization_js_policies = {
-      type = "keycloak_openid_client_authorization_js_policy";
-      prefix = "openid_client_authz_js_policy";
+    openid_client_js_policies = {
+      type = "keycloak_openid_client_js_policy";
+      prefix = "openid_client_js_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2162,9 +2162,9 @@ let
       };
     };
 
-    openid_client_authorization_role_policies = {
-      type = "keycloak_openid_client_authorization_role_policy";
-      prefix = "openid_client_authz_role_policy";
+    openid_client_role_policies = {
+      type = "keycloak_openid_client_role_policy";
+      prefix = "openid_client_role_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2201,9 +2201,9 @@ let
       };
     };
 
-    openid_client_authorization_time_policies = {
-      type = "keycloak_openid_client_authorization_time_policy";
-      prefix = "openid_client_authz_time_policy";
+    openid_client_time_policies = {
+      type = "keycloak_openid_client_time_policy";
+      prefix = "openid_client_time_policy";
       nameAttr = "name";
       scope = null;
       refs = {
@@ -2707,9 +2707,9 @@ let
       };
     };
 
-    openid_client_authorization_user_policies = {
-      type = "keycloak_openid_client_authorization_user_policy";
-      prefix = "openid_client_authz_user_policy";
+    openid_client_user_policies = {
+      type = "keycloak_openid_client_user_policy";
+      prefix = "openid_client_user_policy";
       nameAttr = "name";
       scope = null;
       refs = {
