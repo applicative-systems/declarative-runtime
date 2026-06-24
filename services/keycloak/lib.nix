@@ -2907,15 +2907,13 @@ let
           enabled_when_scope = oListStr "Scopes that make the attribute available.";
           required_for_roles = oListStr "Roles for which the attribute is required.";
           required_for_scopes = oListStr "Scopes for which the attribute is required.";
+          # both are Required upstream; declared as oListStr (nullable,
+          # default null) so cleanNulls drops them when unset and apply
+          # errors -- vs `listOf str` which would silently default to []
+          # and *strip* every role from keycloak's side.
           permissions = oSub {
-            view = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              description = "Roles that can view the attribute (e.g. \"admin\", \"user\").";
-            };
-            edit = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              description = "Roles that can edit the attribute.";
-            };
+            view = oListStr "Roles that can view the attribute (e.g. \"admin\", \"user\").";
+            edit = oListStr "Roles that can edit the attribute.";
           } "View / edit permissions for the attribute.";
           validator = oListSub {
             name = rStr "Validator id (e.g. \"length\", \"pattern\").";
