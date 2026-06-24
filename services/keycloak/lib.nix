@@ -74,6 +74,15 @@ let
     add_to_userinfo = oBool "Include in UserInfo?";
   };
 
+  # protocol mappers attach to a client *or* a client scope -- never
+  # both, never neither (the provider rejects either).
+  clientOrScopeOneOf = [
+    [
+      "client"
+      "client_scope"
+    ]
+  ];
+
   # SAML counterparts of the openid refs above.
   samlClientOptionalRef = {
     attr = "client_id";
@@ -1082,6 +1091,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "user_attribute"
         "claim_name"
@@ -1106,6 +1116,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "user_property"
         "claim_name"
@@ -1128,6 +1139,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "claim_name" ];
       description = "OpenID protocol mapper that maps group memberships to a claim.";
       attrs = openidMapperCommonAttrs // {
@@ -1146,6 +1158,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       description = "OpenID protocol mapper that emits the user's full name as a single claim.";
       attrs = openidMapperCommonAttrs;
     };
@@ -1160,6 +1173,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       description = "OpenID protocol mapper for the `sub` claim.";
       attrs = {
         name = oStr "Mapper name. Defaults to the attribute key.";
@@ -1178,6 +1192,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "claim_name"
         "claim_value"
@@ -1200,6 +1215,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       description = "OpenID protocol mapper that adds an audience to issued tokens (exactly one of `included_client_audience` / `included_custom_audience`).";
       attrs = {
         name = oStr "Mapper name. Defaults to the attribute key.";
@@ -1220,6 +1236,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       description = "OpenID audience-resolve mapper (derives audience from client roles).";
       attrs = {
         name = oStr "Mapper name. Defaults to the attribute key.";
@@ -1236,6 +1253,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "role_id" ];
       description = "OpenID protocol mapper that adds a hardcoded role to issued tokens.";
       attrs = {
@@ -1254,6 +1272,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "claim_name" ];
       description = "OpenID protocol mapper that maps the user's realm roles to a claim.";
       attrs = openidMapperCommonAttrs // {
@@ -1275,6 +1294,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "claim_name" ];
       description = "OpenID protocol mapper that maps the user's roles on a specific client to a claim.";
       attrs = openidMapperCommonAttrs // {
@@ -1296,6 +1316,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "claim_name"
         "session_note"
@@ -1321,6 +1342,7 @@ let
         client = openidClientOptionalRef;
         client_scope = openidClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "script"
         "claim_name"
@@ -1344,6 +1366,7 @@ let
         client = samlClientOptionalRef;
         client_scope = samlClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "user_attribute"
         "saml_attribute_name"
@@ -1369,6 +1392,7 @@ let
         client = samlClientOptionalRef;
         client_scope = samlClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "user_property"
         "saml_attribute_name"
@@ -1393,6 +1417,7 @@ let
         client = samlClientOptionalRef;
         client_scope = samlClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "script"
         "saml_attribute_name"
@@ -1418,6 +1443,7 @@ let
         client = anyClientOptionalRef;
         client_scope = anyClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "protocol"
         "protocol_mapper"
@@ -1442,6 +1468,7 @@ let
         client = anyClientOptionalRef;
         client_scope = anyClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [
         "protocol"
         "protocol_mapper"
@@ -1466,6 +1493,7 @@ let
         client = anyClientOptionalRef;
         client_scope = anyClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "role_id" ];
       description = "Generic role-scope mapper that attaches a role to a client / client scope, keyed by an arbitrary label.";
       attrs = {
@@ -1483,6 +1511,7 @@ let
         client = anyClientOptionalRef;
         client_scope = anyClientScopeOptionalRef;
       };
+      oneOfRefs = clientOrScopeOneOf;
       requiredAttrs = [ "role_id" ];
       description = "Generic role-scope mapper attached to a specific client (deprecated alias kept for completeness).";
       attrs = {
