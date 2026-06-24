@@ -54,9 +54,12 @@ realm). The pairing offers two paths:
    `admin` composite role, and persists the
    resulting `client_id`/`client_secret` 0600 under
    `/var/lib/declarative-keycloak-bootstrap/`. The reconciler picks them up
-   via systemd `LoadCredential=` on every run; the file pair is the
-   "already bootstrapped" marker, so the oneshot is a no-op on subsequent
-   boots.
+   via systemd `LoadCredential=` on every run. On subsequent boots the
+   oneshot probes the saved pair against keycloak's token endpoint --
+   if the secret has been rotated server-side (e.g. through the admin
+   console) the pair is refreshed in place from the existing client.
+   Recovery is therefore a `systemctl restart declarative-keycloak-bootstrap`
+   away.
 
 2. **Operator-supplied.** Set both `clientIdFile` and `clientSecretFile` to
    host paths for a service-account client you've created externally. The
