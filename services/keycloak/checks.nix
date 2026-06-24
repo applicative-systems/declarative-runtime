@@ -24,6 +24,7 @@ in
         environment.etc."keycloak-db-password".text = "hackme";
         environment.etc."keycloak-admin-password".text = keycloakAdminPassword;
         environment.etc."acme-google-secret".text = "fakesecret";
+        environment.etc."acme-smtp-password".text = "verysecretpassword";
 
         services.keycloak = {
           enable = true;
@@ -62,14 +63,19 @@ in
                 ];
                 default_locale = "en";
               };
-              # smtp_server is a nested block too; flat fields only here
-              # (no auth -- the nested-Sensitive auth.password / token_auth.
-              # client_secret aren't yet protected by <attr>File).
+              # smtp_server with nested auth credentials: passwordFile is a
+              # host path read via LoadCredential=, never copied into the
+              # generated .tf.json (substituteSecrets walks the value tree
+              # and substitutes `${var.<id>}` at the nested location).
               smtp_server = {
                 host = "smtp.example.com";
                 from = "noreply@example.com";
                 port = "25";
                 from_display_name = "ACME";
+                auth = {
+                  username = "noreply";
+                  passwordFile = "/etc/acme-smtp-password";
+                };
               };
               # exercises the nested-in-nested block-list wrapping (the
               # security_defenses outer block and its inner headers /
@@ -631,6 +637,12 @@ in
           ).strip()
           assert client_secret, "bootstrap did not write client_secret"
           assert client_secret not in tfjson, "client_secret leaked into generated .tf.json"
+          # nested-secret indirection: smtp_server.auth.passwordFile must
+          # leave the literal out of the generated config.
+          assert "verysecretpassword" not in tfjson, \
+              "smtp_server.auth.password leaked into generated .tf.json"
+          assert "secret_realm_acme_smtp_server_auth_password" in tfjson, \
+              "expected nested-secret var reference in generated .tf.json"
 
       with subtest("tfstate file is not empty"):
           machine.succeed(

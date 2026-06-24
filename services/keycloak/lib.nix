@@ -383,9 +383,11 @@ let
         default_optional_client_scopes = oListStr "Optional client scopes available to new clients.";
 
         # nested blocks: rendered as [{ ... }] via the `blockAttrs` markup.
-        # Nested-sensitive fields (smtp_server.auth.password,
-        # smtp_server.token_auth.client_secret) don't yet have <attr>File
-        # support; supplying a literal lands in the world-readable store.
+        # Nested-Sensitive fields (smtp_server.auth.password,
+        # smtp_server.token_auth.client_secret) can be supplied either as
+        # a literal (lands in the world-readable store) or via the matching
+        # `<attr>File` sibling (host path resolved at apply time through
+        # systemd LoadCredential=, never copied to the store).
         smtp_server = oSub {
           host = rStr "SMTP host.";
           from = rStr "From address.";
@@ -399,13 +401,15 @@ let
           envelope_from = oStr "Envelope From address.";
           auth = oSub {
             username = rStr "SMTP auth username.";
-            password = rStr "SMTP auth password (LITERAL -- nested <attr>File support not yet implemented).";
+            password = oStr "SMTP auth password. Prefer `passwordFile`.";
+            passwordFile = oStr "Runtime path to a file holding `password` (loaded via systemd LoadCredential=; never copied to the store). Mutually exclusive with a literal `password`.";
           } "SMTP basic-auth credentials (mutually exclusive with token_auth).";
           token_auth = oSub {
             username = rStr "OAuth2 token-auth username.";
             url = rStr "OAuth2 token endpoint.";
             client_id = rStr "OAuth2 client_id.";
-            client_secret = rStr "OAuth2 client_secret (LITERAL -- nested <attr>File support not yet implemented).";
+            client_secret = oStr "OAuth2 client_secret. Prefer `client_secretFile`.";
+            client_secretFile = oStr "Runtime path to a file holding `client_secret` (loaded via systemd LoadCredential=; never copied to the store). Mutually exclusive with a literal `client_secret`.";
             scope = rStr "OAuth2 scope.";
           } "SMTP OAuth2 token credentials (mutually exclusive with auth).";
         } "SMTP server configuration.";
@@ -633,7 +637,8 @@ let
         required_actions = oListStr "Required actions on next login (e.g. \"VERIFY_EMAIL\", \"UPDATE_PASSWORD\").";
 
         initial_password = oSub {
-          value = rStr "Initial password (LITERAL -- nested <attr>File support not yet implemented).";
+          value = oStr "Initial password literal. Prefer `valueFile`.";
+          valueFile = oStr "Runtime path to a file holding `value` (loaded via systemd LoadCredential=; never copied to the store). Mutually exclusive with a literal `value`.";
           temporary = oBool "Force the user to change the password on first login.";
         } "Initial password set at user creation.";
 
@@ -3103,34 +3108,105 @@ let
         else
           val;
 
-      # Host-file-sourced secrets of one item: [{ attr; id; path; }]. Throws if
-      # both the literal attribute and its `<attr>File` are set.
-      itemSecrets =
-        c: spec: key: item:
-        lib.concatMap (
-          attr:
-          let
-            file = item.${attr + "File"} or null;
-          in
-          lib.optionals (file != null) (
-            if (item.${attr} or null) != null then
-              throw "services.keycloak.runtime.${c}.${key}: set either '${attr}' or '${attr}File', not both"
-            else
-              [
+      # Walk a (cleaned) value tree, replacing every `<attr>File = "/path"`
+      # with `<attr> = "${var.<id>}"` and collecting `[{ id; file; }]`
+      # entries. Works at any depth -- top-level attrs, nested submodules
+      # and inside list elements. Throws when both `<attr>` and `<attr>File`
+      # are set on the same object. The id uses a dotted-path-encoded
+      # suffix so nested secrets (e.g. smtp_server.auth.password) get a
+      # unique var name (`secret_realm_acme_smtp_server_auth_password`).
+      substituteSecrets =
+        spec: key:
+        let
+          mkId = pathParts: secretId spec key (varSafe (lib.concatStringsSep "_" pathParts));
+          go =
+            pathParts: v:
+            if builtins.isAttrs v then
+              let
+                fileKeys = builtins.filter (k: lib.hasSuffix "File" k) (builtins.attrNames v);
+                fileEntries = map (
+                  k:
+                  let
+                    attr = lib.removeSuffix "File" k;
+                    id = mkId (pathParts ++ [ attr ]);
+                  in
+                  {
+                    inherit attr id;
+                    file = v.${k};
+                    bareConflict = v ? ${attr};
+                  }
+                ) fileKeys;
+                conflict = builtins.filter (e: e.bareConflict) fileEntries;
+                fileMap = lib.listToAttrs (
+                  map (
+                    e:
+                    lib.nameValuePair e.attr {
+                      inherit (e) id;
+                      ref = "\${var.${e.id}}";
+                    }
+                  ) fileEntries
+                );
+                # Walk each existing key: drop *File entries; for bare attrs
+                # in fileMap, replace with ${var.<id>}; otherwise recurse.
+                processed = lib.concatMapAttrs (
+                  k: x:
+                  if lib.hasSuffix "File" k then
+                    { }
+                  else if fileMap ? ${k} then
+                    { ${k} = fileMap.${k}.ref; }
+                  else
+                    { ${k} = (go (pathParts ++ [ k ]) x).value; }
+                ) v;
+                # Synthesize bare attrs from fileMap that aren't present
+                # in v (i.e. user only supplied <attr>File, no literal).
+                synthesized = lib.listToAttrs (
+                  map (a: lib.nameValuePair a fileMap.${a}.ref) (
+                    builtins.filter (a: !(v ? ${a})) (builtins.attrNames fileMap)
+                  )
+                );
+                localSecrets = map (e: {
+                  inherit (e) id file;
+                }) fileEntries;
+                childSecrets = lib.concatLists (
+                  lib.mapAttrsToList (
+                    k: x: if lib.hasSuffix "File" k || fileMap ? ${k} then [ ] else (go (pathParts ++ [ k ]) x).secrets
+                  ) v
+                );
+              in
+              if conflict != [ ] then
+                throw "services.keycloak.runtime.${spec.prefix}.${key}: set either '${
+                  lib.concatStringsSep "." (pathParts ++ [ (builtins.head conflict).attr ])
+                }' or '${
+                  lib.concatStringsSep "." (pathParts ++ [ ((builtins.head conflict).attr + "File") ])
+                }', not both"
+              else
                 {
-                  inherit attr;
-                  id = secretId spec key attr;
-                  path = file;
+                  value = processed // synthesized;
+                  secrets = localSecrets ++ childSecrets;
                 }
-              ]
-          )
-        ) (spec.secrets or [ ]);
+            else if builtins.isList v then
+              let
+                mapped = map (e: go pathParts e) v;
+              in
+              {
+                value = map (m: m.value) mapped;
+                secrets = lib.concatLists (map (m: m.secrets) mapped);
+              }
+            else
+              {
+                value = v;
+                secrets = [ ];
+              };
+        in
+        go [ ];
 
       renderItem =
         c: spec: key: item:
         let
-          secretEntries = itemSecrets c spec key item;
-          virtuals = builtins.attrNames spec.refs ++ map (s: "${s}File") (spec.secrets or [ ]);
+          # Drop ref virtuals (their values get re-injected via refAttrs).
+          # *File siblings are NOT dropped here -- substituteSecrets handles
+          # them via the value-tree walk after cleanNulls.
+          virtuals = builtins.attrNames spec.refs;
           base = removeAttrs item ([ "_module" ] ++ virtuals);
           nameInject = lib.optionalAttrs (spec.nameAttr != null && (item.${spec.nameAttr} or null) == null) {
             ${spec.nameAttr} = key;
@@ -3141,7 +3217,6 @@ let
               ${refSpec.attr} = resolveRef refSpec item.${refName};
             }
           ) spec.refs;
-          secretAttrs = lib.listToAttrs (map (e: lib.nameValuePair e.attr "\${var.${e.id}}") secretEntries);
           # A required secret must be supplied via either the literal or its file.
           reqSecretChecks = map (
             attr:
@@ -3188,25 +3263,33 @@ let
               map (wrapBlocks path) v
             else
               v;
+          cleaned = cleanNulls (base // nameInject // refAttrs);
+          substituted = substituteSecrets spec key cleaned;
+          wrapped = wrapBlocks "" substituted.value;
         in
         # use deepSeq to force evaluation of checks
         # (these are not config.assertions so they can be used outside a nixos system build)
-        lib.nameValuePair (tfLabel spec.prefix key) (
-          builtins.deepSeq [ reqSecretChecks reqAttrChecks ] (
-            wrapBlocks "" (cleanNulls (base // nameInject // refAttrs // secretAttrs))
-          )
-        );
+        builtins.deepSeq [ reqSecretChecks reqAttrChecks ] {
+          label = tfLabel spec.prefix key;
+          value = wrapped;
+          inherit (substituted) secrets;
+        };
 
       nonEmpty = lib.filterAttrs (c: _: (cfg.${c} or { }) != { }) resourceTypes;
+      # Per-collection: [ { label; value; secrets } ... ] for each managed item.
+      renderedPerCollection = lib.mapAttrs (
+        c: items: lib.mapAttrsToList (key: item: renderItem c resourceTypes.${c} key item) items
+      ) (lib.intersectAttrs nonEmpty cfg);
       resourceBlocks = lib.mapAttrs' (
-        c: spec: lib.nameValuePair spec.type (lib.mapAttrs' (renderItem c spec) cfg.${c})
-      ) nonEmpty;
+        c: items:
+        lib.nameValuePair resourceTypes.${c}.type (
+          lib.listToAttrs (map (r: lib.nameValuePair r.label r.value) items)
+        )
+      ) renderedPerCollection;
 
       # combine sensitive variables with (id -> host path) credential map
       allSecrets = lib.concatLists (
-        lib.mapAttrsToList (
-          c: spec: lib.concatLists (lib.mapAttrsToList (key: item: itemSecrets c spec key item) cfg.${c})
-        ) nonEmpty
+        lib.concatLists (lib.mapAttrsToList (_: items: map (r: r.secrets) items) renderedPerCollection)
       );
       secretIds = map (e: e.id) allSecrets;
 
@@ -3247,7 +3330,7 @@ let
         if lib.length secretIds != lib.length (lib.unique secretIds) then
           throw "services.keycloak.runtime: secret credential id collision (${toString secretIds}); rename the colliding resource keys"
         else
-          lib.listToAttrs (map (e: lib.nameValuePair e.id e.path) allSecrets);
+          lib.listToAttrs (map (e: lib.nameValuePair e.id e.file) allSecrets);
     in
     {
       inherit config credentials;
