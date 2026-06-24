@@ -1,48 +1,42 @@
-# Shared, provider-agnostic helpers for the declarative-service pairings: the
-# .tf.json label/file helpers and the run-once OpenTofu reconciler unit.
-#
-# Provider-specific pieces — the provider-wrapped executor, the .tf.json
-# provider/resource generation, the token variable name — live in each pairing's
-# services/<svc>/lib.nix and are injected into the helpers below.
+# shared helpers for the pairings: tf-label/file helpers and the run-once
+# reconciler unit. provider-specific bits live in services/<svc>/lib.nix.
 { pkgs }:
 let
   inherit (pkgs) lib;
 in
 rec {
-  # Sanitize an arbitrary string into a valid Terraform block label
-  # ([A-Za-z_][A-Za-z0-9_-]*). Always prefixed, so the result starts with a
-  # letter regardless of the input.
+  # turn an arbitrary string into a valid Terraform block label. always
+  # prefixed so the result starts with a letter.
   tfLabel =
     prefix: name:
     "${prefix}_"
     + lib.stringAsChars (c: if builtins.match "[A-Za-z0-9_-]" c != null then c else "_") name;
 
-  # Render a config attrset to a .tf.json store file. Safe by construction: the
-  # config must carry no secrets (anything in the store is world-readable).
+  # write the config as a .tf.json file in the nix store. must contain no
+  # secrets -- the store is world-readable.
   tfJsonFile = name: config: pkgs.writeText "${name}.tf.json" (builtins.toJSON config);
 
-  # Build the run-once reconciler systemd service definition.
+  # build the run-once reconciler systemd service.
   #
-  #   name       unit + generated-config name (e.g. "declarative-forgejo")
-  #   tfConfig   the provider-specific config attrset to apply
-  #   afterUnits units to order/require after (the service's primary unit)
-  #   healthUrl  URL polled until the service answers, before applying
-  #   tokenFile  runtime path to the admin token, exposed via LoadCredential
-  #   executor   OpenTofu wrapped with the pairing's provider (offline mirror)
-  #   tokenVar   Terraform input variable carrying the token; also the
-  #              LoadCredential id, so `TF_VAR_<tokenVar>` is fed from it
-  #   credentials extra TF_VAR_<id> -> host file path pairs (per-resource
-  #              secrets); each is LoadCredential'd and exported like the token
-  #   user/group the base service's user/group the reconciler runs as
-  #   stateDir   the base service's primary state dir; Terraform state lives in
-  #              a `declarative-terraform` subdir of it, co-located with the service
-  #   dynamicUser  set when the base service runs as systemd DynamicUser (so
-  #                the `User=` name only exists per-unit). The reconciler then
-  #                runs with `DynamicUser=true` too, so systemd allocates the
-  #                same hashed UID as the primary unit, and the work dir is
-  #                created via `StateDirectory=` (derived from `stateDir`)
-  #                rather than `mkdir`. Requires `stateDir` to live under
-  #                `/var/lib`; enforced at eval time.
+  #   name        unit + generated-config name (e.g. "declarative-forgejo")
+  #   tfConfig    the .tf.json config to apply
+  #   afterUnits  units to order/require after (the service's main unit)
+  #   healthUrl   url polled until the service answers, before applying
+  #   tokenFile   path to the admin token on the host, read via LoadCredential
+  #   executor    OpenTofu wrapped with the pairing's provider (offline)
+  #   tokenVar    name of the sensitive tf variable carrying the token; also
+  #               the LoadCredential id -- exported as TF_VAR_<tokenVar>
+  #   credentials extra TF_VAR_<id> -> host path pairs for per-resource
+  #               secrets, handled the same way as tokenFile
+  #   user/group  the service's user/group; the reconciler runs as them
+  #   stateDir    base dir for the reconciler; tfstate lives in a
+  #               `declarative-terraform` subdir of it
+  #   dynamicUser set when the base service uses systemd DynamicUser=true
+  #               (the `User=` name only exists per-unit). the reconciler
+  #               then runs with DynamicUser=true too, so it picks up the
+  #               same hashed UID as the main unit, and systemd creates
+  #               the work dir via StateDirectory= (derived from stateDir).
+  #               requires stateDir to live under /var/lib.
   mkReconcileService =
     {
       name,
@@ -60,19 +54,17 @@ rec {
     }:
     let
       confFile = tfJsonFile name tfConfig;
-      # Admin token + any per-resource secret files, each kept out of the store
-      # and exposed to tofu as TF_VAR_<id> via systemd LoadCredential=.
+      # admin token + per-resource secrets, all read via LoadCredential
+      # so they never land in the world-readable store.
       allCredentials = {
         ${tokenVar} = tokenFile;
       }
       // credentials;
-      # Terraform state is co-located with the base service: a subdir of its
-      # primary state directory, created and owned by the service user.
+      # tfstate lives in this subdir of stateDir.
       workDir = "${stateDir}/declarative-terraform";
-      # Under DynamicUser= the absolute work dir is also expressed as a
-      # relative `StateDirectory=` so systemd creates and owns it. Deriving
-      # both from `stateDir` is the single source of truth: the path the
-      # script `cd`s into and the path the unit declares can never drift.
+      # under DynamicUser= systemd creates the dir via StateDirectory=
+      # (relative to /var/lib). derive both from stateDir so the script
+      # path and the unit declaration cannot drift.
       stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
     in
     assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
@@ -82,7 +74,7 @@ rec {
       after = afterUnits;
       requires = afterUnits;
       wantedBy = [ "multi-user.target" ];
-      # Re-apply whenever the generated configuration changes.
+      # re-apply when the generated config changes.
       restartTriggers = [ confFile ];
       path = [
         executor
@@ -96,17 +88,16 @@ rec {
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        # Run as the base service's user so Terraform state can live in (and be
-        # backed up alongside) that service's primary state directory.
+        # run as the service's own user so tfstate sits next to its data.
         User = user;
         Group = group;
-        # Secrets stay out of the store: read from the credentials dir at runtime.
+        # secrets stay out of the store; loaded into $CREDENTIALS_DIRECTORY at runtime.
         LoadCredential = lib.mapAttrsToList (id: path: "${id}:${path}") allCredentials;
       }
       // lib.optionalAttrs dynamicUser {
-        # Bases like Keycloak ship no persistent state dir and run as
-        # systemd DynamicUser=true; the `User=` name is hashed to a stable UID
-        # that's reused across units, and systemd creates/owns the state dir.
+        # services like Keycloak use DynamicUser=true and have no
+        # persistent state dir. systemd hashes the User= name to a
+        # stable UID that's shared across units and owns the state dir.
         DynamicUser = true;
         StateDirectory = stateDirectoryRelative;
         StateDirectoryMode = "0700";
@@ -115,15 +106,15 @@ rec {
         set -euo pipefail
         umask 077
 
-        # Work in a Terraform state dir under the base service's primary state
-        # directory, created 0700 on first run and owned by the service user.
+        # work in a subdir of the service's state dir; created 0700 on
+        # first run, owned by the service user.
         mkdir -p ${lib.escapeShellArg workDir}
         cd ${lib.escapeShellArg workDir}
 
-        # Refresh the generated config (state persists across runs).
+        # refresh the generated config (tfstate persists across runs).
         install -m 0600 ${confFile} ./main.tf.json
 
-        # Gate on the service actually answering before applying.
+        # wait for the service to actually answer before applying.
         for _ in $(seq 1 60); do
           if curl -fsS -o /dev/null "${healthUrl}"; then
             break
@@ -131,7 +122,7 @@ rec {
           sleep 2
         done
 
-        # Feed every credential to tofu as TF_VAR_<id>, read from the creds dir.
+        # pass each credential to tofu as TF_VAR_<id>.
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done

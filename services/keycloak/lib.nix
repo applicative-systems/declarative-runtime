@@ -8,7 +8,7 @@ let
   provider = pkgs.terraform-providers.keycloak_keycloak;
   providerVersion = provider.version;
 
-  # credential names for the (less privileged) keycloak provisioner
+  # tf-var names for the service-account oauth2 client the reconciler uses.
   tokenVar = "keycloak_client_secret";
   clientIdVar = "keycloak_client_id";
 
@@ -79,8 +79,8 @@ let
       inherit description;
     };
 
-  # ref spec shared by almost every non-realm resource: realm_id is a numeric
-  # id the user can't know, so it must resolve to a managed realm by key.
+  # most non-realm resources reference their realm by numeric id, which
+  # the user can't know up front -- resolve it by managed key instead.
   realmRef = {
     attr = "realm_id";
     targets = [
@@ -120,7 +120,7 @@ let
     required = false;
     description = "Optional managed OpenID client scope this mapper attaches to.";
   };
-  # the four common openid-mapper attrs (every mapper has at least the first 3)
+  # attrs every openid mapper carries (some carry only the first 3).
   openidMapperCommonAttrs = {
     name = oStr "Mapper name. Defaults to the attribute key.";
     add_to_id_token = oBool "Include in ID token?";
@@ -128,7 +128,7 @@ let
     add_to_userinfo = oBool "Include in UserInfo?";
   };
 
-  # SAML mapper attachment refs (analogous to the openid pair above).
+  # SAML counterparts of the openid refs above.
   samlClientOptionalRef = {
     attr = "client_id";
     targets = [
@@ -154,8 +154,8 @@ let
     description = "Optional managed SAML client scope this mapper attaches to.";
   };
 
-  # identity providers reference the realm by its alias (name), not by id;
-  # `realm = "<alias>"` is how the provider wires them.
+  # identity providers reference the realm by its alias (name) -- the
+  # provider's `realm` attribute, not `realm_id`.
   realmAliasRef = {
     attr = "realm";
     targets = [
@@ -169,8 +169,7 @@ let
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
   };
 
-  # LDAP mappers reference their parent federation by managed key (numeric
-  # id). Used by every keycloak_ldap_*_mapper resource.
+  # every ldap_*_mapper resolves its parent federation by id.
   ldapFederationIdRef = {
     attr = "ldap_user_federation_id";
     targets = [
@@ -184,8 +183,8 @@ let
     description = "Key of the managed LDAP user federation (services.keycloak.runtime.ldap_user_federations.<name>) this mapper attaches to.";
   };
 
-  # identity provider mappers reference an IdP by alias; the alias may
-  # belong to any of the six IdP variants we model.
+  # IdP mappers reference an IdP by alias; the alias can belong to
+  # any of the six IdP collections.
   idpAliasRequiredRef = {
     attr = "identity_provider_alias";
     targets = [
@@ -219,14 +218,13 @@ let
     description = "Alias of the managed identity provider (in any IdP collection) this mapper attaches to, or a literal alias.";
   };
 
-  # common attrs every IdP mapper carries.
+  # attrs every IdP mapper carries.
   commonIdpMapperAttrs = {
     name = oStr "Mapper name. Defaults to the attribute key.";
     extra_config = oAttrsStr "Free-form extra mapper config entries.";
   };
 
-  # shared attrs every keycloak identity provider exposes (alias is the IdP
-  # key, display_name is human-readable, enabled toggles, etc.).
+  # attrs every IdP exposes (alias is the IdP key, etc.).
   commonIdpAttrs = {
     alias = oStr "Provider alias. Defaults to the attribute key.";
     display_name = oStr "Human-readable name shown on the login page.";
@@ -246,9 +244,9 @@ let
     org_domain = oStr "Organization domain matched against the user's email.";
   };
 
-  # generic mappers / role mappers attach to either an openid or a SAML
-  # client/scope; multi-target so a managed key from either collection
-  # resolves, and a literal id string falls through.
+  # generic mappers attach to either an openid or a saml client/scope.
+  # multi-target: a managed key from either collection resolves; an
+  # unknown string falls through as a literal.
   anyClientOptionalRef = {
     attr = "client_id";
     targets = [
@@ -282,19 +280,17 @@ let
     description = "Optional managed client scope (openid or saml) this mapper attaches to.";
   };
 
-  # The full keycloak/keycloak resource surface. Per
-  # resource:
-  #   type            the `keycloak_*` resource type
-  #   prefix          unique Terraform label prefix
+  # every keycloak resource type we expose. each entry:
+  #   type            `keycloak_*` resource name
+  #   prefix          tf-label prefix
   #   nameAttr        attribute defaulted from the collection key (or null)
-  #   scope           reserved for future per-resource scoping; null under
-  #                   client-credentials auth
-  #   refs            parent links resolved to references against managed
-  #                   siblings
-  #   secrets         secret-valued attributes gaining an `<attr>File` form
-  #   requiredSecrets secrets the provider requires (one of `<attr>`/`<attr>File`)
-  #   attrs           the settable attributes, each a typed option (no
-  #                   freeform)
+  #   scope           reserved; currently unused
+  #   refs            parent links resolved to managed siblings
+  #   blockAttrs      dotted paths that wrap as `[ {...} ]` (MaxItems:1)
+  #   secrets         attrs that gain an `<attr>File` sibling
+  #   requiredSecrets secrets that must be set as literal or File
+  #   requiredAttrs   attrs that must be set non-empty
+  #   attrs           settable attributes, all typed (no freeform)
   resourceTypes = {
     realms = {
       type = "keycloak_realm";
@@ -382,12 +378,9 @@ let
         default_default_client_scopes = oListStr "Default client scopes auto-granted to new clients.";
         default_optional_client_scopes = oListStr "Optional client scopes available to new clients.";
 
-        # nested blocks: rendered as [{ ... }] via the `blockAttrs` markup.
-        # Nested-Sensitive fields (smtp_server.auth.password,
-        # smtp_server.token_auth.client_secret) can be supplied either as
-        # a literal (lands in the world-readable store) or via the matching
-        # `<attr>File` sibling (host path resolved at apply time through
-        # systemd LoadCredential=, never copied to the store).
+        # nested blocks; emitted as `[{ ... }]` via blockAttrs.
+        # nested secrets (smtp.auth.password, smtp.token_auth.client_secret)
+        # accept either a literal or an `<attr>File` host path.
         smtp_server = oSub {
           host = rStr "SMTP host.";
           from = rStr "From address.";
@@ -675,10 +668,9 @@ let
       refs.realm = realmRef;
       requiredAttrs = [ "username" ];
       blockAttrs = [ "initial_password" ];
-      # initial_password.value is Sensitive but supplied LITERAL today
-      # (nested-<attr>File support is a follow-up); avoid setting a real
-      # password until that lands. federated_identity is a TypeSet of
-      # nested blocks -- renders as a JSON array directly, no wrap needed.
+      # initial_password.value supports the `valueFile` indirection;
+      # federated_identity is a list of nested blocks (rendered as a
+      # JSON array, no wrap needed).
       description = "Keycloak users, keyed by username (must be lowercase).";
       attrs = {
         username = oStr "Username (lowercase). Defaults to the attribute key.";
@@ -829,8 +821,9 @@ let
         "authorization"
         "authentication_flow_binding_overrides"
       ];
-      # Skips the write-only secret variants (client_secret_wo /
-      # client_secret_wo_version) -- those need a write-only renderer mode.
+      # write-only secret variants (client_secret_wo /
+      # client_secret_wo_version) are skipped -- they need a separate
+      # write-only renderer mode.
       description = "OpenID Connect clients (per-realm), keyed by clientId.";
       attrs = {
         client_id = oStr "OAuth2 clientId. Defaults to the attribute key.";
@@ -1008,7 +1001,7 @@ let
       ];
       description = "Grant a per-client role to a service-account user, keyed by an arbitrary label.";
       attrs = {
-        # Computed from the source client (`${keycloak_openid_client.X.service_account_user_id}`).
+        # supply via `${keycloak_openid_client.<key>.service_account_user_id}`
         service_account_user_id = oStr "Service-account user id (typically `\${keycloak_openid_client.X.service_account_user_id}`).";
         role = oStr "Name of the role granted (must exist on the target client).";
       };
@@ -1037,9 +1030,8 @@ let
       nameAttr = "client_id";
       scope = null;
       refs.realm = realmRef;
-      # signing_private_key isn't marked Sensitive by the provider but is a
-      # private key in practice; expose <attr>File so operators can keep it
-      # out of the world-readable store.
+      # signing_private_key isn't marked Sensitive upstream but is a
+      # private key; expose <attr>File so it stays out of the store.
       secrets = [ "signing_private_key" ];
       blockAttrs = [ "authentication_flow_binding_overrides" ];
       description = "SAML clients (per-realm), keyed by clientId.";
@@ -1132,8 +1124,8 @@ let
       attrs = { };
     };
 
-    # OpenID protocol mappers: each is its own resource type, keyed by the
-    # mapper name; all share the same realm + (client | client_scope) refs.
+    # OpenID protocol mappers: one collection per mapper type. all share
+    # realm + (client | client_scope) refs.
     openid_user_attribute_protocol_mappers = {
       type = "keycloak_openid_user_attribute_protocol_mapper";
       prefix = "openid_user_attribute_mapper";
@@ -2320,9 +2312,10 @@ let
         "connection_url"
         "users_dn"
       ];
-      # `kerberos` and `cache` are TypeList+MaxItems:1 nested blocks --
-      # declared as oSub here, but their JSON emission will be wrong
-      # until R1 (block-list wrapping) lands. Avoid setting them.
+      blockAttrs = [
+        "kerberos"
+        "cache"
+      ];
       description = "LDAP user federations (per-realm), keyed by name.";
       attrs = {
         name = oStr "Federation name. Defaults to the attribute key.";
@@ -2362,14 +2355,14 @@ let
           server_principal = oStr "Kerberos service principal of the LDAP server.";
           key_tab = oStr "Path to the keytab file.";
           use_kerberos_for_password_authentication = oBool "Use Kerberos for password auth.";
-        } "Kerberos integration sub-block. Needs R1 (block-list wrapping) to emit correctly.";
+        } "Kerberos integration.";
         cache = oSub {
           policy = oStr "Cache policy ('DEFAULT', 'EVICT_DAILY', 'EVICT_WEEKLY', 'MAX_LIFESPAN', 'NO_CACHE').";
           max_lifespan = oStr "Max lifespan (for MAX_LIFESPAN).";
           eviction_day = oStr "Eviction day (for EVICT_WEEKLY).";
           eviction_hour = oStr "Eviction hour.";
           eviction_minute = oStr "Eviction minute.";
-        } "Cache configuration sub-block. Needs R1 (block-list wrapping) to emit correctly.";
+        } "Cache configuration.";
       };
     };
 
@@ -2706,8 +2699,8 @@ let
       nameAttr = "name";
       scope = null;
       refs.realm = realmRef;
-      # private_key and certificate are PEM material; provider doesn't mark
-      # them Sensitive but operators want them out of the world-readable store.
+      # private_key and certificate are PEM material; expose <attr>File
+      # for both even though only private_key is technically secret.
       secrets = [
         "private_key"
         "certificate"
@@ -2920,9 +2913,8 @@ let
         enabled = oBool "Is the organization enabled?";
         description = oStr "Organization description.";
         redirect_url = oStr "Optional redirect URL for organization-aware flows.";
-        # domain is TypeSet of nested blocks; user provides a list of objects
-        # and the renderer emits as a JSON array unchanged (no blockAttrs
-        # wrap needed because it's already a list).
+        # domain is a list of nested blocks; renders as a json array,
+        # no blockAttrs wrap needed.
         domain = oListSub {
           name = rStr "Domain name (e.g. acme.example).";
           verified = oBool "Has the domain been verified?";
@@ -2955,9 +2947,8 @@ let
       nameAttr = null;
       scope = null;
       refs.realm = realmRef;
-      # `attribute[].permissions` is a MaxItems:1 nested block inside a list
-      # element; the recursive wrapBlocks walks into list elements, so the
-      # dotted path picks it up.
+      # nested block inside a list element; wrapBlocks recurses through
+      # the list, so the dotted path matches.
       blockAttrs = [ "attribute.permissions" ];
       description = "Per-realm user-profile schema (attribute declarations + groups). Keyed by an arbitrary label (one resource per realm).";
       attrs = {
@@ -3065,7 +3056,7 @@ let
           description = "Key of the managed group these fine-grained permissions apply to.";
         };
       };
-      # every scope_* attr is a MaxItems:1 nested block per scopePermissionsSchema().
+      # every scope_* attr is a MaxItems:1 nested block.
       blockAttrs = [
         "view_scope"
         "manage_scope"
@@ -3228,12 +3219,12 @@ let
     else
       v;
 
-  # build JSON config and credential map (id -> host path)
-  # secrets are provided at apply time
+  # build the .tf.json + the credentials map (id -> host path).
+  # secrets are passed in via $CREDENTIALS_DIRECTORY at apply time.
   keycloakTfConfig =
     cfg:
     let
-      # Var-safe id (Terraform variable name + LoadCredential id) for a secret.
+      # make a string valid as a tf variable / LoadCredential id.
       varSafe = lib.stringAsChars (c: if builtins.match "[A-Za-z0-9_]" c != null then c else "_");
       secretId =
         spec: key: attr:
@@ -3262,13 +3253,12 @@ let
         else
           val;
 
-      # Walk a (cleaned) value tree, replacing every `<attr>File = "/path"`
-      # with `<attr> = "${var.<id>}"` and collecting `[{ id; file; }]`
-      # entries. Works at any depth -- top-level attrs, nested submodules
-      # and inside list elements. Throws when both `<attr>` and `<attr>File`
-      # are set on the same object. The id uses a dotted-path-encoded
-      # suffix so nested secrets (e.g. smtp_server.auth.password) get a
-      # unique var name (`secret_realm_acme_smtp_server_auth_password`).
+      # walk the value tree, swap every `<attr>File = "/path"` for
+      # `<attr> = "${var.<id>}"` and collect [{ id; file; }] entries.
+      # works at any depth (top-level attrs, nested submodules, list
+      # elements). throws if both `<attr>` and `<attr>File` are set.
+      # the id uses a dotted-path suffix so nested secrets get a unique
+      # name like `secret_realm_acme_smtp_server_auth_password`.
       substituteSecrets =
         spec: key:
         let
@@ -3300,8 +3290,8 @@ let
                     }
                   ) fileEntries
                 );
-                # Walk each existing key: drop *File entries; for bare attrs
-                # in fileMap, replace with ${var.<id>}; otherwise recurse.
+                # walk each key: drop `*File` entries; for bare attrs in
+                # fileMap, replace with `${var.<id>}`; otherwise recurse.
                 processed = lib.concatMapAttrs (
                   k: x:
                   if lib.hasSuffix "File" k then
@@ -3311,8 +3301,8 @@ let
                   else
                     { ${k} = (go (pathParts ++ [ k ]) x).value; }
                 ) v;
-                # Synthesize bare attrs from fileMap that aren't present
-                # in v (i.e. user only supplied <attr>File, no literal).
+                # add bare attrs from fileMap that aren't already in v
+                # (user supplied `<attr>File` but no literal).
                 synthesized = lib.listToAttrs (
                   map (a: lib.nameValuePair a fileMap.${a}.ref) (
                     builtins.filter (a: !(v ? ${a})) (builtins.attrNames fileMap)
@@ -3357,9 +3347,8 @@ let
       renderItem =
         c: spec: key: item:
         let
-          # Drop ref virtuals (their values get re-injected via refAttrs).
-          # *File siblings are NOT dropped here -- substituteSecrets handles
-          # them via the value-tree walk after cleanNulls.
+          # drop ref keys (re-injected as refAttrs below). *File siblings
+          # are kept -- substituteSecrets handles them after cleanNulls.
           virtuals = builtins.attrNames spec.refs;
           base = removeAttrs item ([ "_module" ] ++ virtuals);
           nameInject = lib.optionalAttrs (spec.nameAttr != null && (item.${spec.nameAttr} or null) == null) {
@@ -3375,7 +3364,7 @@ let
                 if refSpec.list or false then map (resolveRef refSpec) v else resolveRef refSpec v;
             }
           ) spec.refs;
-          # A required secret must be supplied via either the literal or its file.
+          # required secret: literal or `<attr>File` must be set.
           reqSecretChecks = map (
             attr:
             if (item.${attr} or null) == null && (item.${attr + "File"} or null) == null then
@@ -3383,10 +3372,9 @@ let
             else
               null
           ) (spec.requiredSecrets or [ ]);
-          # Required map/list attributes: the module system gives `attrsOf`/
-          # `listOf` an empty-value default ({}/[]) rather than treating a
-          # missing value as undefined, so a "required" collection is enforced
-          # here.
+          # required map / list attrs: nixos modules default attrsOf / listOf
+          # to {} / [] rather than treating "unset" as undefined; enforce
+          # non-empty here.
           reqAttrChecks = map (
             attr:
             let
@@ -3397,12 +3385,11 @@ let
             else
               null
           ) (spec.requiredAttrs or [ ]);
-          # wrap TypeList+MaxItems:1 nested blocks in [ obj ] so Terraform
-          # JSON gets block syntax. spec.blockAttrs lists dotted paths
-          # (e.g. "smtp_server", "security_defenses.headers",
-          # "attribute.permissions"); recursion walks into both attrsets
-          # and list elements -- so a nested block inside a list element
-          # (like realm_user_profile.attribute[].permissions) is wrapped.
+          # wrap nested MaxItems:1 blocks in `[ obj ]` so terraform reads
+          # them as blocks. spec.blockAttrs lists dotted paths (e.g.
+          # "smtp_server", "security_defenses.headers",
+          # "attribute.permissions"). recurses through attrsets and list
+          # elements, so a block inside a list element is wrapped too.
           wrapBlocks =
             path: v:
             if builtins.isAttrs v then
@@ -3425,8 +3412,9 @@ let
           substituted = substituteSecrets spec key cleaned;
           wrapped = wrapBlocks "" substituted.value;
         in
-        # use deepSeq to force evaluation of checks
-        # (these are not config.assertions so they can be used outside a nixos system build)
+        # deepSeq forces the checks to run.
+        # (they're not nixos assertions because we generate the .tf.json
+        # outside a full system build too.)
         builtins.deepSeq [ reqSecretChecks reqAttrChecks ] {
           label = tfLabel spec.prefix key;
           value = wrapped;
@@ -3434,7 +3422,7 @@ let
         };
 
       nonEmpty = lib.filterAttrs (c: _: (cfg.${c} or { }) != { }) resourceTypes;
-      # Per-collection: [ { label; value; secrets } ... ] for each managed item.
+      # for each collection: [ { label; value; secrets } ... ].
       renderedPerCollection = lib.mapAttrs (
         c: items: lib.mapAttrsToList (key: item: renderItem c resourceTypes.${c} key item) items
       ) (lib.intersectAttrs nonEmpty cfg);
@@ -3445,7 +3433,8 @@ let
         )
       ) renderedPerCollection;
 
-      # combine sensitive variables with (id -> host path) credential map
+      # every secret across the config (for sensitive tf vars + the
+      # id -> host path map fed to LoadCredential).
       allSecrets = lib.concatLists (
         lib.concatLists (lib.mapAttrsToList (_: items: map (r: r.secrets) items) renderedPerCollection)
       );

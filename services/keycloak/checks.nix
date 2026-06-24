@@ -1,13 +1,12 @@
-# Per-resource-family keycloak tests. The `keycloak` test is a full VM
-# (specialisations only work in QEMU nodes); the rest are nspawn containers
-# for faster boot and tighter focus.
+# keycloak tests, one per resource family. the `keycloak` test boots a
+# full VM (specialisations need QEMU). the rest run as nspawn containers.
 { pkgs, self }:
 let
   inherit (pkgs) lib;
   keycloakAdminPassword = "hackme";
 
-  # Python helpers; each takes the machine reference (`machine` for VMs,
-  # `keycloak` for containers) so the body is identical across both shapes.
+  # python helpers; each takes the machine reference (`machine` in the VM
+  # test, `keycloak` in the container tests) so bodies match.
   pyHelpers = ''
     import json
     def admin_token(m):
@@ -28,8 +27,8 @@ let
         return admin_get(m, realm)
   '';
 
-  # Common keycloak service config every test reuses. `runtime` carries
-  # the per-test resource fixture; `extraEtc` mocks operator secret files.
+  # shared keycloak host config. `runtime` is the per-test fixture;
+  # `extraEtc` mocks operator-supplied secret files.
   mkHost =
     {
       runtime,
@@ -58,7 +57,7 @@ let
         settings = {
           hostname = "keycloak";
           http-port = 8080;
-          http-enabled = true; # HTTP-only test deployment
+          http-enabled = true; # http-only test deployment
           hostname-strict = false;
         };
 
@@ -72,8 +71,8 @@ let
     };
 in
 {
-  # Core test: full VM proving the boot -> bootstrap -> reconcile chain
-  # plus config-change reconciliation via a specialisation.
+  # core test: full vm covering boot -> bootstrap -> reconcile, plus a
+  # specialisation switch that adds a second realm.
   keycloak = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak";
 
@@ -87,7 +86,7 @@ in
           };
         } args)
         {
-          # keycloak is thicc -- only VMs accept memorySize.
+          # keycloak is thicc; only VMs accept memorySize.
           virtualisation.memorySize = 3072;
           specialisation.addRealm.configuration.services.keycloak.runtime.realms.delta = {
             display_name = "Delta Realm";
@@ -98,7 +97,7 @@ in
       ${pyHelpers}
       machine.start()
 
-      # whole chain (keycloak -> bootstrap -> reconciler) must converge.
+      # wait for the chain: keycloak -> bootstrap -> reconciler.
       machine.wait_for_unit("declarative-keycloak.service")
 
       with subtest("declared realm exists with display_name applied"):
@@ -138,7 +137,7 @@ in
     '';
   };
 
-  # RBAC: roles, groups, users + bindings via managed-key list refs.
+  # roles, groups, users + bindings via managed-key list refs.
   keycloak-rbac = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak-rbac";
 
@@ -243,7 +242,7 @@ in
     '';
   };
 
-  # OpenID clients + scopes + a protocol mapper + default-scope binding.
+  # openid clients + scopes + protocol mapper + default-scope binding.
   keycloak-clients = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak-clients";
 
@@ -284,7 +283,7 @@ in
           ];
         };
 
-        # Protocol mapper attached to the managed scope via its key.
+        # protocol mapper attached to the managed scope by key.
         openid_user_attribute_protocol_mappers.team_claim = {
           realm = "acme";
           client_scope = "acme_profile";
@@ -322,7 +321,7 @@ in
               f"acme-profile not bound as default scope: {names}"
 
       with subtest("protocol mapper attached to client scope"):
-          # protocolMappers travel with the client-scope representation.
+          # protocolMappers ride along on the client-scope representation.
           scopes = admin_get(keycloak, "acme/client-scopes")
           s = next((x for x in scopes if x["name"] == "acme-profile"), None)
           assert s, f"acme-profile scope missing: {[x['name'] for x in scopes]}"
@@ -339,9 +338,9 @@ in
     '';
   };
 
-  # Realm extras: extended realm attrs, nested-secret smtp, security
-  # defenses (nested-in-nested), otp_policy, realm_user_profile (nested
-  # in list elements), a keystore, required_action, localization.
+  # realm extras: extended realm attrs, smtp with nested-secret,
+  # security_defenses (nested-in-nested), otp_policy, realm_user_profile
+  # (nested-in-list), a keystore, required_action, localization.
   keycloak-realm-extras = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak-realm-extras";
 
@@ -351,7 +350,7 @@ in
         realms.acme = {
           display_name = "ACME Corp.";
           display_name_html = "<b>ACME</b> Corp.";
-          # extended attrs
+          # cross-section of the extended realm attrs.
           registration_allowed = true;
           login_theme = "keycloak";
           ssl_required = "external";
@@ -365,7 +364,7 @@ in
             ];
             default_locale = "en";
           };
-          # smtp_server with nested-secret indirection.
+          # smtp with a nested-secret indirection (auth.passwordFile).
           smtp_server = {
             host = "smtp.example.com";
             from = "noreply@example.com";
@@ -376,8 +375,8 @@ in
               passwordFile = "/etc/acme-smtp-password";
             };
           };
-          # nested-in-nested block-list wrap (security_defenses.headers,
-          # security_defenses.brute_force_detection).
+          # nested-in-nested block wrap (headers + brute_force_detection
+          # inside security_defenses).
           security_defenses = {
             headers = {
               x_frame_options = "DENY";
@@ -419,9 +418,9 @@ in
           texts.loginAccountTitle = "ACME";
         };
 
-        # realm_user_profile exercises a MaxItems:1 nested block inside a
-        # list element (attribute[].permissions). Keycloak refuses to drop
-        # the built-in attrs; declare them alongside the custom one.
+        # realm_user_profile exercises a nested MaxItems:1 block inside a
+        # list element (attribute[].permissions). keycloak refuses to drop
+        # the built-in attrs, so declare them alongside the custom one.
         realm_user_profiles.acme = {
           realm = "acme";
           unmanaged_attribute_policy = "ENABLED";
@@ -582,7 +581,7 @@ in
     '';
   };
 
-  # Identity providers + IdP mappers + an authentication flow.
+  # identity providers + IdP mappers + an authentication flow.
   keycloak-idp = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak-idp";
 
@@ -591,14 +590,14 @@ in
       runtime = {
         realms.acme.display_name = "ACME";
 
-        # google IdP exercises realmAliasRef and secret-file indirection.
+        # google IdP exercises realm-alias resolution + secret-file indirection.
         oidc_google_identity_providers.acme_google = {
           realm = "acme";
           client_id = "fake-client-id";
           client_secretFile = "/etc/acme-google-secret";
         };
 
-        # IdP mapper exercises idpAliasRequiredRef across IdP collections.
+        # IdP mapper exercises the multi-target idp-alias ref.
         attribute_importer_identity_provider_mappers.google_email = {
           realm = "acme";
           identity_provider = "acme_google";
@@ -621,8 +620,8 @@ in
       keycloak.wait_for_unit("declarative-keycloak.service")
 
       with subtest("google IdP exists, client_secret kept out of .tf.json"):
-          # alias defaults to the collection key (`acme_google`) via nameAttr;
-          # the provider sets providerId="google".
+          # alias defaults to the collection key (`acme_google`);
+          # providerId is fixed to "google" by the resource type.
           idp = admin_get(keycloak, "acme/identity-provider/instances/acme_google")
           assert idp.get("providerId") == "google", f"idp: {idp}"
           assert idp.get("alias") == "acme_google"

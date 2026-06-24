@@ -19,9 +19,9 @@ let
 
   defaultBaseUrl = "http://localhost:${toString keycloak.settings.http-port}";
 
-  # Companion oneshot that creates the reconciler's service-account OIDC
-  # client. Only used when the operator does not supply their own
-  # (clientIdFile, clientSecretFile) pair.
+  # one-shot that creates the reconciler's service-account oauth2 client
+  # on first boot. skipped when the operator supplies their own
+  # (clientIdFile, clientSecretFile).
   bootstrapServiceName = "declarative-keycloak-bootstrap";
   bootstrapClient = cfg.clientIdFile == null;
   effectiveClientIdFile =
@@ -34,15 +34,14 @@ in
 {
   options.services.keycloak.runtime = {
     enable = mkEnableOption (
-      "declarative Keycloak configuration, applied via OpenTofu and the keycloak/keycloak "
-      + "provider after keycloak.service starts"
+      "declarative keycloak runtime config, applied via OpenTofu after keycloak.service starts"
     );
 
     baseUrl = mkOption {
       type = types.str;
       default = defaultBaseUrl;
       defaultText = literalExpression ''"http://localhost:''${toString config.services.keycloak.settings.http-port}"'';
-      description = "Base URL of the local Keycloak admin API the provider targets.";
+      description = "Base URL of the local keycloak admin API.";
     };
 
     bootstrapAdminPasswordFile = mkOption {
@@ -50,16 +49,13 @@ in
       default = null;
       example = "/run/secrets/keycloak-admin-password";
       description = ''
-        Host path to a file containing the password of an existing
-        realm-admin user (default `admin`) in the `master` realm. The
-        path is resolved on the target host (e.g. provisioned by sops-nix
-        or agenix), NOT a store path: it is handed to the bootstrap
-        oneshot via systemd `LoadCredential=` and never copied into the
-        Nix store.
+        Host path to a file with the master-realm admin password (the
+        user `admin` by default). Read via systemd `LoadCredential=`;
+        never copied into the nix store.
 
-        Required when `clientIdFile`/`clientSecretFile` are unset (the
-        default), since the bootstrap uses this admin to mint a dedicated
-        service-account client. Ignored when both are supplied.
+        Required when `clientIdFile` / `clientSecretFile` are unset --
+        the bootstrap uses this admin to mint the service-account client.
+        Ignored otherwise.
       '';
     };
 
@@ -67,11 +63,10 @@ in
       type = types.str;
       default = "declarative-keycloak";
       description = ''
-        Service-account client `clientId` the bootstrap oneshot creates
-        in the `master` realm. The matching service-account user is
-        granted the `realm-admin` role of the `realm-management` client
-        so the reconciler can manage every realm. Unused when
-        `clientIdFile`/`clientSecretFile` are set directly.
+        clientId of the service-account client the bootstrap creates in
+        the `master` realm. Its service-account user gets the realm-level
+        `admin` role so the reconciler can manage every realm. Unused
+        when `clientIdFile` / `clientSecretFile` are set directly.
       '';
     };
 
@@ -80,10 +75,9 @@ in
       default = null;
       example = "/run/secrets/keycloak-tf-client-id";
       description = ''
-        Host path to a file containing the OIDC `client_id` the
-        reconciler authenticates as. Set together with `clientSecretFile`
-        to bypass the bootstrap and supply your own service-account
-        client.
+        Host path to a file with the oauth2 `client_id` the reconciler
+        uses. Set together with `clientSecretFile` to skip the bootstrap
+        and supply your own service-account client.
       '';
     };
 
@@ -92,9 +86,9 @@ in
       default = null;
       example = "/run/secrets/keycloak-tf-client-secret";
       description = ''
-        Host path to a file containing the OIDC `client_secret` paired
-        with `clientIdFile`. Read via systemd `LoadCredential=`, never
-        copied into the store.
+        Host path to a file with the oauth2 `client_secret` paired with
+        `clientIdFile`. Read via systemd `LoadCredential=`; never copied
+        into the store.
       '';
     };
   }
@@ -131,10 +125,9 @@ in
         tokenFile = effectiveClientSecretFile;
         user = "keycloak";
         group = "keycloak";
-        # Upstream keycloak runs as DynamicUser=true with no persistent
-        # state dir; allocate a dedicated one owned by the same hashed UID
-        # via systemd StateDirectory= (derived by mkReconcileService from
-        # stateDir, which must live under /var/lib for that derivation).
+        # upstream keycloak uses DynamicUser=true and has no state dir.
+        # mkReconcileService will create /var/lib/keycloak via
+        # StateDirectory= and reuse the same hashed UID as keycloak.service.
         stateDir = "/var/lib/keycloak";
         dynamicUser = true;
       };
@@ -152,9 +145,8 @@ in
           pkgs.coreutils
         ];
         environment = {
-          # kcadm.sh places its token cache under $HOME/.keycloak; under
-          # DynamicUser there is no real home, so direct it into the
-          # StateDirectory (writable and owned by the same hashed UID).
+          # kcadm.sh writes its token cache under $HOME/.keycloak;
+          # DynamicUser has no real home, so point HOME at our state dir.
           HOME = "/var/lib/${bootstrapServiceName}";
         };
         serviceConfig = {
@@ -174,13 +166,13 @@ in
           client_id_file="$STATE_DIRECTORY/client_id"
           client_secret_file="$STATE_DIRECTORY/client_secret"
 
-          # the persisted credential pair is the "already bootstrapped" marker.
-          # /var/lib survives reboots, so this won't run on every boot after the first successful run
+          # the saved credential pair is the "already bootstrapped"
+          # marker. /var/lib persists across reboots.
           if [ -s "$client_id_file" ] && [ -s "$client_secret_file" ]; then
             exit 0
           fi
 
-          # poll max 3 minutes until keycloak has fully booted
+          # wait up to 3 minutes for keycloak to come up.
           for _ in $(seq 1 90); do
             if curl -fsS -o /dev/null "${cfg.baseUrl}/realms/master"; then
               break
@@ -194,7 +186,7 @@ in
             --user admin \
             --password "$(cat "$CREDENTIALS_DIRECTORY/admin-password")"
 
-          # Tolerate a client left over from a partial earlier bootstrap.
+          # reuse a client left over from a partial earlier bootstrap.
           existing_uuid="$(kcadm.sh get clients -r master \
             -q clientId=${lib.escapeShellArg cfg.clientName} \
             | jq -r '.[0].id // empty')"
@@ -216,9 +208,8 @@ in
           sa_uid="$(kcadm.sh get clients/$client_uuid/service-account-user -r master \
             | jq -r .id)"
 
-          # The master realm's `admin` grants global admin across every realm;
-          # assigning it to the service-account user gives the reconciler full access.
-          # Idempotent: kcadm tolerates re-grant.
+          # the master-realm `admin` role grants global admin across every
+          # realm. kcadm tolerates re-grant.
           kcadm.sh add-roles -r master \
             --uid "$sa_uid" \
             --rolename admin
@@ -226,8 +217,8 @@ in
           client_secret="$(kcadm.sh get clients/$client_uuid/client-secret -r master \
             | jq -r .value)"
 
-          # Atomic write: rename only succeeds once both tempfiles exist, so
-          # the idempotency check above never observes a half-written pair.
+          # write tempfiles first, then rename, so the "already
+          # bootstrapped" check above never sees a half-written pair.
           printf '%s' ${lib.escapeShellArg cfg.clientName} > "$client_id_file.tmp"
           printf '%s' "$client_secret"                   > "$client_secret_file.tmp"
           mv "$client_id_file.tmp"     "$client_id_file"
