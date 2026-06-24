@@ -1,101 +1,24 @@
-# Forgejo-provider specifics: the forgejo-wrapped OpenTofu executor and the
-# .tf.json generation for a Forgejo pairing. The provider-agnostic helpers
-# (label/file/reconciler) live in modules/lib and are specialized here for the
-# svalabs/forgejo provider (vendored in ./pkg.nix).
-#
-# Every svalabs/forgejo *resource* is exposed as an option collection
-# (`resourceOptions`): `attrsOf` a submodule whose options are the resource's
-# settable attributes, each declared with the NixOS type the corresponding
-# provider attribute accepts (so a wrong name, type, or missing required field is
-# an eval-time error -- `nix flake check` -- not an apply-time one). The option
-# set is derived from the provider schema (`tofu providers schema -json` for
-# svalabs/forgejo 1.5.0); computed/output-only attributes are omitted. The
-# attrset key becomes the Terraform label (and, for name-bearing resources, the
-# default name/login). Parent links are resolved to Terraform references against
-# other managed resources (see `resourceTypes.<c>.refs`), which both wires the
-# `*_id` numeric attributes a user cannot know and orders `tofu apply` correctly.
-#
-# Imported as `import ./lib.nix { inherit pkgs; }` from the Forgejo module and
-# checks.
+# forgejo-provider specifics: executor, resource types, provider block.
+# shared helpers (option helpers, renderer, reconciler) live in modules/lib.
 { pkgs }:
 let
-  inherit (pkgs) lib;
   genlib = import ../../modules/lib { inherit pkgs; };
-  inherit (genlib) tfLabel;
+  inherit (genlib)
+    oStr
+    oBool
+    oInt
+    oListStr
+    oSub
+    rStr
+    rBool
+    rMapStr
+    ;
+  inherit (pkgs) lib;
 
   provider = import ./pkg.nix { inherit pkgs; };
-
-  # Pin required_providers to the vendored provider version so the manifest
-  # always matches the offline mirror.
   providerVersion = provider.version;
-
-  # Terraform input variable (and LoadCredential id) carrying the admin token.
   tokenVar = "forgejo_api_token";
-
-  # OpenTofu wrapped with the svalabs/forgejo provider. The provider lives in
-  # the wrapper's NIX_TERRAFORM_PLUGIN_DIR, so `tofu init`/`apply` resolve it
-  # with no registry access.
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
-
-  ty = lib.types;
-
-  # Per-attribute option constructors. `o*` declare an *optional* attribute
-  # (`nullOr T`, default null -> omitted from the generated `.tf.json` when
-  # unset); `r*` declare a *required* attribute (no default -> a missing value is
-  # an eval-time error). Each carries the exact value shape the provider accepts.
-  oStr =
-    description:
-    lib.mkOption {
-      type = ty.nullOr ty.str;
-      default = null;
-      inherit description;
-    };
-  oBool =
-    description:
-    lib.mkOption {
-      type = ty.nullOr ty.bool;
-      default = null;
-      inherit description;
-    };
-  oInt =
-    description:
-    lib.mkOption {
-      type = ty.nullOr ty.int;
-      default = null;
-      inherit description;
-    };
-  oListStr =
-    description:
-    lib.mkOption {
-      type = ty.nullOr (ty.listOf ty.str);
-      default = null;
-      inherit description;
-    };
-  oSub =
-    options: description:
-    lib.mkOption {
-      type = ty.nullOr (ty.submodule { inherit options; });
-      default = null;
-      inherit description;
-    };
-  rStr =
-    description:
-    lib.mkOption {
-      type = ty.str;
-      inherit description;
-    };
-  rBool =
-    description:
-    lib.mkOption {
-      type = ty.bool;
-      inherit description;
-    };
-  rMapStr =
-    description:
-    lib.mkOption {
-      type = ty.attrsOf ty.str;
-      inherit description;
-    };
 
   # Reference specs, reused across resources. `attr` is the Terraform attribute
   # emitted; `targets` are the managed collections (in priority order) whose key
@@ -484,59 +407,11 @@ let
     };
   };
 
-  # One option collection per resource: an `attrsOf` strictly-typed submodule.
-  # The submodule's options are the resource's settable attributes, plus the
-  # reference inputs (resolved into Terraform references at generation) and one
-  # `<attr>File` input per secret. No `freeformType`: an undeclared attribute is
-  # a definition error.
-  resourceOptions = lib.mapAttrs (
-    _: spec:
-    lib.mkOption {
-      type = lib.types.attrsOf (
-        lib.types.submodule {
-          options =
-            (spec.attrs or { })
-            // lib.mapAttrs (
-              _: refSpec:
-              if refSpec.required or false then
-                lib.mkOption {
-                  type = lib.types.str;
-                  description = refSpec.description;
-                }
-              else
-                lib.mkOption {
-                  type = lib.types.nullOr lib.types.str;
-                  default = null;
-                  description = refSpec.description;
-                }
-            ) spec.refs
-            // lib.listToAttrs (
-              map (
-                attr:
-                lib.nameValuePair "${attr}File" (
-                  lib.mkOption {
-                    type = lib.types.nullOr lib.types.str;
-                    default = null;
-                    description = "Runtime path to a file holding `${attr}` (loaded via systemd LoadCredential=; never copied to the store). Mutually exclusive with a literal `${attr}`.";
-                  }
-                )
-              ) (spec.secrets or [ ])
-            );
-        }
-      );
-      default = { };
-      description = spec.description;
-    }
-  ) resourceTypes;
-
-  # Comma-separated union of token scopes for the declared resource collections
-  # (a least-privilege set for the config).
-  #
-  # Currently unused: the bootstrap mints a maximally-scoped ("all") token to
-  # avoid ever having to re-mint (see module.nix). Retained for Forgejo >= 16,
-  # where the admin token API (PR #12323, v16.0.0) lets the bootstrap re-mint
-  # cleanly on scope change and we can request `requiredScopes cfg` + write:admin
-  # instead of the maximal scope.
+  # union of token scopes for the declared resource collections (least-
+  # privilege set for the config). currently dormant: the bootstrap mints
+  # a maximally-scoped ("all") token to avoid having to re-mint. switch
+  # to `requiredScopes cfg` + write:admin once on Forgejo >= 16, where
+  # the admin token API can re-mint cleanly on scope change.
   requiredScopes =
     cfg:
     let
@@ -545,193 +420,19 @@ let
     in
     if scopes == [ ] then "write:organization" else lib.concatStringsSep "," scopes;
 
-  # Recursively drop null-valued attributes (unset options) and the submodule
-  # bookkeeping key `_module`, so the generated JSON carries only what the user
-  # actually set -- at every nesting level, including the typed nested objects
-  # (external_tracker, ...).
-  cleanNulls =
-    v:
-    if builtins.isAttrs v then
-      lib.mapAttrs (_: cleanNulls) (lib.filterAttrs (_: x: x != null) (removeAttrs v [ "_module" ]))
-    else if builtins.isList v then
-      map cleanNulls v
-    else
-      v;
-
-  # Build the Terraform JSON config for a Forgejo pairing from the module's cfg,
-  # together with the (id -> host path) credential map for any host-file-sourced
-  # secrets. Returns { config; credentials; }.
-  #
-  # Contains NO provider secret: the admin token and every `<attr>File` secret
-  # are supplied at apply time as sensitive input variables fed from systemd
-  # `LoadCredential=`, never written to the store. A *literal* secret attribute
-  # (e.g. `data`/`password` set directly) still lands in the world-readable
-  # store -- use the matching `<attr>File` option to avoid that.
-  forgejoTfConfig =
-    cfg:
-    let
-      # Var-safe id (Terraform variable name + LoadCredential id) for a secret.
-      varSafe = lib.stringAsChars (c: if builtins.match "[A-Za-z0-9_]" c != null then c else "_");
-      secretId =
-        spec: key: attr:
-        "secret_${spec.prefix}_${varSafe key}_${attr}";
-
-      resolveRef =
-        refSpec: val:
-        let
-          tryTarget =
-            t:
-            let
-              tspec = resourceTypes.${t.collection};
-            in
-            if (cfg.${t.collection} or { }) ? ${val} then
-              "\${" + tspec.type + "." + tfLabel tspec.prefix val + "." + t.field + "}"
-            else
-              null;
-          hits = builtins.filter (x: x != null) (map tryTarget refSpec.targets);
-        in
-        if hits != [ ] then
-          builtins.head hits
-        else if refSpec.managedOnly then
-          throw "services.forgejo.runtime: reference '${val}' does not match any managed ${
-            lib.concatMapStringsSep " or " (t: t.collection) refSpec.targets
-          }"
-        else
-          val;
-
-      # Host-file-sourced secrets of one item: [{ attr; id; path; }]. Throws if
-      # both the literal attribute and its `<attr>File` are set.
-      itemSecrets =
-        c: spec: key: item:
-        lib.concatMap (
-          attr:
-          let
-            file = item.${attr + "File"} or null;
-          in
-          lib.optionals (file != null) (
-            if (item.${attr} or null) != null then
-              throw "services.forgejo.runtime.${c}.${key}: set either '${attr}' or '${attr}File', not both"
-            else
-              [
-                {
-                  inherit attr;
-                  id = secretId spec key attr;
-                  path = file;
-                }
-              ]
-          )
-        ) (spec.secrets or [ ]);
-
-      renderItem =
-        c: spec: key: item:
-        let
-          secretEntries = itemSecrets c spec key item;
-          virtuals = builtins.attrNames spec.refs ++ map (s: "${s}File") (spec.secrets or [ ]);
-          base = removeAttrs item ([ "_module" ] ++ virtuals);
-          nameInject = lib.optionalAttrs (spec.nameAttr != null && (item.${spec.nameAttr} or null) == null) {
-            ${spec.nameAttr} = key;
-          };
-          refAttrs = lib.concatMapAttrs (
-            refName: refSpec:
-            lib.optionalAttrs (item.${refName} or null != null) {
-              ${refSpec.attr} = resolveRef refSpec item.${refName};
-            }
-          ) spec.refs;
-          secretAttrs = lib.listToAttrs (map (e: lib.nameValuePair e.attr "\${var.${e.id}}") secretEntries);
-          # A required secret must be supplied via either the literal or its file.
-          reqSecretChecks = map (
-            attr:
-            if (item.${attr} or null) == null && (item.${attr + "File"} or null) == null then
-              throw "services.forgejo.runtime.${c}.${key}: set either '${attr}' or '${attr}File' (required)"
-            else
-              null
-          ) (spec.requiredSecrets or [ ]);
-          # Required map/list attributes: the module system gives `attrsOf`/
-          # `listOf` an empty-value default ({}/[]) rather than treating a missing
-          # value as undefined, so a "required" collection is enforced here.
-          reqAttrChecks = map (
-            attr:
-            let
-              v = item.${attr} or null;
-            in
-            if v == null || v == { } || v == [ ] then
-              throw "services.forgejo.runtime.${c}.${key}: '${attr}' is required and must be non-empty"
-            else
-              null
-          ) (spec.requiredAttrs or [ ]);
-        in
-        # deepSeq forces the validation thunks (whose results are otherwise unused)
-        # so a violated check `throw`s here. These live in the generator, not in
-        # NixOS `config.assertions`, because assertions only fire during a full
-        # NixOS system evaluation -- whereas `forgejoTfConfig` is also called
-        # standalone (e.g. tests, `nix eval`), where assertions would be silently
-        # skipped and a malformed config would surface opaquely at `tofu apply`.
-        lib.nameValuePair (tfLabel spec.prefix key) (
-          builtins.deepSeq [ reqSecretChecks reqAttrChecks ] (
-            cleanNulls (base // nameInject // refAttrs // secretAttrs)
-          )
-        );
-
-      nonEmpty = lib.filterAttrs (c: _: (cfg.${c} or { }) != { }) resourceTypes;
-      resourceBlocks = lib.mapAttrs' (
-        c: spec: lib.nameValuePair spec.type (lib.mapAttrs' (renderItem c spec) cfg.${c})
-      ) nonEmpty;
-
-      # Every host-file-sourced secret across the config, for the sensitive input
-      # variables and the (id -> host path) credential map.
-      allSecrets = lib.concatLists (
-        lib.mapAttrsToList (
-          c: spec: lib.concatLists (lib.mapAttrsToList (key: item: itemSecrets c spec key item) cfg.${c})
-        ) nonEmpty
-      );
-      secretIds = map (e: e.id) allSecrets;
-
-      config = {
-        terraform.required_providers.forgejo = {
-          source = "svalabs/forgejo";
-          version = providerVersion;
-        };
-        variable = {
-          ${tokenVar} = {
-            type = "string";
-            sensitive = true;
-          };
-        }
-        // lib.listToAttrs (
-          map (
-            e:
-            lib.nameValuePair e.id {
-              type = "string";
-              sensitive = true;
-            }
-          ) allSecrets
-        );
-        provider.forgejo = {
-          host = cfg.baseUrl;
-          api_token = "\${var.${tokenVar}}";
-        };
-      }
-      // lib.optionalAttrs (resourceBlocks != { }) { resource = resourceBlocks; };
-
-      credentials =
-        if lib.length secretIds != lib.length (lib.unique secretIds) then
-          throw "services.forgejo.runtime: secret credential id collision (${toString secretIds}); rename the colliding resource keys"
-        else
-          lib.listToAttrs (map (e: lib.nameValuePair e.id e.path) allSecrets);
-    in
-    {
-      inherit config credentials;
+  forgejoTfConfig = genlib.mkTfConfig {
+    inherit resourceTypes providerVersion tokenVar;
+    providerName = "forgejo";
+    providerSource = "svalabs/forgejo";
+    runtimePrefix = "services.forgejo.runtime";
+    providerBlock = cfg: {
+      host = cfg.baseUrl;
+      api_token = "\${var.${tokenVar}}";
     };
+  };
 in
 {
-  inherit
-    resourceTypes
-    resourceOptions
-    requiredScopes
-    forgejoTfConfig
-    ;
-
-  # The generic run-once reconciler, specialized with the forgejo executor and
-  # the forgejo_api_token credential.
+  inherit resourceTypes requiredScopes forgejoTfConfig;
+  resourceOptions = genlib.resourceOptions resourceTypes;
   mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
 }
