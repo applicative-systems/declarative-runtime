@@ -91,6 +91,18 @@ live in the per-pairing README:
   service-account bootstrap flow and the operator-supplied client
   override.
 
+### Runnable examples
+
+Each entry under [`examples/`](examples/) is a complete NixOS
+configuration with its own walkthrough. `nix run .#<example>` builds
+and boots the example as a QEMU VM (host ports forwarded so you can
+hit the services from a browser).
+
+- [`keycloak-forgejo`](examples/keycloak-forgejo/README.md) — both
+  pairings together, a custom Keycloak login theme, SSO from Forgejo
+  into Keycloak, a private internal repo, and per-user avatars served
+  over a side nginx. `nix run .#keycloak-forgejo`.
+
 ### Secrets
 
 Secrets should never enter the world-readable Nix store. The admin token and
@@ -103,7 +115,7 @@ path — prefer it over the literal for any real secret.
 ## Repository layout
 
 ```
-flake.nix              # outputs: nixosModules, checks, formatter
+flake.nix              # outputs: nixosModules, packages (examples), checks, formatter
 treefmt.nix            # treefmt + nixfmt config
 modules/
   default.nix          # aggregates per-pairing modules into nixosModules.default
@@ -120,6 +132,8 @@ services/              # one directory per service<->provider pairing
     lib.nix            #   ~95 typed resourceTypes + the value-tree renderer
     checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
     README.md          #   usage docs
+examples/              # runnable demos; one configuration.nix + README per example
+  keycloak-forgejo/    #   both pairings together with theme, SSO, avatar
 ```
 
 ## Development
