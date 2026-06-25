@@ -664,4 +664,124 @@ in
           assert flow.get("description") == "Passkey login flow"
     '';
   };
+
+  # OIDC password-grant end-to-end: declared user authenticates against a
+  # declared client, and the returned id_token + userinfo carry the
+  # standard claims the runtime config promised. Validates the typed
+  # options -> .tf.json -> Keycloak API -> OIDC token pipeline end-to-end,
+  # not just the admin-API surface the per-family tests cover.
+  keycloak-e2e = pkgs.testers.runNixOSTest {
+    name = "declarative-keycloak-e2e";
+
+    containers.keycloak = mkHost {
+      runtime = {
+        realms.acme = {
+          display_name = "ACME";
+          login_with_email_allowed = true;
+        };
+
+        users.alice = {
+          realm = "acme";
+          username = "alice";
+          email = "alice@acme.test";
+          first_name = "Alice";
+          last_name = "Tester";
+          enabled = true;
+          email_verified = true;
+          initial_password = {
+            valueFile = "/etc/secrets/alice-pw";
+            temporary = false;
+          };
+        };
+
+        # PUBLIC client, only direct access grants enabled (the password
+        # grant doesn't use redirects, so no valid_redirect_uris and
+        # standard/implicit flow off -- the provider rejects redirect
+        # URIs without a flow that uses them).
+        openid_clients.test_app = {
+          realm = "acme";
+          client_id = "test-app";
+          name = "Test App";
+          access_type = "PUBLIC";
+          standard_flow_enabled = false;
+          direct_access_grants_enabled = true;
+        };
+      };
+      extraEtc = {
+        "secrets/alice-pw".text = "hackme";
+      };
+    };
+
+    testScript = ''
+      ${pyHelpers}
+      import base64
+
+      def jwt_claims(tok):
+          # JWT = header.payload.signature; payload is urlsafe-base64 JSON
+          # (no padding). pad to a multiple of 4 before decoding.
+          payload = tok.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+          return json.loads(base64.urlsafe_b64decode(payload))
+
+      start_all()
+      keycloak.wait_for_unit("declarative-keycloak.service")
+
+      with subtest("password grant returns access + id token"):
+          resp = json.loads(keycloak.succeed(
+              "curl --fail -s -X POST "
+              "http://localhost:8080/realms/acme/protocol/openid-connect/token "
+              "-d grant_type=password "
+              "-d client_id=test-app "
+              "-d username=alice "
+              "-d password=hackme "
+              "--data-urlencode 'scope=openid email profile'"
+          ))
+          assert "access_token" in resp, f"no access_token in response: {resp}"
+          assert "id_token" in resp, f"no id_token in response: {resp}"
+          access_token = resp["access_token"]
+          id_token = resp["id_token"]
+
+      with subtest("id_token claims match declared user attributes"):
+          c = jwt_claims(id_token)
+          assert c.get("preferred_username") == "alice", c
+          assert c.get("email") == "alice@acme.test", c
+          assert c.get("email_verified") is True, c
+          assert c.get("given_name") == "Alice", c
+          assert c.get("family_name") == "Tester", c
+          assert c.get("name") == "Alice Tester", c
+
+      with subtest("userinfo endpoint matches the id_token claims"):
+          ui = json.loads(keycloak.succeed(
+              f"curl --fail -s -H 'Authorization: Bearer {access_token}' "
+              "http://localhost:8080/realms/acme/protocol/openid-connect/userinfo"
+          ))
+          assert ui.get("preferred_username") == "alice", ui
+          assert ui.get("email") == "alice@acme.test", ui
+          assert ui.get("given_name") == "Alice", ui
+          assert ui.get("family_name") == "Tester", ui
+
+      with subtest("login-with-email accepts the email as the username field"):
+          resp2 = json.loads(keycloak.succeed(
+              "curl --fail -s -X POST "
+              "http://localhost:8080/realms/acme/protocol/openid-connect/token "
+              "-d grant_type=password "
+              "-d client_id=test-app "
+              "-d username=alice@acme.test "
+              "-d password=hackme "
+              "--data-urlencode 'scope=openid'"
+          ))
+          assert "access_token" in resp2, f"email login rejected: {resp2}"
+
+      with subtest("wrong password is rejected with 401"):
+          # `curl --fail` exits non-zero on >= 400, so use machine.fail.
+          keycloak.fail(
+              "curl --fail -s -X POST "
+              "http://localhost:8080/realms/acme/protocol/openid-connect/token "
+              "-d grant_type=password "
+              "-d client_id=test-app "
+              "-d username=alice "
+              "-d password=wrong"
+          )
+    '';
+  };
 }
