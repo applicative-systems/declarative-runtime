@@ -1,0 +1,49 @@
+/* Dunder Mifflin Paper Company -- corporate beige with Scranton blue. */
+body,
+.login-pf-page,
+.pf-v5-c-login,
+.pf-v5-c-login__main,
+.pf-v5-c-login__container {
+  background: #f4ede1 !important;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+
+.kc-logo-text {
+  background-image: none !important;
+  text-align: center;
+}
+.kc-logo-text::before {
+  content: "DUNDER MIFFLIN";
+  display: block;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #003c8f;
+}
+.kc-logo-text::after {
+  content: "Paper Company, Inc.";
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  color: #6c6c6c;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.pf-v5-c-login__main {
+  background: #ffffff !important;
+  border: 1px solid #003c8f;
+  border-top: 4px solid #003c8f;
+  border-radius: 2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.pf-v5-c-button.pf-m-primary {
+  background-color: #003c8f !important;
+  border-color: #003c8f !important;
+}
+
+.pf-v5-c-login__footer-item a {
+  color: #003c8f !important;
+}
