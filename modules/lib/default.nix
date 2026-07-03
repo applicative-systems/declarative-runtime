@@ -458,7 +458,8 @@ rec {
   #   name        unit + generated-config name (e.g. "declarative-forgejo")
   #   tfConfig    the .tf.json config to apply
   #   afterUnits  units to order/require after (the service's main unit)
-  #   healthUrl   url polled until the service answers, before applying
+  #   healthUrl   url polled until the service answers, before applying; null
+  #               skips health check
   #   tokenFile   path to the admin token on the host, read via LoadCredential
   #   executor    OpenTofu wrapped with the pairing's provider (offline)
   #   tokenVar    name of the sensitive tf variable carrying the token; also
@@ -479,7 +480,7 @@ rec {
       name,
       tfConfig,
       afterUnits,
-      healthUrl,
+      healthUrl ? null,
       tokenFile,
       executor,
       tokenVar,
@@ -551,13 +552,15 @@ rec {
         # refresh the generated config (tfstate persists across runs).
         install -m 0600 ${confFile} ./main.tf.json
 
-        # wait for the service to actually answer before applying.
-        for _ in $(seq 1 60); do
-          if curl -fsS -o /dev/null "${healthUrl}"; then
-            break
-          fi
-          sleep 2
-        done
+        ${lib.optionalString (healthUrl != null) ''
+          # wait for the service to actually answer before applying.
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null "${healthUrl}"; then
+              break
+            fi
+            sleep 2
+          done
+        ''}
 
         # pass each credential to tofu as TF_VAR_<id>.
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
