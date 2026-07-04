@@ -4,6 +4,7 @@
   imports = [
     ../services/forgejo/module.nix
     ../services/hetzner-dns/module.nix
+    ../services/jellyfin/module.nix
     ../services/keycloak/module.nix
   ];
 }

@@ -81,6 +81,12 @@ rec {
       type = ty.attrsOf ty.str;
       inherit description;
     };
+  rListStr =
+    description:
+    lib.mkOption {
+      type = ty.listOf ty.str;
+      inherit description;
+    };
 
   # ---------------------------------------------------------------------------
   # tf-label + tf-json helpers
@@ -475,6 +481,13 @@ rec {
   #               same hashed UID as the main unit, and systemd creates
   #               the work dir via StateDirectory= (derived from stateDir).
   #               requires stateDir to live under /var/lib.
+  #   applyRetries    number of `tofu apply` attempts before failing the unit
+  #               (default 1 = fail fast). Values > 1 absorb transient errors
+  #               from a service that answers the readiness probe but is briefly
+  #               unable to serve an operation (e.g. Jellyfin returns 503 while
+  #               first-boot DB migrations finish, past the public-info probe).
+  #               `tofu apply` is idempotent, so re-running only reconverges.
+  #   applyRetryDelay seconds between apply attempts (default 10).
   mkReconcileService =
     {
       name,
@@ -489,6 +502,8 @@ rec {
       stateDir,
       credentials ? { },
       dynamicUser ? false,
+      applyRetries ? 1,
+      applyRetryDelay ? 10,
     }:
     let
       confFile = tfJsonFile name tfConfig;
@@ -567,7 +582,22 @@ rec {
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done
         tofu init -no-color
-        tofu apply -auto-approve -input=false -no-color
+        # apply, retrying transient failures (e.g. a 503 while the service
+        # finishes late startup work) up to `applyRetries` times. a single
+        # attempt (the default) preserves fail-fast behaviour.
+        attempt=1
+        while :; do
+          if tofu apply -auto-approve -input=false -no-color; then
+            break
+          fi
+          if [ "$attempt" -ge ${toString applyRetries} ]; then
+            echo "tofu apply failed after $attempt attempt(s)" >&2
+            exit 1
+          fi
+          echo "tofu apply attempt $attempt failed; retrying in ${toString applyRetryDelay}s (service may not be fully ready)" >&2
+          attempt=$((attempt + 1))
+          sleep ${toString applyRetryDelay}
+        done
       '';
     };
 }

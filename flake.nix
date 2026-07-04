@@ -30,6 +30,7 @@
       nixosModules.forgejo = ./services/forgejo/module.nix;
       nixosModules.keycloak = ./services/keycloak/module.nix;
       nixosModules.hetzner-dns = ./services/hetzner-dns/module.nix;
+      nixosModules.jellyfin = ./services/jellyfin/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
@@ -50,6 +51,10 @@
           inherit (inputs) self;
         })
         // (import ./services/hetzner-dns/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (import ./services/jellyfin/checks.nix {
           inherit pkgs;
           inherit (inputs) self;
         })
