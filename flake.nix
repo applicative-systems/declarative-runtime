@@ -1,19 +1,15 @@
 {
   description = "declarative-runtime: declarative NixOS service runtime config via paired OpenTofu providers";
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
     {
       self,
       nixpkgs,
-      treefmt-nix,
     }:
     let
+      inherit (nixpkgs) lib;
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -27,7 +23,6 @@
             pkgs = nixpkgs.legacyPackages.${system};
           }
         );
-      treefmtEval = forAllSystems ({ pkgs, ... }: treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
       # runnable examples (see ./examples/<name>/README.md). each `name`
       # surfaces as `nix run .#<name>` (the qemu vm) and as an eval-only
       # check, so option-name drift fails CI without paying for a full vm test.
@@ -69,11 +64,38 @@
           name: cfg:
           nixpkgs.lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel
         ) examples)
-        // {
-          formatting = treefmtEval.${system}.config.build.check self;
-        }
       );
 
-      formatter = forAllSystems ({ system, ... }: treefmtEval.${system}.config.build.wrapper);
+      formatter = builtins.mapAttrs (
+        _: pkgs:
+        pkgs.treefmt.withConfig {
+          settings = {
+            tree-root-file = "flake.nix";
+            on-unmatched = "info";
+            formatter = {
+              nixfmt = {
+                command = lib.getExe pkgs.nixfmt;
+                includes = [ "*.nix" ];
+              };
+              statix = {
+                command = lib.getExe pkgs.statix;
+                options = [ "fix" ];
+                no-positional-arg-support = true;
+                includes = [ "*.nix" ];
+              };
+              deadnix = {
+                command = lib.getExe pkgs.deadnix;
+                options = [ "--edit" ];
+                includes = [ "*.nix" ];
+              };
+              prettier = {
+                command = lib.getExe pkgs.prettier;
+                options = [ "--write" ];
+                includes = [ "*.md" ];
+              };
+            };
+          };
+        }
+      ) nixpkgs.legacyPackages;
     };
 }
