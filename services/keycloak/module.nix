@@ -33,9 +33,7 @@ let
 in
 {
   options.services.keycloak.runtime = {
-    enable = mkEnableOption (
-      "declarative keycloak runtime config, applied via OpenTofu after keycloak.service starts"
-    );
+    enable = mkEnableOption "declarative keycloak runtime config, applied via OpenTofu after keycloak.service starts";
 
     baseUrl = mkOption {
       type = types.str;

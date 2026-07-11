@@ -52,7 +52,7 @@
 
       packages = forAllSystems (
         { system, ... }:
-        nixpkgs.lib.mapAttrs (name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
+        nixpkgs.lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
       );
 
       checks = forAllSystems (
