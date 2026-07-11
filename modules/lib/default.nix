@@ -133,13 +133,13 @@ rec {
                 if refSpec.required or false then
                   lib.mkOption {
                     type = base;
-                    description = refSpec.description;
+                    inherit (refSpec) description;
                   }
                 else
                   lib.mkOption {
                     type = ty.nullOr base;
                     default = null;
-                    description = refSpec.description;
+                    inherit (refSpec) description;
                   }
               ) spec.refs
               // lib.listToAttrs (
@@ -157,7 +157,7 @@ rec {
           }
         );
         default = { };
-        description = spec.description;
+        inherit (spec) description;
       }
     ) resourceTypes;
 

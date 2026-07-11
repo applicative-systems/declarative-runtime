@@ -91,7 +91,7 @@ in
       declarative-forgejo = tflib.mkReconcileService {
         name = "declarative-forgejo";
         tfConfig = tf.config;
-        credentials = tf.credentials;
+        inherit (tf) credentials;
         afterUnits = [ "forgejo.service" ] ++ lib.optional bootstrapToken "${tokenServiceName}.service";
         healthUrl = "${cfg.baseUrl}/api/healthz";
         tokenFile = effectiveTokenFile;

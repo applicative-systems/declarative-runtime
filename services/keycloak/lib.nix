@@ -13,7 +13,6 @@ let
     oSub
     oListSub
     rStr
-    rBool
     ;
 
   provider = pkgs.terraform-providers.keycloak_keycloak;
