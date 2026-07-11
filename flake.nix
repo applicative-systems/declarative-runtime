@@ -4,25 +4,9 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
-    {
-      self,
-      nixpkgs,
-    }:
+    inputs:
     let
-      inherit (nixpkgs) lib;
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      forAllSystems =
-        f:
-        nixpkgs.lib.genAttrs systems (
-          system:
-          f {
-            inherit system;
-            pkgs = nixpkgs.legacyPackages.${system};
-          }
-        );
+      inherit (inputs.nixpkgs) lib;
       # runnable examples (see ./examples/<name>/README.md). each `name`
       # surfaces as `nix run .#<name>` (the qemu vm) and as an eval-only
       # check, so option-name drift fails CI without paying for a full vm test.
@@ -31,10 +15,10 @@
       };
       exampleSystem =
         system: cfg:
-        nixpkgs.lib.nixosSystem {
+        lib.nixosSystem {
           inherit system;
           modules = [
-            self.nixosModules.default
+            inputs.self.nixosModules.default
             cfg
           ];
         };
@@ -46,27 +30,34 @@
       nixosModules.forgejo = ./services/forgejo/module.nix;
       nixosModules.keycloak = ./services/keycloak/module.nix;
 
-      nixosConfigurations = nixpkgs.lib.mapAttrs' (
-        name: cfg: nixpkgs.lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
+      nixosConfigurations = lib.mapAttrs' (
+        name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
       ) examples;
 
-      packages = forAllSystems (
-        { system, ... }:
-        nixpkgs.lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
-      );
+      packages = lib.mapAttrs (
+        system: _pkgs: lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
+      ) inputs.nixpkgs.legacyPackages;
 
-      checks = forAllSystems (
-        { pkgs, system }:
-        # Per-service checks (one attrset per pairing under ./services/<svc>).
-        (import ./services/forgejo/checks.nix { inherit pkgs self; })
-        // (import ./services/keycloak/checks.nix { inherit pkgs self; })
-        // (nixpkgs.lib.mapAttrs' (
+      checks = lib.mapAttrs (
+        system: pkgs:
+        import ./services/forgejo/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        }
+        // (import ./services/keycloak/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (lib.mapAttrs' (
           name: cfg:
-          nixpkgs.lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel
+          lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel
         ) examples)
-      );
+        // {
+          formatting = inputs.self.formatter.${system}.check inputs.self;
+        }
+      ) inputs.nixpkgs.legacyPackages;
 
-      formatter = builtins.mapAttrs (
+      formatter = lib.mapAttrs (
         _: pkgs:
         pkgs.treefmt.withConfig {
           settings = {
@@ -96,6 +87,6 @@
             };
           };
         }
-      ) nixpkgs.legacyPackages;
+      ) inputs.nixpkgs.legacyPackages;
     };
 }
