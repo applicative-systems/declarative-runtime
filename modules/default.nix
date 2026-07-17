@@ -3,6 +3,7 @@
 {
   imports = [
     ../services/forgejo/module.nix
+    ../services/hetzner-dns/module.nix
     ../services/keycloak/module.nix
   ];
 }
