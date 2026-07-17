@@ -31,6 +31,7 @@
       nixosModules.keycloak = ./services/keycloak/module.nix;
       nixosModules.hetzner-dns = ./services/hetzner-dns/module.nix;
       nixosModules.jellyfin = ./services/jellyfin/module.nix;
+      nixosModules.proxmox-ve = ./services/proxmox-ve/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
@@ -55,6 +56,10 @@
           inherit (inputs) self;
         })
         // (import ./services/jellyfin/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (import ./services/proxmox-ve/checks.nix {
           inherit pkgs;
           inherit (inputs) self;
         })
