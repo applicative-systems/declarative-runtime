@@ -3,6 +3,11 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+  # Proxmox VE itself is not in Nixpkgs; the `proxmox-vm` example runs it via
+  # this out-of-tree flake. Per upstream guidance its `nixpkgs-stable` input is
+  # left as-is (only its own tested revision is supported).
+  inputs.proxmox-nixos.url = "github:SaumonNet/proxmox-nixos";
+
   outputs =
     inputs:
     let
@@ -22,6 +27,19 @@
             cfg
           ];
         };
+
+      # The proxmox-vm example additionally needs the proxmox-nixos module +
+      # overlay, and is x86_64-only (proxmox-nixos supports no other system), so
+      # it is built here rather than through the generic `examples` map above.
+      proxmoxExample = lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          inputs.self.nixosModules.default
+          inputs.proxmox-nixos.nixosModules.proxmox-ve
+          { nixpkgs.overlays = [ inputs.proxmox-nixos.overlays.x86_64-linux ]; }
+          ./examples/proxmox-vm/configuration.nix
+        ];
+      };
     in
     {
       # NixOS module entrypoint: enables a Nixpkgs service and reconciles its
@@ -33,13 +51,22 @@
       nixosModules.jellyfin = ./services/jellyfin/module.nix;
       nixosModules.proxmox-ve = ./services/proxmox-ve/module.nix;
 
-      nixosConfigurations = lib.mapAttrs' (
-        name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
-      ) examples;
+      nixosConfigurations =
+        lib.mapAttrs' (
+          name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
+        ) examples
+        // {
+          example-proxmox-vm = proxmoxExample;
+        };
 
-      packages = lib.mapAttrs (
-        system: _pkgs: lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
-      ) inputs.nixpkgs.legacyPackages;
+      packages =
+        lib.recursiveUpdate
+          (lib.mapAttrs (
+            system: _pkgs: lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
+          ) inputs.nixpkgs.legacyPackages)
+          {
+            x86_64-linux.proxmox-vm = proxmoxExample.config.system.build.vm;
+          };
 
       checks = lib.mapAttrs (
         system: pkgs:

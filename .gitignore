@@ -10,3 +10,4 @@ result-*
 
 # NixOS interactive test driver (REPL command history)
 .nixos-test-history
+*.qcow2
