@@ -148,6 +148,71 @@ in
     '';
   };
 
+  # import-adoption: an importable-only realm + user, created by the reconciler,
+  # then re-adopted after the tfstate is deleted (0 added / 0 destroyed). Full
+  # VM (needs state deletion + restart). keycloak keys most resources by a
+  # server-assigned UUID; realm (by name) and user (by realm/username) are the
+  # derivable ones.
+  keycloak-import = pkgs.testers.runNixOSTest {
+    name = "declarative-keycloak-import";
+
+    nodes.machine =
+      args:
+      lib.recursiveUpdate
+        (mkHost {
+          runtime = {
+            realms.acme.display_name = "ACME Corp.";
+            users.alice = {
+              realm = "acme";
+              email = "alice@example.com";
+              enabled = true;
+            };
+          };
+        } args)
+        {
+          virtualisation.memorySize = 3072;
+        };
+
+    testScript = ''
+      ${pyHelpers}
+
+      def usernames(m):
+          return [u["username"] for u in admin_get(m, "acme/users")]
+
+      machine.start()
+      machine.wait_for_unit("declarative-keycloak.service")
+
+      # Baseline: the declared realm and user exist.
+      assert get_realm(machine, "acme").get("realm") == "acme"
+      assert "alice" in usernames(machine), "user not created at boot"
+
+      # Simulate a lost / rebuilt tfstate, then re-run the reconciler.
+      state = "/var/lib/keycloak/declarative-terraform"
+      machine.succeed("systemctl stop declarative-keycloak.service")
+      machine.succeed(f"rm -f {state}/terraform.tfstate {state}/terraform.tfstate.backup")
+      machine.succeed(f"test ! -e {state}/terraform.tfstate")
+      machine.succeed("systemctl start declarative-keycloak.service")
+      machine.wait_for_unit("declarative-keycloak.service")
+
+      # The reconciler must ADOPT the pre-existing realm + user, not recreate.
+      journal = machine.succeed(
+          "journalctl -u declarative-keycloak.service --no-pager --output=cat"
+      )
+      for addr in ["keycloak_realm.realm_acme", "keycloak_user.user_alice"]:
+          assert f"declarative-import: adopted {addr}" in journal, \
+              f"{addr} was not adopted via import:\n{journal}"
+
+      apply_lines = [line for line in journal.splitlines() if "Apply complete" in line]
+      assert apply_lines, "no 'Apply complete!' line after state-loss re-apply"
+      adopted = apply_lines[-1]
+      assert "0 added" in adopted and "0 destroyed" in adopted, \
+          f"state-loss re-apply recreated resources instead of adopting: {adopted}"
+
+      # The user is intact (adopted, not duplicated or dropped).
+      assert usernames(machine).count("alice") == 1, "user missing or duplicated after adoption"
+    '';
+  };
+
   # roles, groups, users + bindings via managed-key list refs.
   keycloak-rbac = pkgs.testers.runNixOSTest {
     name = "declarative-keycloak-rbac";

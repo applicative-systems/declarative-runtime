@@ -81,6 +81,9 @@ let
   #   requiredSecrets secrets the provider requires (one of `<attr>`/`<attr>File`)
   #   requiredAttrs   collection-typed attrs that must be set non-empty
   #   attrs           the settable attributes, each a typed option (no freeform)
+  #   importId        (optional) declared-state -> provider import id (see
+  #                   modules/lib mkImportEntries); omitted where the id is a
+  #                   server-assigned GUID/token or the resource is a singleton
   resourceTypes = {
     users = {
       type = "jellyfin_user";
@@ -103,6 +106,8 @@ let
       prefix = "library";
       nameAttr = "name";
       refs = { };
+      # imported by library name.
+      importId = ctx: ctx.item.name;
       requiredAttrs = [ "paths" ];
       description = "Jellyfin media libraries (virtual folders), keyed by library name.";
       attrs = {
@@ -127,6 +132,8 @@ let
       prefix = "plugin_repo";
       nameAttr = "name";
       refs = { };
+      # imported by repository name.
+      importId = ctx: ctx.item.name;
       description = "Jellyfin plugin repositories, keyed by repository name.";
       attrs = {
         name = oStr "The repository name. Defaults to the attribute key.";
@@ -139,6 +146,8 @@ let
       prefix = "plugin";
       nameAttr = "name";
       refs.repository = pluginRepoRef;
+      # imported by plugin package name (the provider also accepts a GUID).
+      importId = ctx: ctx.item.name;
       description = "Jellyfin plugins installed from a repository, keyed by plugin package name. Installation downloads the package, so the server needs network access to the repository.";
       attrs = {
         name = oStr "The plugin package name. Defaults to the attribute key.";

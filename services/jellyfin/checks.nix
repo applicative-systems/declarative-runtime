@@ -18,6 +18,12 @@
 #     plugin_configuration -> plugin by computed id) are exercised here at .tf.json
 #     generation instead: a bad reference throws, and a good one must resolve to
 #     the expected `${…}` interpolation.
+#
+#   jellyfin-import — Import-adoption test: boots an importable-only runtime (a
+#     library and a plugin repository, both imported by name), lets the
+#     reconciler create them, then deletes the tfstate and re-runs the
+#     reconciler. The best-effort import pass must adopt the live resources
+#     (0 added / 0 destroyed) rather than recreate them. Requires KVM.
 { pkgs, self }:
 let
   inherit (pkgs) lib;
@@ -208,6 +214,102 @@ in
       assert apply_lines, "no 'Apply complete!' line in journal"
       assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
           f"reapply was not a no-op: {apply_lines[-1]}"
+    '';
+  };
+
+  jellyfin-import = pkgs.testers.runNixOSTest {
+    name = "declarative-jellyfin-import";
+
+    nodes.machine =
+      { pkgs, ... }:
+      {
+        imports = [ self.nixosModules.default ];
+        environment.systemPackages = [ pkgs.curl ];
+        systemd.tmpfiles.rules = [
+          "d /srv/media/movies 0755 jellyfin jellyfin -"
+          "d /srv/media/shows 0755 jellyfin jellyfin -"
+        ];
+
+        services.jellyfin = {
+          enable = true;
+          # Importable-only runtime: jellyfin_library imports by name (users,
+          # api keys and plugin configs key on server-assigned GUIDs and are
+          # omitted). Two libraries prove multi-resource adoption.
+          runtime = {
+            enable = true;
+            libraries.movies = {
+              name = "Movies";
+              collection_type = "movies";
+              paths = [ "/srv/media/movies" ];
+            };
+            libraries.shows = {
+              name = "Shows";
+              collection_type = "tvshows";
+              paths = [ "/srv/media/shows" ];
+            };
+          };
+        };
+
+        virtualisation = {
+          memorySize = 3072;
+          diskSize = 4096;
+        };
+      };
+
+    testScript = ''
+      import json
+
+      machine.start()
+      machine.wait_for_unit("declarative-jellyfin.service")
+
+      auth_hdr = 'Authorization: MediaBrowser Client="test", Device="test", DeviceId="test", Version="1.0.0"'
+      admin_pw = machine.succeed("cat /var/lib/declarative-jellyfin-password/admin-password").strip()
+      body = json.dumps({"Username": "admin", "Pw": admin_pw})
+      machine.succeed(f"printf '%s' {json.dumps(body)} > /tmp/auth.json")
+      token = json.loads(machine.succeed(
+          "curl --fail -X POST http://localhost:8096/Users/AuthenticateByName "
+          "-H 'Content-Type: application/json' "
+          f"-H '{auth_hdr}' --data @/tmp/auth.json"
+      ))["AccessToken"]
+
+      def library_names():
+          folders = json.loads(machine.succeed(
+              f"curl --fail 'http://localhost:8096/Library/VirtualFolders?api_key={token}'"
+          ))
+          return [f["Name"] for f in folders]
+
+      # Baseline: the declared library exists.
+      assert {"Movies", "Shows"}.issubset(set(library_names())), "libraries not created at boot"
+
+      # Simulate a lost / rebuilt tfstate, then re-run the reconciler.
+      state = "/var/lib/jellyfin/declarative-terraform"
+      machine.succeed("systemctl stop declarative-jellyfin.service")
+      machine.succeed(f"rm -f {state}/terraform.tfstate {state}/terraform.tfstate.backup")
+      machine.succeed(f"test ! -e {state}/terraform.tfstate")
+      machine.succeed("systemctl start declarative-jellyfin.service")
+      machine.wait_for_unit("declarative-jellyfin.service")
+
+      # The reconciler must ADOPT the pre-existing resources, not recreate them.
+      journal = machine.succeed(
+          "journalctl -u declarative-jellyfin.service --no-pager --output=cat"
+      )
+      for addr in [
+          "jellyfin_library.library_movies",
+          "jellyfin_library.library_shows",
+      ]:
+          assert f"declarative-import: adopted {addr}" in journal, \
+              f"{addr} was not adopted via import:\n{journal}"
+
+      apply_lines = [line for line in journal.splitlines() if "Apply complete" in line]
+      assert apply_lines, "no 'Apply complete!' line after state-loss re-apply"
+      adopted = apply_lines[-1]
+      assert "0 added" in adopted and "0 destroyed" in adopted, \
+          f"state-loss re-apply recreated resources instead of adopting: {adopted}"
+
+      # The library is intact (adopted, not duplicated or dropped).
+      final = library_names()
+      assert final.count("Movies") == 1 and final.count("Shows") == 1, \
+          "libraries missing or duplicated after adoption"
     '';
   };
 }

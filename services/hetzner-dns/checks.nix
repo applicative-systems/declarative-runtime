@@ -1,5 +1,12 @@
 # hetzner-dns — Full integration test.
 # Hetzner DNS is a remote cloud API with. We emulate it with ./emulator.py.
+#
+#   hetzner-dns-import — Import-adoption test: two importable-only zones,
+#   created against the emulator, then re-adopted after the tfstate is deleted
+#   (0 added / 0 destroyed) rather than recreated. hcloud_zone imports by name.
+#   RRSets/records reference their parent zone by a server-assigned numeric id
+#   (not derivable from a lost state), so they are excluded here; composite
+#   import ids are covered by the forgejo branch-protection test.
 { pkgs, self }:
 let
   port = 8899;
@@ -169,6 +176,110 @@ in
           f"http://127.0.0.1:{PORT}/v1/zones/acme.example/rrsets/api/A"
       )
       assert '203.0.113.20' in api_, f"api A not applied: {api_}"
+    '';
+  };
+
+  hetzner-dns-import = pkgs.testers.runNixOSTest {
+    name = "declarative-hetzner-dns-import";
+
+    nodes.machine =
+      { pkgs, ... }:
+      {
+        imports = [ self.nixosModules.default ];
+        environment.systemPackages = [ pkgs.curl ];
+        environment.etc."hcloud-dns-token".text = apiToken;
+
+        systemd.services.hetzner-dns-emulator = {
+          description = "Hetzner DNS API test double";
+          wantedBy = [ "multi-user.target" ];
+          environment = {
+            PORT = toString port;
+            EXPECTED_TOKEN = apiToken;
+          };
+          serviceConfig = {
+            ExecStart = "${pkgs.python3}/bin/python3 ${./emulator.py}";
+            ExecStartPost = "${pkgs.curl}/bin/curl --retry 30 --retry-delay 1 --retry-all-errors -fsS -o /dev/null http://127.0.0.1:${toString port}/v1/healthz";
+            DynamicUser = true;
+            Restart = "on-failure";
+          };
+        };
+
+        systemd.services.declarative-hetzner-dns = {
+          after = [ "hetzner-dns-emulator.service" ];
+          wants = [ "hetzner-dns-emulator.service" ];
+        };
+
+        services.hetzner-dns.runtime = {
+          enable = true;
+          tokenFile = "/etc/hcloud-dns-token";
+          inherit endpoint;
+
+          # Importable-only: hcloud_zone imports by name. Two zones prove
+          # multi-resource adoption. (zone_rrsets/zone_records link to their
+          # parent zone by its server-assigned numeric id, which a lost state
+          # cannot re-derive, so on re-apply the provider force-replaces them
+          # rather than adopting; only zones adopt cleanly here. Composite
+          # import ids are covered by the forgejo branch-protection test.)
+          zones.acme = {
+            name = "acme.example";
+            ttl = 3600;
+            labels.team = "platform";
+          };
+          zones.beta = {
+            name = "beta.example";
+            ttl = 7200;
+          };
+        };
+
+        virtualisation.memorySize = 2048;
+      };
+
+    testScript = ''
+      PORT = ${toString port}
+      TOKEN = "${apiToken}"
+
+      def api(path):
+          return machine.succeed(
+              f"curl --fail -H 'Authorization: Bearer {TOKEN}' "
+              f"http://127.0.0.1:{PORT}/v1{path}"
+          )
+
+      machine.start()
+      machine.wait_for_unit("hetzner-dns-emulator.service")
+      machine.wait_for_unit("declarative-hetzner-dns.service")
+
+      # Baseline: both zones exist.
+      api("/zones/acme.example")
+      api("/zones/beta.example")
+
+      # Simulate a lost / rebuilt tfstate, then re-run the reconciler.
+      state = "/var/lib/declarative-hetzner-dns/declarative-terraform"
+      machine.succeed("systemctl stop declarative-hetzner-dns.service")
+      machine.succeed(f"rm -f {state}/terraform.tfstate {state}/terraform.tfstate.backup")
+      machine.succeed(f"test ! -e {state}/terraform.tfstate")
+      machine.succeed("systemctl start declarative-hetzner-dns.service")
+      machine.wait_for_unit("declarative-hetzner-dns.service")
+
+      # The reconciler must ADOPT the pre-existing zone + rrsets, not recreate.
+      journal = machine.succeed(
+          "journalctl -u declarative-hetzner-dns.service --no-pager --output=cat"
+      )
+      for addr in [
+          "hcloud_zone.zone_acme",
+          "hcloud_zone.zone_beta",
+      ]:
+          assert f"declarative-import: adopted {addr}" in journal, \
+              f"{addr} was not adopted via import:\n{journal}"
+
+      apply_lines = [line for line in journal.splitlines() if "Apply complete" in line]
+      assert apply_lines, "no 'Apply complete!' line after state-loss re-apply"
+      adopted = apply_lines[-1]
+      assert "0 added" in adopted and "0 destroyed" in adopted, \
+          f"state-loss re-apply recreated resources instead of adopting: {adopted}"
+
+      # Zones intact after adoption.
+      zone = api("/zones/acme.example")
+      assert '"team": "platform"' in zone, f"zone label changed after adoption: {zone}"
     '';
   };
 }

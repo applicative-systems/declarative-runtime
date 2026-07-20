@@ -75,7 +75,7 @@ in
       tflib.mkReconcileService {
         name = "declarative-hetzner-dns";
         tfConfig = tf.config;
-        inherit (tf) credentials;
+        inherit (tf) credentials importEntries;
         afterUnits = [ ];
         inherit (cfg) tokenFile;
         user = serviceUser;

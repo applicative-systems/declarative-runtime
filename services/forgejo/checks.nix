@@ -11,6 +11,13 @@
 #     resolution and apply ordering. A user with a `passwordFile` also proves
 #     per-secret credential indirection — the value is loaded from a host file
 #     and kept out of the generated `.tf.json`. Requires KVM (a NixOS VM test).
+#
+#   forgejo-import — Import-adoption test: boots an importable-only runtime
+#     (user + repository + branch protection, all with derivable import ids),
+#     lets the reconciler create them, then deletes the tfstate and re-runs the
+#     reconciler. The best-effort import pass must *adopt* the live resources
+#     into the fresh state (0 added / 0 destroyed) rather than recreate them,
+#     and the pairing must then reconverge to a no-op. Requires KVM.
 { pkgs, self }:
 {
   forgejo = pkgs.testers.runNixOSTest {
@@ -149,6 +156,130 @@
       # mus work because the scopen is the maximal "all" token
       machine.succeed("/run/current-system/specialisation/widenScope/bin/switch-to-configuration test")
       machine.wait_until_succeeds("curl --fail http://localhost:3000/api/v1/users/alice")
+    '';
+  };
+
+  forgejo-import = pkgs.testers.runNixOSTest {
+    name = "declarative-forgejo-import";
+
+    nodes.machine =
+      { pkgs, ... }:
+      {
+        imports = [ self.nixosModules.default ];
+        environment.systemPackages = [ pkgs.curl ];
+        environment.etc."forgejo-bob-password".text = "hackme";
+
+        services.forgejo = {
+          enable = true;
+          settings.server = {
+            HTTP_PORT = 3000;
+            DOMAIN = "localhost";
+          };
+          settings.security.MIN_PASSWORD_LENGTH = 6;
+
+          # Importable-only runtime: every declared resource has a derivable
+          # import id -- forgejo_user by login, forgejo_repository by
+          # "<owner>/<name>", forgejo_branch_protection by
+          # "<owner>/<repo>/<branch>" (composed from the repo's own import id).
+          # Organizations/teams/secrets are omitted: the provider gives them no
+          # id-string importer, so a lost state could not re-adopt them.
+          runtime = {
+            enable = true;
+
+            users.bob = {
+              email = "bob@localhost.localdomain";
+              passwordFile = "/etc/forgejo-bob-password";
+              must_change_password = false;
+            };
+
+            # owner is the managed user -> import id "bob/widgets".
+            repositories.widgets = {
+              owner = "bob";
+              description = "Widget factory";
+              private = false;
+              auto_init = true;
+            };
+
+            # composed from the repo's import id -> "bob/widgets/main".
+            branch_protections.main = {
+              repository = "widgets";
+              branch_name = "main";
+              enable_push = true;
+            };
+          };
+        };
+
+        virtualisation = {
+          memorySize = 3072;
+          diskSize = 4096;
+        };
+      };
+
+    testScript = ''
+      machine.start()
+
+      # Cold boot converges the importable-only config: the reconciler *creates*
+      # bob, bob/widgets and its branch protection (the first-boot import pass
+      # finds nothing to adopt yet).
+      machine.wait_for_unit("declarative-forgejo.service")
+
+      token = machine.succeed("cat /var/lib/declarative-forgejo-token/api-token").strip()
+
+      def auth(path):
+          return machine.succeed(
+              f"curl --fail -H 'Authorization: token {token}' http://localhost:3000{path}"
+          )
+
+      # Baseline: the three declared resources exist.
+      auth("/api/v1/users/bob")
+      auth("/api/v1/repos/bob/widgets")
+      auth("/api/v1/repos/bob/widgets/branch_protections/main")
+
+      # Simulate a lost / rebuilt tfstate, then re-run the reconciler.
+      state = "/var/lib/forgejo/declarative-terraform"
+      machine.succeed("systemctl stop declarative-forgejo.service")
+      machine.succeed(f"rm -f {state}/terraform.tfstate {state}/terraform.tfstate.backup")
+      machine.succeed(f"test ! -e {state}/terraform.tfstate")
+      machine.succeed("systemctl start declarative-forgejo.service")
+      machine.wait_for_unit("declarative-forgejo.service")
+
+      # The reconciler must ADOPT the pre-existing resources into the fresh
+      # state via `tofu import`, not recreate them.
+      journal = machine.succeed(
+          "journalctl -u declarative-forgejo.service --no-pager --output=cat"
+      )
+      for addr in [
+          "forgejo_user.user_bob",
+          "forgejo_repository.repo_widgets",
+          "forgejo_branch_protection.branch_protection_main",
+      ]:
+          assert f"declarative-import: adopted {addr}" in journal, \
+              f"{addr} was not adopted via import:\n{journal}"
+
+      # The adoption apply must add and destroy nothing (nothing recreated).
+      apply_lines = [line for line in journal.splitlines() if "Apply complete" in line]
+      assert apply_lines, "no 'Apply complete!' line after state-loss re-apply"
+      adopted = apply_lines[-1]
+      assert "0 added" in adopted and "0 destroyed" in adopted, \
+          f"state-loss re-apply recreated resources instead of adopting: {adopted}"
+
+      # Resources are intact (adopted, not duplicated or dropped).
+      auth("/api/v1/users/bob")
+      auth("/api/v1/repos/bob/widgets")
+      auth("/api/v1/repos/bob/widgets/branch_protections/main")
+
+      # A further reconcile adopts nothing new and recreates nothing: the
+      # imported resources stay imported. (A residual in-place update is
+      # expected -- forgejo_user's password is write-only, so the provider can
+      # never read it back and reconciles it on every apply; that is not a
+      # recreation, so we assert on added/destroyed, not changed.)
+      machine.succeed("systemctl restart declarative-forgejo.service")
+      stable = machine.succeed(
+          "journalctl -u declarative-forgejo.service --no-pager --output=cat "
+          "| grep 'Apply complete'"
+      ).strip().splitlines()[-1]
+      assert "0 added" in stable and "0 destroyed" in stable, \
+          f"post-adoption reconcile recreated resources: {stable}"
     '';
   };
 }

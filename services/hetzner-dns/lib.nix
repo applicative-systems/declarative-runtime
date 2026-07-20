@@ -48,6 +48,9 @@ let
   #   refs            parent links resolved to references against managed zones
   #   requiredAttrs   collection attrs that must be present and non-empty
   #   attrs           the settable attributes, each a typed option (no freeform)
+  #   importId        (optional) declared-state -> provider import id (see
+  #                   modules/lib mkImportEntries); omitted where the id is
+  #                   server-assigned or not importable by id string
   # Computed/output-only attributes (id, registrar, authoritative_nameservers,
   # protection read-back, ...) are intentionally omitted.
   resourceTypes = {
@@ -56,6 +59,8 @@ let
       prefix = "zone";
       nameAttr = "name";
       refs = { };
+      # imported by zone (domain) name.
+      importId = ctx: ctx.item.name;
       description = "Hetzner DNS zones, keyed by zone (domain) name.";
       attrs = {
         name = oStr "Name of the zone (domain, e.g. \"example.com\"). Defaults to the attribute key.";
@@ -89,6 +94,14 @@ let
       prefix = "rrset";
       nameAttr = null;
       refs.zone = zoneRef;
+      # imported by "<zone>/<name>/<type>"; the zone component is the parent
+      # zone's name (or the literal the user gave).
+      importId =
+        ctx:
+        let
+          zone = ctx.refName "zone";
+        in
+        if zone == null then null else "${zone}/${ctx.item.name}/${ctx.item.type}";
       requiredAttrs = [ "records" ];
       description = "Hetzner DNS resource record sets (all records sharing a name+type), keyed by an arbitrary label. The recommended way to manage records.";
       attrs = {

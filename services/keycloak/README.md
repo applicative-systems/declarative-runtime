@@ -418,6 +418,26 @@ Other federation:
 | `group_permissions`                                  | `group_permissions`                                 | —            | `realm`, `group` → groups                                             |
 | `users_permissions`                                  | `users_permissions`                                 | —            | `realm`                                                               |
 
+## Importing existing resources
+
+Pointing the pairing at a Keycloak instance that **already** holds some of the
+declared state — or recovering after the Terraform state under
+`/var/lib/keycloak/declarative-terraform` is lost — does not fail with "already
+exists". Before each `tofu apply`, the reconciler runs a best-effort
+`tofu import` for every declared resource whose id is derivable from your
+configuration, adopting what already exists into state; anything genuinely
+absent is created. The same plan is also written to
+`declarative-keycloak-import.tf.json.disabled` in the work dir for a manual,
+previewable adoption.
+
+Keycloak keys **most** resources by a server-assigned UUID (clients, roles,
+groups, protocol mappers, identity providers, flows, LDAP, keystores,
+authorization objects, …), which a lost state cannot re-derive — those are
+(re)created and must not already exist when adopting a brownfield instance. The
+resources with a derivable import id, and therefore adopted, are `realms` (by
+name), `users` (`<realm>/<username>`), `required_actions` (`<realm>/<alias>`),
+and `realm_localizations` (`<realm>/<locale>`).
+
 ## State directory note
 
 Keycloak's upstream NixOS module runs as `User = "keycloak"; DynamicUser =

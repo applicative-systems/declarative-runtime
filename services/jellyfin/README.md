@@ -206,6 +206,25 @@ keyed by an arbitrary handle:
 The `*_configuration` singletons manage one server-wide object each; declare a
 single entry (the key is only a Terraform label).
 
+## Importing existing resources
+
+Pointing the pairing at a Jellyfin instance that **already** holds some of the
+declared state — or recovering after the Terraform state under
+`/var/lib/jellyfin/declarative-terraform` is lost — does not fail with "already
+exists". Before each `tofu apply`, the reconciler runs a best-effort
+`tofu import` for every declared resource whose id is derivable from your
+configuration, adopting what already exists into state; anything genuinely
+absent is created. The same plan is also written to
+`declarative-jellyfin-import.tf.json.disabled` in the work dir for a manual,
+previewable adoption.
+
+Only resources imported by a name you declare are adopted: `libraries`,
+`plugin_repositories`, and `plugins` (all by name). `users`, `api_keys` and
+`plugin_configurations` key on server-assigned GUIDs/tokens, `scheduled_tasks`
+on fixed built-in ids, and the configuration singletons have no meaningful
+import id; those are (re)created, so they must not already exist when adopting a
+brownfield instance.
+
 ## Security note
 
 Secret-valued _resource_ attributes — `password` (`users`) and

@@ -450,10 +450,119 @@ rec {
           throw "${runtimePrefix}: secret credential id collision (${toString secretIds}); rename the colliding resource keys"
         else
           lib.listToAttrs (map (e: lib.nameValuePair e.id e.file) allSecrets);
+      importEntries = mkImportEntries resourceTypes cfg;
     in
     {
-      inherit config credentials;
+      inherit config credentials importEntries;
     };
+
+  # ---------------------------------------------------------------------------
+  # import-plan generator
+  # ---------------------------------------------------------------------------
+
+  # Build the declarative import plan for a config: for every managed resource
+  # whose `resourceTypes.<c>` declares an `importId`, resolve its Terraform
+  # address (`<type>.<label>`) and the provider's import id -- computed purely
+  # from the declared state -- into `{ to; id; }`. Resources without an
+  # `importId` (server-assigned ids, or no importer at all) are skipped, as are
+  # items whose `importId` returns null (e.g. an optional parent needed to form
+  # the id is unset). The result feeds both the `<name>-import.tf.json` artifact
+  # and the reconciler's best-effort `tofu import` pass.
+  #
+  # `resourceTypes.<c>.importId` is a function of a per-item context:
+  #   { key;   the collection key
+  #     item;  the declared attrs, with `nameAttr` injected from the key
+  #     refName;      refName -> the referenced managed sibling's *name* (its
+  #                   `nameAttr` value, which defaults to the key) or the literal
+  #                   the user gave; null when unset, or (managedOnly) when the
+  #                   value is not a managed sibling
+  #     refImportId;  refName -> the referenced managed sibling's own import id
+  #                   (for composite ids such as `<repo import id>/<branch>`);
+  #                   null when unset, a literal, or the sibling has no importId }
+  # returns cfg -> [ { to; id; } ] sorted by address.
+  mkImportEntries =
+    resourceTypes: cfg:
+    let
+      # the first ref target whose managed collection contains key `v`, or null.
+      managedTarget =
+        refSpec: v: lib.findFirst (t: (cfg.${t.collection} or { }) ? ${v}) null refSpec.targets;
+      mkCtx =
+        c: key:
+        let
+          spec = resourceTypes.${c};
+          raw = cfg.${c}.${key};
+          item =
+            raw
+            // lib.optionalAttrs (spec.nameAttr != null && (raw.${spec.nameAttr} or null) == null) {
+              ${spec.nameAttr} = key;
+            };
+          refName =
+            rn:
+            let
+              v = raw.${rn} or null;
+              m = if v == null then null else managedTarget spec.refs.${rn} v;
+            in
+            if v == null then
+              null
+            else if m != null then
+              let
+                tsp = resourceTypes.${m.collection};
+                # the sibling's declared name; fall back to its key `v` when the
+                # nameAttr is unset (module configs carry it as null, and the
+                # renderer defaults it from the key too).
+                n = if tsp.nameAttr == null then null else cfg.${m.collection}.${v}.${tsp.nameAttr} or null;
+              in
+              if n != null then n else v
+            else if spec.refs.${rn}.managedOnly or false then
+              null
+            else
+              v;
+          refImportId =
+            rn:
+            let
+              v = raw.${rn} or null;
+              m = if v == null then null else managedTarget spec.refs.${rn} v;
+            in
+            if m == null then null else siblingImportId m.collection v;
+        in
+        {
+          inherit
+            key
+            item
+            refName
+            refImportId
+            ;
+        };
+      siblingImportId =
+        c: key:
+        let
+          spec = resourceTypes.${c};
+        in
+        if spec ? importId then spec.importId (mkCtx c key) else null;
+      entries = lib.concatLists (
+        lib.mapAttrsToList (
+          c: spec:
+          lib.optionals (spec ? importId) (
+            lib.filter (e: e != null) (
+              lib.mapAttrsToList (
+                key: _:
+                let
+                  id = spec.importId (mkCtx c key);
+                in
+                if id == null then
+                  null
+                else
+                  {
+                    to = "${spec.type}.${tfLabel spec.prefix key}";
+                    inherit id;
+                  }
+              ) (cfg.${c} or { })
+            )
+          )
+        ) resourceTypes
+      );
+    in
+    lib.sort (a: b: a.to < b.to) entries;
 
   # ---------------------------------------------------------------------------
   # run-once reconciler systemd service
@@ -488,6 +597,12 @@ rec {
   #               first-boot DB migrations finish, past the public-info probe).
   #               `tofu apply` is idempotent, so re-running only reconverges.
   #   applyRetryDelay seconds between apply attempts (default 10).
+  #   importEntries   declarative import plan [ { to; id; } ] (see
+  #               mkImportEntries). Rendered to a `<name>-import.tf.json`
+  #               artifact and, before apply, adopted best-effort via
+  #               `tofu import` so a lost/rebuilt tfstate (or a brownfield
+  #               instance) reconciles existing resources instead of failing to
+  #               recreate them. Default [] (no import blocks).
   mkReconcileService =
     {
       name,
@@ -504,6 +619,7 @@ rec {
       dynamicUser ? false,
       applyRetries ? 1,
       applyRetryDelay ? 10,
+      importEntries ? [ ],
     }:
     let
       confFile = tfJsonFile name tfConfig;
@@ -519,6 +635,13 @@ rec {
       # (relative to /var/lib). derive both from stateDir so the script
       # path and the unit declaration cannot drift.
       stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
+      # declarative import plan rendered as a store artifact (also adopted
+      # best-effort via `tofu import` in the script below).
+      importFile = tfJsonFile "${name}-import" {
+        "//" =
+          "Generated import plan for ${name}. Not auto-loaded here; drop the .disabled suffix and place beside main.tf.json to adopt an existing instance via `tofu apply`.";
+        import = map (e: { inherit (e) to id; }) importEntries;
+      };
     in
     assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
       "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
@@ -533,6 +656,7 @@ rec {
         executor
         pkgs.curl
         pkgs.coreutils
+        pkgs.gnugrep
       ];
       environment = {
         TF_IN_AUTOMATION = "1";
@@ -582,6 +706,38 @@ rec {
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done
         tofu init -no-color
+        ${lib.optionalString (importEntries != [ ]) ''
+          # Reference copy of the generated import plan (see its "//" note).
+          # Suffixed `.disabled` so tofu does not auto-load it here: applying
+          # `import` blocks on a greenfield instance fails on objects that do
+          # not yet exist.
+          install -m 0600 ${importFile} ./declarative-import.tf.json.disabled
+
+          # Best-effort adoption before apply: import every declared resource
+          # that already exists remotely but is absent from state, so a lost or
+          # rebuilt tfstate (or a brownfield instance) reconciles by *adopting*
+          # rather than re-creating it (which the provider rejects with
+          # "already exists"). OpenTofu has no native "ignore missing import"
+          # (opentofu/opentofu#2351): skip addresses already tracked, and
+          # tolerate an import that fails because the object is not there yet --
+          # `tofu apply` then creates it and surfaces any real (auth/network)
+          # failure itself.
+          managed="$(tofu state list || true)"
+          import_one() {
+            if printf '%s\n' "$managed" | grep -qxF "$1"; then
+              return 0
+            fi
+            if tofu import -input=false -no-color "$1" "$2"; then
+              echo "declarative-import: adopted $1"
+            else
+              echo "declarative-import: $1 absent remotely or not yet created; apply will create it" >&2
+            fi
+          }
+          ${lib.concatMapStringsSep "\n          " (
+            e: "import_one ${lib.escapeShellArg e.to} ${lib.escapeShellArg e.id}"
+          ) importEntries}
+        ''}
+
         # apply, retrying transient failures (e.g. a 503 while the service
         # finishes late startup work) up to `applyRetries` times. a single
         # attempt (the default) preserves fail-fast behaviour.

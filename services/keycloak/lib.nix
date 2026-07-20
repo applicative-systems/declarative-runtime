@@ -245,6 +245,9 @@ let
   #   requiredSecrets secrets that must be set as literal or File
   #   requiredAttrs   attrs that must be set non-empty
   #   attrs           settable attributes, all typed (no freeform)
+  #   importId        (optional) declared-state -> provider import id (see
+  #                   modules/lib mkImportEntries); omitted for the many
+  #                   resources Keycloak keys by a server-assigned UUID
   resourceTypes = {
     realms = {
       type = "keycloak_realm";
@@ -252,6 +255,8 @@ let
       nameAttr = "realm";
       scope = null;
       refs = { };
+      # imported by realm name.
+      importId = ctx: ctx.item.realm;
       blockAttrs = [
         "smtp_server"
         "internationalization"
@@ -620,6 +625,14 @@ let
       nameAttr = "username";
       scope = null;
       refs.realm = realmRef;
+      # imported by "<realm>/<username>" (the provider accepts the username as
+      # well as the internal user UUID).
+      importId =
+        ctx:
+        let
+          realm = ctx.refName "realm";
+        in
+        if realm == null then null else "${realm}/${ctx.item.username}";
       requiredAttrs = [ "username" ];
       blockAttrs = [ "initial_password" ];
       # initial_password.value supports the `valueFile` indirection;
@@ -2775,6 +2788,13 @@ let
       nameAttr = "alias";
       scope = null;
       refs.realm = realmRef;
+      # imported by "<realm>/<alias>".
+      importId =
+        ctx:
+        let
+          realm = ctx.refName "realm";
+        in
+        if realm == null then null else "${realm}/${ctx.item.alias}";
       description = "Realm required actions (per-realm), keyed by alias.";
       attrs = {
         alias = oStr "Required action alias (e.g. 'CONFIGURE_TOTP'). Defaults to the attribute key.";
@@ -2809,6 +2829,13 @@ let
       nameAttr = "locale";
       scope = null;
       refs.realm = realmRef;
+      # imported by "<realm>/<locale>".
+      importId =
+        ctx:
+        let
+          realm = ctx.refName "realm";
+        in
+        if realm == null then null else "${realm}/${ctx.item.locale}";
       description = "Per-realm i18n message bundle, keyed by locale.";
       attrs = {
         locale = oStr "BCP-47 locale tag (e.g. 'en'). Defaults to the attribute key.";

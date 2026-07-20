@@ -125,12 +125,27 @@ pattern. Everything below is what the forgejo pairing encodes.
 ### Modeling the resource surface
 
 - Enumerate every provider resource in a `resourceTypes` record:
-  `{ type = "<provider>_<resource>"; prefix; nameAttr; scope; refs; secrets; requiredSecrets; attrs; description; }`
+  `{ type = "<provider>_<resource>"; prefix; nameAttr; scope; refs; secrets; requiredSecrets; attrs; description; importId?; }`
   — `prefix` is a unique label prefix, `nameAttr` the attribute defaulted from
   the collection key (or `null`), `scope` the token scope(s) the resource needs,
   `refs` its parent links, `secrets` its secret-valued attributes,
   `requiredSecrets` those of them the provider requires, `attrs` the typed
   option for every settable attribute.
+- **`importId` (optional) — the import surface.** A function
+  `ctx -> <string|null>` mapping the declared state of one item to the provider's
+  `terraform import` id, computed **purely from declared config** (`ctx.item`
+  with `nameAttr` injected, `ctx.refName <ref>` for a parent's declared name,
+  `ctx.refImportId <ref>` for a parent's own import id, e.g.
+  `"<repo import id>/<branch>"`). Define it **only** where every id component is
+  derivable — a name/login/alias/parent-name the user wrote. Omit it (the
+  default) for resources the provider keys by a **server-assigned id** (numeric
+  db id / UUID) or that have **no importer**: those cannot be reconstructed from
+  declared state, and emitting a wrong id would make a state-loss re-apply
+  recreate rather than adopt. The generic `modules/lib` `mkImportEntries` walks
+  these into a `[ { to; id; } ]` plan (returning `null` from `importId` skips
+  that item, e.g. an optional parent left unset); `mkTfConfig` threads it out as
+  `importEntries`. Modeled provider-side; the engine, plan, `<name>-import.tf.json`
+  renderer and reconciler wiring are all provider-agnostic in `modules/lib`.
 - Each resource is exposed as a **strictly typed** collection:
   `attrsOf (submodule { options = <attrs> ++ <refs> ++ <attr>File; })` — **no
   `freeformType`**. Every settable upstream attribute is a declared option typed
@@ -179,7 +194,19 @@ pattern. Everything below is what the forgejo pairing encodes.
   isolated `DynamicUser` state dir.
 - The script installs the generated config `0600`, **polls `healthUrl`** until
   the service answers, exports each credential from `$CREDENTIALS_DIRECTORY`,
-  then runs `tofu init` + `tofu apply -auto-approve` (`-input=false -no-color`).
+  runs `tofu init`, then — before `tofu apply -auto-approve` (`-input=false
+-no-color`) — a **best-effort import pass** (only when `importEntries` is
+  non-empty): for each `{ to; id; }` not already in `tofu state list`, run
+  `tofu import`, tolerating failure (the object may not exist yet on a
+  greenfield instance — `tofu apply` then creates it and surfaces any real
+  auth/network error itself). This makes a lost or rebuilt tfstate (or a
+  brownfield instance) **adopt** existing resources instead of failing to
+  recreate them. OpenTofu has no native "ignore missing import"
+  (opentofu/opentofu#2351), so the pass is done via the CLI rather than by
+  leaving `import` blocks in the always-applied config (which would break the
+  greenfield first boot). The same plan is also written to a
+  `<name>-import.tf.json` artifact (installed `.disabled` beside `main.tf.json`)
+  for manual config-driven adoption.
 
 ### `module.nix` — the NixOS module
 
@@ -214,6 +241,19 @@ pattern. Everything below is what the forgejo pairing encodes.
   value reaches the service; the literal is absent from the generated
   `.tf.json`). Use `specialisation` for config-change cases; size
   `virtualisation` for the service. No mocks.
+- Ship a companion `<svc>-import` test for the import surface: boot an
+  **importable-only** `runtime` (every declared resource must have an
+  `importId`), let the reconciler create it, then `systemctl stop`, delete
+  `terraform.tfstate*`, `systemctl start`, and assert the reconciler **adopted**
+  the live resources — the journal shows `declarative-import: adopted <addr>`
+  for each and the re-apply reports **`0 added` / `0 destroyed`** (recreation is
+  a failure). Also verify the resources are intact via the live API (not
+  duplicated). A pure-eval `lib-import` check in `modules/lib/tests.nix` covers
+  the shared plan generator (`mkImportEntries`) for all providers at once, so
+  the VM test only needs to prove the provider actually adopts by its
+  `importId`. The pure-eval test **must** exercise a referenced sibling whose
+  `nameAttr` is `null` (as NixOS submodules default it), the case a plain-attrset
+  fixture silently passes.
 
 ### `pkg.nix` — vendoring (only when the provider is not in nixpkgs)
 

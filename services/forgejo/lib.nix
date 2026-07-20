@@ -71,6 +71,9 @@ let
   #   secrets         secret-valued attributes gaining an `<attr>File` form
   #   requiredSecrets secrets the provider requires (one of `<attr>`/`<attr>File`)
   #   attrs           the settable attributes, each a typed option (no freeform)
+  #   importId        (optional) declared-state -> provider import id (see
+  #                   modules/lib mkImportEntries); omitted where the id is
+  #                   server-assigned or the resource has no importer
   resourceTypes = {
     organizations = {
       type = "forgejo_organization";
@@ -100,6 +103,8 @@ let
         "read:user"
       ];
       refs = { };
+      # imported by login.
+      importId = ctx: ctx.item.login;
       secrets = [ "password" ];
       requiredSecrets = [ "password" ];
       description = "Forgejo users, keyed by login. Requires administrative privileges.";
@@ -148,6 +153,14 @@ let
         required = false;
         description = "Repository owner: the key of a managed organization or user, a literal owner name, or null for the authenticated user.";
       };
+      # imported by "<owner>/<name>"; skipped when the owner is left implicit
+      # (the authenticated user, whose name is not known at generation time).
+      importId =
+        ctx:
+        let
+          owner = ctx.refName "owner";
+        in
+        if owner == null then null else "${owner}/${ctx.item.name}";
       secrets = [ "auth_token" ];
       description = "Forgejo repositories, keyed by repository name.";
       attrs = {
@@ -219,6 +232,13 @@ let
       nameAttr = "name";
       scope = "write:organization";
       refs.organization = orgNameRef;
+      # imported by "<organization>/<team>".
+      importId =
+        ctx:
+        let
+          org = ctx.refName "organization";
+        in
+        if org == null then null else "${org}/${ctx.item.name}";
       requiredAttrs = [ "units_map" ];
       description = "Forgejo organization teams, keyed by team name.";
       attrs = {
@@ -291,6 +311,15 @@ let
       nameAttr = null;
       scope = "write:repository";
       refs.repository = repoRef;
+      # imported by "<owner>/<repo>/<branch>", composed from the parent
+      # repository's own import id (skipped when that repo has no import id,
+      # e.g. an implicit owner).
+      importId =
+        ctx:
+        let
+          repo = ctx.refImportId "repository";
+        in
+        if repo == null then null else "${repo}/${ctx.item.branch_name}";
       description = "Forgejo branch protections, keyed by an arbitrary label.";
       attrs = {
         branch_name = rStr "Name of the branch (or glob) to protect.";

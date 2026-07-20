@@ -128,6 +128,7 @@ in
       declarative-keycloak = tflib.mkReconcileService {
         name = "declarative-keycloak";
         tfConfig = tf.config;
+        inherit (tf) importEntries;
         credentials = tf.credentials // {
           ${tflib.clientIdVar} = effectiveClientIdFile;
         };

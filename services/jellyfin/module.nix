@@ -132,7 +132,7 @@ in
       declarative-jellyfin = lib.recursiveUpdate (tflib.mkReconcileService {
         name = "declarative-jellyfin";
         tfConfig = tf.config;
-        inherit (tf) credentials;
+        inherit (tf) credentials importEntries;
         afterUnits = [
           "jellyfin.service"
         ]

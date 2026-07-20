@@ -58,6 +58,7 @@
           inherit pkgs;
           inherit (inputs) self;
         })
+        // (import ./modules/lib/tests.nix { inherit pkgs; })
         // (lib.mapAttrs' (
           name: cfg:
           lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel

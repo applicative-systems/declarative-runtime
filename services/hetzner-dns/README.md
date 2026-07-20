@@ -178,6 +178,24 @@ Notes:
   `/var/lib/declarative-hetzner-dns`, owned by a dedicated `declarative-hetzner-dns`
   system user.
 
+## Importing existing resources
+
+Pointing the pairing at zones that **already** exist — or recovering after the
+Terraform state under `/var/lib/declarative-hetzner-dns/declarative-terraform`
+is lost — does not fail with "already exists". Before each `tofu apply`, the
+reconciler runs a best-effort `tofu import` for every declared resource whose id
+is derivable from your configuration, adopting what already exists into state;
+anything genuinely absent is created. The same plan is also written to
+`declarative-hetzner-dns-import.tf.json.disabled` in the work dir for a manual,
+previewable adoption.
+
+`zones` adopt by name. `zone_rrsets` have a derivable import id
+(`<zone>/<name>/<type>`), but reconcile cleanly on adoption **only** when their
+`zone` is a literal name (a zone managed elsewhere); when `zone` names a
+_managed_ zone (whose numeric id a lost state cannot re-derive), a re-apply
+replaces the RRSet rather than adopting it. `zone_records` support only
+identity-based import and are always recreated.
+
 ## Security note
 
 The API token always flows through systemd `LoadCredential=` into the sensitive

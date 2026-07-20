@@ -201,6 +201,26 @@ an arbitrary handle:
 | `ssh_keys`                      | `ssh_key`                      | —            | `user` → user (requires admin)     |
 | `gpg_keys`                      | `gpg_key`                      | —            | —                                  |
 
+## Importing existing resources
+
+Pointing the pairing at a Forgejo instance that **already** holds some of the
+declared state — or recovering after the Terraform state under
+`/var/lib/forgejo/declarative-terraform` is lost — does not fail with "already
+exists". Before each `tofu apply`, the reconciler runs a best-effort
+`tofu import` for every declared resource whose id is derivable from your
+configuration, adopting what already exists into state; anything genuinely
+absent is created as usual. The same plan is also written to
+`declarative-forgejo-import.tf.json.disabled` in the work dir — rename it beside
+`main.tf.json` and `tofu apply` for a manual, previewable adoption.
+
+Only resources whose import id is fully derivable from declared state are
+adopted: `users` (by login), `repositories` (`<owner>/<name>`), `teams`
+(`<organization>/<team>`), and `branch_protections` (`<owner>/<repo>/<branch>`).
+The rest key on server-assigned ids the provider does not expose for import
+(webhooks, deploy keys) or have no importer at all (organizations, team members,
+collaborators, SSH/GPG keys, Actions secrets/variables); those are (re)created,
+so they must not already exist when adopting a brownfield instance.
+
 ## Security note
 
 Secret-valued _resource_ attributes — `password` (`users`), `data`
