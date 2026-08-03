@@ -131,7 +131,7 @@ let
   };
 
   # IdP mappers reference an IdP by alias; the alias can belong to
-  # any of the six IdP collections.
+  # any of the eight IdP collections.
   idpAliasRequiredRef = {
     attr = "identity_provider_alias";
     targets = [
@@ -157,6 +157,14 @@ let
       }
       {
         collection = "kubernetes_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "oidc_openshift_v4_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "spiffe_identity_providers";
         field = "alias";
       }
     ];
@@ -217,15 +225,6 @@ let
     # every sdk/v2 resource carries a synthetic `id`; it is the resource's own
     # identity, computed on apply, and nothing a configuration declares.
     omitEverywhere = [ "id" ];
-    # resources the provider offers that this pairing does not model yet. The
-    # generator refuses to ignore a resource silently, so this list is the
-    # complete, reviewable statement of what is missing.
-    unsupported = {
-      keycloak_oidc_openshift_v4_identity_provider = "New in provider 5.8.0; not modelled yet.";
-      keycloak_openid_client_regex_policy = "New in provider 5.8.0; not modelled yet.";
-      keycloak_spiffe_identity_provider = "New in provider 5.8.0; not modelled yet.";
-      keycloak_workflow = "New in provider 5.8.0; not modelled yet.";
-    };
     resources = {
       realms = {
         type = "keycloak_realm";
@@ -963,6 +962,22 @@ let
         refs.realm = realmAliasRef;
         description = "Kubernetes OIDC identity providers (per-realm), keyed by alias.";
       };
+      oidc_openshift_v4_identity_providers = {
+        type = "keycloak_oidc_openshift_v4_identity_provider";
+        prefix = "oidc_openshift_v4_idp";
+        nameAttr = "alias";
+        scope = null;
+        refs.realm = realmAliasRef;
+        description = "OpenShift 4 OIDC identity providers (per-realm), keyed by alias (defaults to 'openshift-v4').";
+      };
+      spiffe_identity_providers = {
+        type = "keycloak_spiffe_identity_provider";
+        prefix = "spiffe_idp";
+        nameAttr = "alias";
+        scope = null;
+        refs.realm = realmAliasRef;
+        description = "SPIFFE identity providers (per-realm), keyed by alias.";
+      };
       hardcoded_attribute_identity_provider_mappers = {
         type = "keycloak_hardcoded_attribute_identity_provider_mapper";
         prefix = "hardcoded_attribute_idp_mapper";
@@ -1289,6 +1304,28 @@ let
           };
         };
         description = "Policy granting access by group membership; each group block is `{ id; path; extend_children; }`.";
+      };
+      openid_client_regex_policies = {
+        type = "keycloak_openid_client_regex_policy";
+        prefix = "openid_client_regex_policy";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          resource_server = {
+            attr = "resource_server_id";
+            targets = [
+              {
+                collection = "openid_clients";
+                field = "resource_server_id";
+              }
+            ];
+            managedOnly = true;
+            required = true;
+            description = "Key of the managed openid_client hosting this policy.";
+          };
+        };
+        description = "Policy granting access when a token claim matches a regular expression.";
       };
       openid_client_role_policies = {
         type = "keycloak_openid_client_role_policy";
@@ -1741,6 +1778,14 @@ let
         scope = null;
         refs.realm = realmRef;
         description = "Fine-grained authorization permissions on the realm's users collection; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
+      };
+      workflows = {
+        type = "keycloak_workflow";
+        prefix = "workflow";
+        nameAttr = "name";
+        scope = null;
+        refs.realm = realmAliasRef;
+        description = "Realm workflows: an event trigger (`on`) plus an ordered list of `step` actions, keyed by workflow name.";
       };
     };
   };
