@@ -3,6 +3,18 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+  # Generic Terraform-schema <-> Nix conversion helpers, used to derive each
+  # pairing's resource surface from its vendored provider schema.
+  #
+  # Pulled in source-only (`flake = false`): its own flake builds `lib` from
+  # *its* nixpkgs pin for x86_64 alone, and we evaluate for aarch64 too. We
+  # instantiate `conversion.nix` against our own `pkgs` instead, so there is one
+  # nixpkgs in play and both systems work.
+  inputs.nix-tf-schema = {
+    url = "git+https://git.fediversity.eu/fediversity/nix-tf-schema";
+    flake = false;
+  };
+
   outputs =
     inputs:
     let
