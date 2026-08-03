@@ -97,6 +97,48 @@
           };
         };
 
+      # `<svc>-schema-coverage`: the pairing's coverage table. Building it forces
+      # the generator's drift assertions on their own, so schema drift fails a
+      # check that names it rather than whichever VM test happens to eval first.
+      #
+      # A pairing opts in by exporting `coverage`, i.e. by deriving its resource
+      # surface from the vendored schema.
+      schemaCoverage =
+        pkgs:
+        let
+          inherit (import ./modules/lib/schema-report.nix { inherit pkgs; }) mkCoverageReport;
+        in
+        lib.mapAttrs' (
+          svc: l:
+          lib.nameValuePair "${svc}-schema-coverage" (mkCoverageReport {
+            name = svc;
+            inherit (l) coverage;
+          })
+        ) (lib.filterAttrs (_: l: l ? coverage) (pairingLibs pkgs));
+
+      # `<svc>-options-doc`: the pairing's user-facing option surface as
+      # `options.json`. Build it before and after a change and diff the two --
+      # that is the record of what the API gained, lost or retyped, which
+      # rendered `.tf.json` alone cannot show (an option nobody sets renders to
+      # nothing either way).
+      optionsDocs =
+        pkgs:
+        lib.mapAttrs' (
+          svc: l:
+          lib.nameValuePair "${svc}-options-doc"
+            (pkgs.nixosOptionsDoc {
+              inherit
+                (
+                  (lib.evalModules {
+                    modules = [ { options.services.${svc}.runtime = l.resourceOptions; } ];
+                  })
+                )
+                options
+                ;
+              warningsAreErrors = true;
+            }).optionsJSON
+        ) (pairingLibs pkgs);
+
       # `<svc>-schema-current`: the authoritative drift check. The eval-time
       # assertions in `modules/lib/tf-schema.nix` compare version strings; this
       # one compares content, so a provider that changes a schema without
@@ -188,6 +230,8 @@
           lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel
         ) examples)
         // schemaChecks pkgs
+        // schemaCoverage pkgs
+        // optionsDocs pkgs
         // {
           formatting = inputs.self.formatter.${system}.check inputs.self;
         }

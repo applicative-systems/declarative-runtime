@@ -90,9 +90,10 @@ in
       requiredAttrs  extra non-empty checks
       extraAttrs     last-resort typed overrides; keys must name real attributes
 
-    Returns `{ resourceTypes; checks; }`. `checks` is a list of null-or-throw,
-    `deepSeq`'d into `resourceTypes`, so merely forcing the latter fires every
-    assertion -- a pairing cannot use the surface without also checking it.
+    Returns `{ resourceTypes; checks; coverage; }`. `checks` is a list of
+    null-or-throw, `deepSeq`'d into `resourceTypes`, so merely forcing the
+    latter fires every assertion -- a pairing cannot use the surface without
+    also checking it. `coverage` is report data for `<svc>-schema-coverage`.
   */
   mkResourceTypes =
     {
@@ -355,9 +356,19 @@ in
               ;
             attrs = mkOptions "" tree // o.extraAttrs;
           };
+
+          # what the pairing covers, for the generated coverage report.
+          coverage = {
+            inherit (o) type prefix description;
+            options = length (attrNames spec.attrs);
+            attributes = length (attrNames tree);
+            omitted = sortStrings o.omit;
+            refs = sortStrings (attrNames o.refs);
+            inherit secrets blockAttrs;
+          };
         in
         {
-          inherit spec checks;
+          inherit spec checks coverage;
         };
 
       built = lib.mapAttrs mkOne resources;
@@ -420,5 +431,16 @@ in
       # generated options without also having checked them for drift.
       resourceTypes = builtins.deepSeq checks (lib.mapAttrs (_: r: r.spec) built);
       inherit checks;
+
+      coverage = builtins.deepSeq checks {
+        inherit
+          source
+          runtimePrefix
+          unsupported
+          ;
+        inherit (provider) version;
+        schemaResources = length schemaTypes;
+        collections = lib.mapAttrs (_: r: r.coverage) built;
+      };
     };
 }
