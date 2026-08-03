@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "nix-tf-schema": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785769754,
+        "narHash": "sha256-MsUM7F5R+44laHsgMXFddZacQ0NXFpN2SN6qHOmVtxc=",
+        "ref": "refs/heads/main",
+        "rev": "5d33a2ce2751e4b407e0269319457e088377077d",
+        "revCount": 8,
+        "type": "git",
+        "url": "https://git.fediversity.eu/fediversity/nix-tf-schema"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://git.fediversity.eu/fediversity/nix-tf-schema"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1783522502,
@@ -18,6 +34,7 @@
     },
     "root": {
       "inputs": {
+        "nix-tf-schema": "nix-tf-schema",
         "nixpkgs": "nixpkgs"
       }
     }
