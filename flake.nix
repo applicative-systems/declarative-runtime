@@ -95,6 +95,16 @@
             tfConfig = libs.forgejo.forgejoTfConfig;
             fixtures = import ./services/forgejo/fixtures.nix;
           };
+
+          keycloak-rendered-fixtures = renderFixtures {
+            name = "keycloak";
+            options = libs.keycloak.resourceOptions // {
+              baseUrl = urlOption "http://localhost:8080";
+              adminRealm = urlOption "master";
+            };
+            tfConfig = libs.keycloak.keycloakTfConfig;
+            fixtures = import ./services/keycloak/fixtures.nix;
+          };
         };
 
       # `<svc>-schema-coverage`: the pairing's coverage table. Building it forces
