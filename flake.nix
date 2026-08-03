@@ -61,6 +61,40 @@
             }
           )
         ) (pairingLibs pkgs);
+
+      # `<svc>-schema-current`: the authoritative drift check. The eval-time
+      # assertions in `modules/lib/tf-schema.nix` compare version strings; this
+      # one compares content, so a provider that changes a schema without
+      # changing its version still fails CI.
+      #
+      # A pairing opts in by vendoring the file; once its `lib.nix` derives the
+      # resource surface from `schema.nix` the file is load-bearing and cannot
+      # quietly disappear again.
+      schemaChecks =
+        pkgs:
+        lib.mapAttrs'
+          (
+            name: fresh:
+            let
+              svc = lib.removeSuffix "-provider-schema" name;
+            in
+            lib.nameValuePair "${svc}-schema-current" (
+              pkgs.runCommand "${svc}-schema-current" { nativeBuildInputs = [ pkgs.diffutils ]; } ''
+                if ! diff -u ${./services}/${svc}/provider-schema.json ${fresh}; then
+                  echo >&2
+                  echo "services/${svc}/provider-schema.json is stale; run 'nix run .#update-provider-schemas'" >&2
+                  exit 1
+                fi
+                touch "$out"
+              ''
+            )
+          )
+          (
+            lib.filterAttrs (
+              name: _:
+              lib.pathExists (./services + "/${lib.removeSuffix "-provider-schema" name}/provider-schema.json")
+            ) (providerSchemas pkgs)
+          );
     in
     {
       # NixOS module entrypoint: enables a Nixpkgs service and reconciles its
@@ -117,6 +151,7 @@
           name: cfg:
           lib.nameValuePair "example-${name}" (exampleSystem system cfg).config.system.build.toplevel
         ) examples)
+        // schemaChecks pkgs
         // {
           formatting = inputs.self.formatter.${system}.check inputs.self;
         }

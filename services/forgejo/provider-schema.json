@@ -1,0 +1,1614 @@
+{
+  "format_version": "1.0",
+  "resource_schemas": {
+    "forgejo_branch_protection": {
+      "block": {
+        "attributes": {
+          "approvals_whitelist_teams": {
+            "computed": true,
+            "description": "Whitelisted teams for reviewing. **Note**: This setting is only effective if `enable_approvals_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "approvals_whitelist_usernames": {
+            "computed": true,
+            "description": "Whitelisted users for reviewing. **Note**: This setting is only effective if `enable_approvals_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "block_on_official_review_requests": {
+            "computed": true,
+            "description": "Block merge on official review requests.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "block_on_outdated_branch": {
+            "computed": true,
+            "description": "Block merge if pull request is outdated.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "block_on_rejected_reviews": {
+            "computed": true,
+            "description": "Block merge on rejected reviews.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "branch_name": {
+            "description": "Name of the branch to protect. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "dismiss_stale_approvals": {
+            "computed": true,
+            "description": "Dismiss stale approvals.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "enable_approvals_whitelist": {
+            "computed": true,
+            "description": "Restrict approvals to whitelisted users or teams.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "enable_merge_whitelist": {
+            "computed": true,
+            "description": "Restrict merge to whitelisted users or teams.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "enable_push": {
+            "computed": true,
+            "description": "Enable push to the branch.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "enable_push_whitelist": {
+            "computed": true,
+            "description": "Restrict push to whitelisted users or teams. **Note**: This setting is only effective if `enable_push` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "enable_status_check": {
+            "computed": true,
+            "description": "Enable status check.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "merge_whitelist_teams": {
+            "computed": true,
+            "description": "Whitelisted teams for merging. **Note**: This setting is only effective if `enable_merge_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "merge_whitelist_usernames": {
+            "computed": true,
+            "description": "Whitelisted users for merging. **Note**: This setting is only effective if `enable_merge_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "protected_file_patterns": {
+            "computed": true,
+            "description": "Protected file patterns (separated using semicolon ';').",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "push_whitelist_deploy_keys": {
+            "computed": true,
+            "description": "Whitelist deploy keys with write access to push. **Note**: This setting is only effective if `enable_push_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "push_whitelist_teams": {
+            "computed": true,
+            "description": "Whitelisted teams for pushing. **Note**: This setting is only effective if `enable_push_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "push_whitelist_usernames": {
+            "computed": true,
+            "description": "Whitelisted users for pushing. **Note**: This setting is only effective if `enable_push_whitelist` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          },
+          "require_signed_commits": {
+            "computed": true,
+            "description": "Require signed commits.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "required_approvals": {
+            "computed": true,
+            "description": "Number of required approvals.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "status_check_contexts": {
+            "computed": true,
+            "description": "Status check patterns. **Note**: This setting is only effective if `enable_status_check` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "list",
+              "string"
+            ]
+          },
+          "unprotected_file_patterns": {
+            "computed": true,
+            "description": "Unprotected file patterns (separated using semicolon ';').",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo branch protection resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_collaborator": {
+      "block": {
+        "attributes": {
+          "permission": {
+            "description": "Repository permissions of the collaborator. Must be one of 'read', 'write', 'admin'.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          },
+          "user": {
+            "description": "Username of the collaborator. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo repository collaborator resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_deploy_key": {
+      "block": {
+        "attributes": {
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the deploy key was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "fingerprint": {
+            "computed": true,
+            "description": "Fingerprint of the deploy key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "key": {
+            "description": "Armored SSH key. Trailing newlines must be removed (e.g. using trimspace() function). Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "key_id": {
+            "computed": true,
+            "description": "Numeric identifier of the deploy key.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "read_only": {
+            "description": "Does the key have only read access? Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "bool"
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          },
+          "title": {
+            "description": "Title of the deploy key. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "url": {
+            "computed": true,
+            "description": "URL of the deploy key.",
+            "description_kind": "plain",
+            "type": "string"
+          }
+        },
+        "description": "Forgejo repository deploy key resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_gpg_key": {
+      "block": {
+        "attributes": {
+          "armored_public_key": {
+            "description": "Armored GPG public key. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "can_certify": {
+            "computed": true,
+            "description": "Can this key certify.",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "can_encrypt_comms": {
+            "computed": true,
+            "description": "Can this key encrypt communications.",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "can_encrypt_storage": {
+            "computed": true,
+            "description": "Can this key encrypt storage.",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "can_sign": {
+            "computed": true,
+            "description": "Can this key sign.",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the GPG key was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "emails": {
+            "computed": true,
+            "description": "Emails associated with the GPG key.",
+            "description_kind": "plain",
+            "type": [
+              "list",
+              [
+                "object",
+                {
+                  "email": "string",
+                  "verified": "bool"
+                }
+              ]
+            ]
+          },
+          "expires_at": {
+            "computed": true,
+            "description": "Time at which the GPG key expires.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "Numeric identifier of the GPG key.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "key_id": {
+            "computed": true,
+            "description": "ID of the GPG key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "primary_key_id": {
+            "computed": true,
+            "description": "Primary ID of the GPG key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "public_key": {
+            "computed": true,
+            "description": "The public key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "subkeys": {
+            "computed": true,
+            "description": "Subkeys of the GPG key.",
+            "description_kind": "plain",
+            "type": [
+              "list",
+              [
+                "object",
+                {
+                  "can_certify": "bool",
+                  "can_encrypt_comms": "bool",
+                  "can_encrypt_storage": "bool",
+                  "can_sign": "bool",
+                  "created_at": "string",
+                  "expires_at": "string",
+                  "id": "number",
+                  "key_id": "string",
+                  "primary_key_id": "string",
+                  "public_key": "string"
+                }
+              ]
+            ]
+          }
+        },
+        "description": "Forgejo user GPG key resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_organization": {
+      "block": {
+        "attributes": {
+          "avatar_url": {
+            "computed": true,
+            "description": "Avatar URL of the organization.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "description": {
+            "computed": true,
+            "description": "Description of the organization.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "full_name": {
+            "computed": true,
+            "description": "Full name of the organization.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "Numeric identifier of the organization.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "location": {
+            "computed": true,
+            "description": "Location of the organization.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the organization. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "repo_admin_change_team_access": {
+            "computed": true,
+            "description": "Whether repository admin can add and remove access for teams. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "visibility": {
+            "computed": true,
+            "description": "Visibility of the organization. Possible values are 'public' (default), 'limited', or 'private'.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "website": {
+            "computed": true,
+            "description": "Website of the organization.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo organization resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_organization_action_secret": {
+      "block": {
+        "attributes": {
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the secret was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "data": {
+            "description": "Data of the secret.",
+            "description_kind": "plain",
+            "required": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the secret. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "organization": {
+            "computed": true,
+            "description": "Name of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "organization_id": {
+            "computed": true,
+            "description": "Numeric identifier of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "number"
+          }
+        },
+        "description": "Forgejo organization action secret resource.\n\n**Note**: The authenticated user must be a member of the managed organization(s) or have administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_organization_action_variable": {
+      "block": {
+        "attributes": {
+          "data": {
+            "description": "Data of the variable.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the variable.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "organization": {
+            "computed": true,
+            "description": "Name of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "organization_id": {
+            "computed": true,
+            "description": "Numeric identifier of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "number"
+          }
+        },
+        "description": "Forgejo organization action variable resource.\n\n**Note**: The authenticated user must be a member of the managed organization(s) or have administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_repository": {
+      "block": {
+        "attributes": {
+          "allow_fast_forward_only_merge": {
+            "computed": true,
+            "description": "Allowed to fast-forward-only merge pull requests? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_manual_merge": {
+            "computed": true,
+            "description": "Allowed to manually merge pull requests? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_merge_commits": {
+            "computed": true,
+            "description": "Allowed to create merge commit? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_rebase": {
+            "computed": true,
+            "description": "Allowed to rebase then fast-forward? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_rebase_explicit": {
+            "computed": true,
+            "description": "Allowed to rebase then create merge commit? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_rebase_update": {
+            "computed": true,
+            "description": "Allowed to update pull request branch by rebase? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_squash_merge": {
+            "computed": true,
+            "description": "Allowed to create squash commit? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "archive_on_destroy": {
+            "computed": true,
+            "description": "Archive the repo instead of delete?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "archived": {
+            "computed": true,
+            "description": "Is the repository archived?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "auth_token": {
+            "description": "API token for authenticating with migrate / clone URL. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "auto_init": {
+            "computed": true,
+            "description": "Whether the repository should be auto-intialized? Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "autodetect_manual_merge": {
+            "computed": true,
+            "description": "Auto-detect manual pull request merges? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "avatar_url": {
+            "computed": true,
+            "description": "Avatar URL of the repository.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "clone_addr": {
+            "computed": true,
+            "description": "Migrate / clone from URL. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "clone_url": {
+            "computed": true,
+            "description": "Clone URL of the repository.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the repository was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "default_allow_maintainer_edit": {
+            "computed": true,
+            "description": "Allow maintainer edits on pull requests by default? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "default_branch": {
+            "computed": true,
+            "description": "Default branch of the repository.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "default_delete_branch_after_merge": {
+            "computed": true,
+            "description": "Delete pull request branch after merge by default? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "default_merge_style": {
+            "computed": true,
+            "description": "Default merge style of the repository. **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "default_update_style": {
+            "computed": true,
+            "description": "Default pull request update style of the repository. **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "description": {
+            "computed": true,
+            "description": "Description of the repository.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "empty": {
+            "computed": true,
+            "description": "Is the repository empty?",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "enable_prune": {
+            "computed": true,
+            "description": "Remove obsolete remote-tracking references when mirroring? **Note**: This setting is only effective if `mirror` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "external_tracker": {
+            "computed": true,
+            "description": "Settings for external issue tracker. **Note**: This setting is only effective if `has_issues` is `true`.",
+            "description_kind": "plain",
+            "nested_type": {
+              "attributes": {
+                "external_tracker_format": {
+                  "description": "External issue tracker URL format. Use the placeholders `{user}`, `{repo}` and `{index}` for the username, repository name and issue index.",
+                  "description_kind": "plain",
+                  "required": true,
+                  "type": "string"
+                },
+                "external_tracker_regexp_pattern": {
+                  "computed": true,
+                  "description": "External issue tracker issue regular expression.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "external_tracker_style": {
+                  "computed": true,
+                  "description": "External issue tracker number format.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "external_tracker_url": {
+                  "description": "URL of external issue tracker.",
+                  "description_kind": "plain",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "nesting_mode": "single"
+            },
+            "optional": true
+          },
+          "external_wiki": {
+            "computed": true,
+            "description": "Settings for external wiki. **Note**: This setting is only effective if `has_wiki` is `true`.",
+            "description_kind": "plain",
+            "nested_type": {
+              "attributes": {
+                "external_wiki_url": {
+                  "description": "URL of external wiki.",
+                  "description_kind": "plain",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "nesting_mode": "single"
+            },
+            "optional": true
+          },
+          "fork": {
+            "computed": true,
+            "description": "Is the repository a fork?",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "forks_count": {
+            "computed": true,
+            "description": "Number of forks of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "full_name": {
+            "computed": true,
+            "description": "Full name of the repository.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "gitignores": {
+            "computed": true,
+            "description": "Gitignores to use. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "globally_editable_wiki": {
+            "computed": true,
+            "description": "Is the repository wiki globally editable? **Note**: This setting is only effective if `has_wiki` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_actions": {
+            "computed": true,
+            "description": "Are integrated CI/CD pipelines enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_issues": {
+            "computed": true,
+            "description": "Is the repository issue tracker enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_packages": {
+            "computed": true,
+            "description": "Is the repository package registry enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_projects": {
+            "computed": true,
+            "description": "Are repository projects enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_pull_requests": {
+            "computed": true,
+            "description": "Are repository pull requests enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_releases": {
+            "computed": true,
+            "description": "Are repository releases enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "has_wiki": {
+            "computed": true,
+            "description": "Is the repository wiki enabled?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "html_url": {
+            "computed": true,
+            "description": "HTML URL of the repository.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "Numeric identifier of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "ignore_whitespace_conflicts": {
+            "computed": true,
+            "description": "Are whitespace conflicts ignored? **Note**: This setting is only effective if `has_pull_requests` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "internal": {
+            "computed": true,
+            "description": "Is the repository internal?",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "internal_tracker": {
+            "computed": true,
+            "description": "Settings for built-in issue tracker. **Note**: This setting is only effective if `has_issues` is `true`.",
+            "description_kind": "plain",
+            "nested_type": {
+              "attributes": {
+                "allow_only_contributors_to_track_time": {
+                  "computed": true,
+                  "description": "Let only contributors track time?",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "bool"
+                },
+                "enable_issue_dependencies": {
+                  "computed": true,
+                  "description": "Enable dependencies for issues and pull requests?",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "bool"
+                },
+                "enable_time_tracker": {
+                  "computed": true,
+                  "description": "Enable time tracking?",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "bool"
+                }
+              },
+              "nesting_mode": "single"
+            },
+            "optional": true
+          },
+          "issue_labels": {
+            "computed": true,
+            "description": "Issue Label set to use. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "labels": {
+            "computed": true,
+            "description": "Whether to migrate labels. Changing this forces a new resource to be created. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "lfs": {
+            "computed": true,
+            "description": "Whether to migrate LFS files. Changing this forces a new resource to be created. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "lfs_endpoint": {
+            "computed": true,
+            "description": "LFS endpoint to use. Changing this forces a new resource to be created. **Note**: This setting is only effective if `lfs` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "license": {
+            "computed": true,
+            "description": "License to use. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "milestones": {
+            "computed": true,
+            "description": "Whether to migrate milestones. Changing this forces a new resource to be created. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "mirror": {
+            "computed": true,
+            "description": "Is the repository a mirror? Changing this forces a new resource to be created. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "mirror_interval": {
+            "computed": true,
+            "description": "Mirror interval of the repository. **Note**: This setting is only effective if `mirror` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "mirror_updated": {
+            "computed": true,
+            "description": "Time at which the repository mirror was updated.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the repository.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "open_issues_count": {
+            "computed": true,
+            "description": "Number of open issues of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "open_pr_counter": {
+            "computed": true,
+            "description": "Number of open pull requests of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "owner": {
+            "computed": true,
+            "description": "Owner of the repository (user or organization). Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "parent_id": {
+            "computed": true,
+            "description": "Numeric identifier of the parent repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "permissions": {
+            "computed": true,
+            "description": "Permissions of the repository.",
+            "description_kind": "plain",
+            "nested_type": {
+              "attributes": {
+                "admin": {
+                  "computed": true,
+                  "description": "Allowed to administer?",
+                  "description_kind": "plain",
+                  "type": "bool"
+                },
+                "pull": {
+                  "computed": true,
+                  "description": "Allowed to pull?",
+                  "description_kind": "plain",
+                  "type": "bool"
+                },
+                "push": {
+                  "computed": true,
+                  "description": "Allowed to push?",
+                  "description_kind": "plain",
+                  "type": "bool"
+                }
+              },
+              "nesting_mode": "single"
+            }
+          },
+          "private": {
+            "computed": true,
+            "description": "Is the repository private?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "readme": {
+            "computed": true,
+            "description": "Readme of the repository to create. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "release_counter": {
+            "computed": true,
+            "description": "Number of releases of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "service": {
+            "computed": true,
+            "description": "Service to migrate from. Changing this forces a new resource to be created. **Note**: This setting is only effective if `clone_addr` is set.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "size": {
+            "computed": true,
+            "description": "Size of the repository in KiB.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "ssh_url": {
+            "computed": true,
+            "description": "SSH URL of the repository.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "stars_count": {
+            "computed": true,
+            "description": "Number of stars of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "template": {
+            "computed": true,
+            "description": "Is the repository a template?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "trust_model": {
+            "computed": true,
+            "description": "TrustModel of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "updated_at": {
+            "computed": true,
+            "description": "Time at which the repository was updated.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "watchers_count": {
+            "computed": true,
+            "description": "Number of watchers of the repository.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "website": {
+            "computed": true,
+            "description": "Website of the repository.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "wiki_branch": {
+            "computed": true,
+            "description": "Branch used for the repository wiki. **Note**: This setting is only effective if `has_wiki` is `true`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo repository resource.\n\n**Note**: Managing user repositories requires administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_repository_action_secret": {
+      "block": {
+        "attributes": {
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the secret was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "data": {
+            "description": "Data of the secret.",
+            "description_kind": "plain",
+            "required": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the secret. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          }
+        },
+        "description": "Forgejo repository action secret resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_repository_action_variable": {
+      "block": {
+        "attributes": {
+          "data": {
+            "description": "Data of the variable.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the variable.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          }
+        },
+        "description": "Forgejo repository action variable resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_repository_webhook": {
+      "block": {
+        "attributes": {
+          "active": {
+            "computed": true,
+            "description": "Boolean indicating if the webhook is active.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "authorization_header": {
+            "description": "Authorization header to send to the target.",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "branch_filter": {
+            "computed": true,
+            "description": "List of allowed branches for push, branch creation and branch deletion events, specified as glob pattern. If empty or *, events for all branches are reported.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "config": {
+            "description": "Map of configuration settings.",
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "map",
+              "string"
+            ]
+          },
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the webhook was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "events": {
+            "computed": true,
+            "description": "List of events which trigger the webhook.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "repository_id": {
+            "description": "Numeric identifier of the repository. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          },
+          "type": {
+            "description": "Type of webhook. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "updated_at": {
+            "computed": true,
+            "description": "Time at which the webhook was updated.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "webhook_id": {
+            "computed": true,
+            "description": "Numeric identifier of the webhook.",
+            "description_kind": "plain",
+            "type": "number"
+          }
+        },
+        "description": "Forgejo repository webhook resource.",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_ssh_key": {
+      "block": {
+        "attributes": {
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the SSH key was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "fingerprint": {
+            "computed": true,
+            "description": "Fingerprint of the SSH key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "key": {
+            "description": "Armored SSH key. Trailing newlines must be removed (e.g. using trimspace() function). Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "key_id": {
+            "computed": true,
+            "description": "Numeric identifier of the SSH key.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "key_type": {
+            "computed": true,
+            "description": "Type of the SSH key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "read_only": {
+            "computed": true,
+            "description": "Does the key have only read access?",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "title": {
+            "description": "Title of the SSH key. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "url": {
+            "computed": true,
+            "description": "URL of the SSH key.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "user": {
+            "description": "Name of the user. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo user SSH key resource.\n\n**Note**: Managing user SSH keys requires administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_team": {
+      "block": {
+        "attributes": {
+          "can_create_org_repo": {
+            "computed": true,
+            "description": "Can create repositories?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "description": {
+            "computed": true,
+            "description": "Description of the team.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "Numeric identifier of the team.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "includes_all_repositories": {
+            "computed": true,
+            "description": "Has access to all repositories?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "name": {
+            "description": "Name of the team.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "organization": {
+            "computed": true,
+            "description": "Name of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "organization_id": {
+            "computed": true,
+            "description": "Numeric identifier of the owning organization. Changing this forces a new resource to be created. **Note**: One of `organization` or `organization_id` must be specified.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "number"
+          },
+          "permission": {
+            "computed": true,
+            "description": "Permissions within the owning organization. **Note**: If you set `admin` or `owner` here, make sure to set the correct `units_map`.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "units_map": {
+            "description": "Map of access units. **Note**: If the `permission` is `admin` or `owner` all units must be set to `admin` as well.",
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "map",
+              "string"
+            ]
+          }
+        },
+        "description": "Forgejo team resource.\n\n**Note**: The authenticated user must be a member of the managed organization(s) or have administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "forgejo_team_member": {
+      "block": {
+        "attributes": {
+          "team_id": {
+            "description": "Numeric identifier of the team. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "number"
+          },
+          "user": {
+            "description": "Username of the team member. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo team member resource.",
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "forgejo_user": {
+      "block": {
+        "attributes": {
+          "active": {
+            "computed": true,
+            "description": "Is the user active?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "admin": {
+            "computed": true,
+            "description": "Is the user an administrator?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_create_organization": {
+            "computed": true,
+            "description": "Allow user to create organizations?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_git_hook": {
+            "computed": true,
+            "description": "Allow user to create Git hooks?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "allow_import_local": {
+            "computed": true,
+            "description": "Allow user to import local repositories?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "avatar_url": {
+            "computed": true,
+            "description": "Avatar URL of the user.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "created_at": {
+            "computed": true,
+            "description": "Time at which the user was created.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "deactivate_on_destroy": {
+            "computed": true,
+            "description": "Deactivate the user instead of delete?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "description": {
+            "computed": true,
+            "description": "Description of the user.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "email": {
+            "description": "Email address of the user.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "followers_count": {
+            "computed": true,
+            "description": "Number of following users.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "following_count": {
+            "computed": true,
+            "description": "Number of users followed.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "full_name": {
+            "computed": true,
+            "description": "Full name of the user.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "html_url": {
+            "computed": true,
+            "description": "URL to the user's profile page.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "Numeric identifier of the user.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "language": {
+            "computed": true,
+            "description": "Locale of the user.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "last_login": {
+            "computed": true,
+            "description": "Time at which the user last logged in.",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "location": {
+            "computed": true,
+            "description": "Location of the user.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "login": {
+            "description": "Name of the user. Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "login_name": {
+            "computed": true,
+            "description": "Login name of the user.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "max_repo_creation": {
+            "computed": true,
+            "description": "Maximum number of repositories user can create. A value of -1 means no limit.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "must_change_password": {
+            "computed": true,
+            "description": "Require user to change password?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "password": {
+            "description": "Password of the user.",
+            "description_kind": "plain",
+            "required": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "prohibit_login": {
+            "computed": true,
+            "description": "Are user logins prohibited?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "restricted": {
+            "computed": true,
+            "description": "Is the user restricted?",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "send_notify": {
+            "computed": true,
+            "description": "Send notification to administrators? Changing this forces a new resource to be created.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "source_id": {
+            "computed": true,
+            "description": "Numeric identifier of the user's authentication source.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "starred_repos_count": {
+            "computed": true,
+            "description": "Number of starred repositories.",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "visibility": {
+            "computed": true,
+            "description": "Visibility of the user. Possible values are 'public' (default), 'limited', or 'private'.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "website": {
+            "computed": true,
+            "description": "Website of the user.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description": "Forgejo user resource.\n\n**Note**: Managing users requires administrative privileges!",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    }
+  },
+  "source": "svalabs/forgejo",
+  "version": "1.5.0"
+}
