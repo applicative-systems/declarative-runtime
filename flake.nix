@@ -38,8 +38,20 @@
       # the pairings, by service name. each `lib.nix` exposes the packaged
       # provider and its source address, which is all the schema tooling needs.
       pairingLibs = pkgs: {
-        forgejo = import ./services/forgejo/lib.nix { inherit pkgs; };
+        forgejo = import ./services/forgejo/lib.nix {
+          inherit pkgs;
+          nixTfSchema = inputs.nix-tf-schema;
+        };
         keycloak = import ./services/keycloak/lib.nix { inherit pkgs; };
+      };
+
+      # A NixOS module cannot reach a flake input by path, so the schema library
+      # a pairing derives its resource surface from is threaded in as a module
+      # argument. Wrapping the exported modules keeps that plumbing invisible to
+      # anyone importing them.
+      withSchemaLib = module: {
+        imports = [ module ];
+        _module.args.nixTfSchema = inputs.nix-tf-schema;
       };
 
       # `<svc>-provider-schema`: the normalized schema of the pinned provider,
@@ -122,9 +134,9 @@
     {
       # NixOS module entrypoint: enables a Nixpkgs service and reconciles its
       # runtime state via OpenTofu after the primary unit starts.
-      nixosModules.default = ./modules;
-      nixosModules.forgejo = ./services/forgejo/module.nix;
-      nixosModules.keycloak = ./services/keycloak/module.nix;
+      nixosModules.default = withSchemaLib ./modules;
+      nixosModules.forgejo = withSchemaLib ./services/forgejo/module.nix;
+      nixosModules.keycloak = withSchemaLib ./services/keycloak/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
