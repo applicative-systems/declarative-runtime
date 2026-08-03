@@ -131,7 +131,8 @@ in
           # the type check has to come first: everything below indexes the
           # schema by it.
           resourceSchema =
-            schema.resource_schemas.${o.type} or (throw "${runtimePrefix}: collection '${collection}' models resource `${o.type}`, which provider ${source} ${provider.version} does not have");
+            schema.resource_schemas.${o.type}
+              or (throw "${runtimePrefix}: collection '${collection}' models resource `${o.type}`, which provider ${source} ${provider.version} does not have");
 
           # top-level nodes, and every node by dotted path.
           tree = conv.settableTree resourceSchema;
