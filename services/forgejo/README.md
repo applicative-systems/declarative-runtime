@@ -49,6 +49,10 @@ an unknown name or wrong type is a build error). Parent links name another
 managed entry by its key, which resolves to a correctly ordered Terraform
 reference.
 
+Those options are **derived from the provider's own schema** rather than
+hand-written, so they track the pinned provider exactly — see
+[Provider updates](#provider-updates).
+
 ### Organizations, repositories, and teams
 
 Create an organization, a repository it owns, and a team inside it. `owner` and
@@ -181,7 +185,13 @@ Plus one collection option per provider resource (next section).
 ## Resources
 
 Every [`svalabs/forgejo`][provider] resource is exposed as a collection keyed by
-an arbitrary handle:
+an arbitrary handle. What each collection accepts comes from the vendored
+provider schema, not from this table: the authoritative option list is
+
+```sh
+nix build .#checks.x86_64-linux.forgejo-options-doc   # every option, typed
+nix build .#checks.x86_64-linux.forgejo-schema-coverage # what is covered
+```
 
 | Option                          | `forgejo_*` resource           | Key defaults | Reference inputs                   |
 | ------------------------------- | ------------------------------ | ------------ | ---------------------------------- |
@@ -200,6 +210,32 @@ an arbitrary handle:
 | `organization_action_variables` | `organization_action_variable` | `name`       | `organization` → org               |
 | `ssh_keys`                      | `ssh_key`                      | —            | `user` → user (requires admin)     |
 | `gpg_keys`                      | `gpg_key`                      | —            | —                                  |
+
+The provider takes an owning organization either by name or by numeric
+`organization_id` and requires exactly one of the two. Only the name form is
+exposed, since the `organization` reference above already accepts both a managed
+organization's key and a literal name.
+
+## Provider updates
+
+The option surface is generated from `provider-schema.json`, a normalized dump
+of the pinned provider's schema, committed next to `pkg.nix`. To move to a newer
+provider, bump `rev`/`hash`/`vendorHash` in `pkg.nix`, then:
+
+```sh
+nix run .#update-provider-schemas
+nix flake check
+```
+
+The check names every difference the bump introduces: resources added or
+removed, attributes added, removed or retyped, and any correction in `lib.nix`
+that no longer matches the schema. A new resource must either be modelled or
+listed in the pairing's `unsupported` set with a reason — it cannot be ignored.
+
+An upstream attribute that becomes **required** turns into a required option,
+which fails evaluation for configurations that never set it. That is usually the
+right signal, but `forceOptional` in the collection's overlay is the release
+valve when it is not.
 
 ## Security note
 
