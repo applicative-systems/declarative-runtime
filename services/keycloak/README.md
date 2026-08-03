@@ -288,7 +288,6 @@ optional `client_scope` → openid_client_scopes):
 | `openid_user_realm_role_protocol_mappers`   | `openid_user_realm_role_protocol_mapper`   |
 | `openid_user_client_role_protocol_mappers`  | `openid_user_client_role_protocol_mapper`  |
 | `openid_user_session_note_protocol_mappers` | `openid_user_session_note_protocol_mapper` |
-| `openid_script_protocol_mappers`            | `openid_script_protocol_mapper`            |
 
 SAML mappers (`realm` + optional `client` → saml_clients + optional
 `client_scope` → saml_client_scopes):
@@ -297,7 +296,6 @@ SAML mappers (`realm` + optional `client` → saml_clients + optional
 | -------------------------------------- | ------------------------------------- |
 | `saml_user_attribute_protocol_mappers` | `saml_user_attribute_protocol_mapper` |
 | `saml_user_property_protocol_mappers`  | `saml_user_property_protocol_mapper`  |
-| `saml_script_protocol_mappers`         | `saml_script_protocol_mapper`         |
 
 Generic mappers (`realm` + optional `client` → openid/saml clients +
 optional `client_scope` → openid/saml client_scopes, multi-target):
@@ -354,7 +352,6 @@ collection, multi-target with literal fallback):
 | `openid_client_client_policies`                     | `openid_client_client_policy`                     | `name`       |
 | `openid_client_authorization_client_scope_policies` | `openid_client_authorization_client_scope_policy` | `name`       |
 | `openid_client_group_policies`                      | `openid_client_group_policy`                      | `name`       |
-| `openid_client_js_policies`                         | `openid_client_js_policy`                         | `name`       |
 | `openid_client_role_policies`                       | `openid_client_role_policy`                       | `name`       |
 | `openid_client_time_policies`                       | `openid_client_time_policy`                       | `name`       |
 | `openid_client_user_policies`                       | `openid_client_user_policy`                       | `name`       |

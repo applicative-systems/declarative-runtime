@@ -1333,30 +1333,6 @@ let
       };
     };
 
-    openid_script_protocol_mappers = {
-      type = "keycloak_openid_script_protocol_mapper";
-      prefix = "openid_script_mapper";
-      nameAttr = "name";
-      scope = null;
-      refs = {
-        realm = realmRef;
-        client = openidClientOptionalRef;
-        client_scope = openidClientScopeOptionalRef;
-      };
-      oneOfRefs = clientOrScopeOneOf;
-      requiredAttrs = [
-        "script"
-        "claim_name"
-      ];
-      description = "OpenID protocol mapper that produces a claim from a JavaScript expression (requires the scripts feature).";
-      attrs = openidMapperCommonAttrs // {
-        multivalued = oBool "Treat as multivalued?";
-        script = oStr "JavaScript expression evaluated to produce the claim value.";
-        claim_name = oStr "Name of the resulting JWT claim.";
-        claim_value_type = oStr "Claim value type.";
-      };
-    };
-
     saml_user_attribute_protocol_mappers = {
       type = "keycloak_saml_user_attribute_protocol_mapper";
       prefix = "saml_user_attribute_mapper";
@@ -1402,32 +1378,6 @@ let
       attrs = {
         name = oStr "Mapper name. Defaults to the attribute key.";
         user_property = oStr "Built-in user property (e.g. 'email', 'username').";
-        friendly_name = oStr "Optional SAML friendlyName.";
-        saml_attribute_name = oStr "SAML attribute name.";
-        saml_attribute_name_format = oStr "SAML attribute name format.";
-      };
-    };
-
-    saml_script_protocol_mappers = {
-      type = "keycloak_saml_script_protocol_mapper";
-      prefix = "saml_script_mapper";
-      nameAttr = "name";
-      scope = null;
-      refs = {
-        realm = realmRef;
-        client = samlClientOptionalRef;
-        client_scope = samlClientScopeOptionalRef;
-      };
-      oneOfRefs = clientOrScopeOneOf;
-      requiredAttrs = [
-        "script"
-        "saml_attribute_name"
-      ];
-      description = "SAML mapper that produces a SAML attribute from a JavaScript expression.";
-      attrs = {
-        name = oStr "Mapper name. Defaults to the attribute key.";
-        single_value_attribute = oBool "Emit as a single-value attribute?";
-        script = oStr "JavaScript expression evaluated to produce the SAML attribute value.";
         friendly_name = oStr "Optional SAML friendlyName.";
         saml_attribute_name = oStr "SAML attribute name.";
         saml_attribute_name_format = oStr "SAML attribute name format.";
@@ -2154,41 +2104,6 @@ let
           path = oStr "Group path (read from the API).";
           extend_children = oBool "Match descendants of the group as well.";
         } "List of `{ id; path; extend_children; }` blocks naming groups the policy applies to.";
-      };
-    };
-
-    openid_client_js_policies = {
-      type = "keycloak_openid_client_js_policy";
-      prefix = "openid_client_js_policy";
-      nameAttr = "name";
-      scope = null;
-      refs = {
-        realm = realmRef;
-        resource_server = {
-          attr = "resource_server_id";
-          targets = [
-            {
-              collection = "openid_clients";
-              field = "resource_server_id";
-            }
-          ];
-          managedOnly = true;
-          required = true;
-          description = "Key of the managed openid_client hosting this policy.";
-        };
-      };
-      requiredAttrs = [
-        "decision_strategy"
-        "code"
-      ];
-      description = "Policy implemented in JavaScript (requires the scripts feature).";
-      attrs = {
-        name = oStr "Policy name. Defaults to the attribute key.";
-        description = oStr "Policy description.";
-        decision_strategy = oStr "Decision strategy.";
-        logic = oStr "Policy logic ('POSITIVE' or 'NEGATIVE').";
-        type = oStr "Policy type discriminator ('js').";
-        code = oStr "JavaScript source.";
       };
     };
 
