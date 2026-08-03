@@ -62,6 +62,29 @@
           )
         ) (pairingLibs pkgs);
 
+      # `<svc>-rendered-fixtures`: each pairing's fixtures rendered through the
+      # real option system and renderer. Build before and after a change to the
+      # resource surface and diff -- an empty diff proves the wire format is
+      # untouched. The `baseUrl` here only has to be stable across the two
+      # builds; the module's own default is what a real system uses.
+      renderedFixtures =
+        pkgs:
+        let
+          libs = pairingLibs pkgs;
+          inherit (import ./modules/lib/render-fixtures.nix { inherit pkgs; }) renderFixtures;
+          urlOption = default: lib.mkOption { inherit default; };
+        in
+        {
+          forgejo-rendered-fixtures = renderFixtures {
+            name = "forgejo";
+            options = libs.forgejo.resourceOptions // {
+              baseUrl = urlOption "http://localhost:3000";
+            };
+            tfConfig = libs.forgejo.forgejoTfConfig;
+            fixtures = import ./services/forgejo/fixtures.nix;
+          };
+        };
+
       # `<svc>-schema-current`: the authoritative drift check. The eval-time
       # assertions in `modules/lib/tf-schema.nix` compare version strings; this
       # one compares content, so a provider that changes a schema without
@@ -111,6 +134,7 @@
         system: pkgs:
         lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
         // providerSchemas pkgs
+        // renderedFixtures pkgs
       ) inputs.nixpkgs.legacyPackages;
 
       # `nix run .#update-provider-schemas` after a nixpkgs bump moves a
