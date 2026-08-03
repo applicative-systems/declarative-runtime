@@ -286,9 +286,9 @@ in
     requiredScopes
     forgejoTfConfig
     ;
-  # the generator's drift assertions, for the pairing's checks to force
-  # independently of any particular configuration.
-  inherit (generated) checks;
+  # the generator's drift assertions and coverage data, for the pairing's checks
+  # to force independently of any particular configuration.
+  inherit (generated) checks coverage;
   resourceOptions = genlib.resourceOptions resourceTypes;
   mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
 }
