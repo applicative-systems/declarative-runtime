@@ -47,9 +47,12 @@ in
 
       `Options` counts a collection's top-level options against the settable
       top-level attributes the provider schema declares for it; the two differ
-      exactly by the attributes consumed by references and by `Omitted`. Nested
-      block attributes are options of their own submodule and are not counted
-      here.
+      exactly by the attributes consumed by references and by the dropped ones.
+      Nested block attributes are options of their own submodule and are not
+      counted here.
+      ${lib.optionalString (coverage.omitEverywhere != [ ])
+        "Dropped from every collection that declares them, on top of each `Omitted` column: ${cell coverage.omitEverywhere}."
+      }
 
       ## Modelled
 

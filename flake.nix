@@ -42,7 +42,10 @@
           inherit pkgs;
           nixTfSchema = inputs.nix-tf-schema;
         };
-        keycloak = import ./services/keycloak/lib.nix { inherit pkgs; };
+        keycloak = import ./services/keycloak/lib.nix {
+          inherit pkgs;
+          nixTfSchema = inputs.nix-tf-schema;
+        };
       };
 
       # A NixOS module cannot reach a flake input by path, so the schema library

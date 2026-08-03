@@ -69,6 +69,10 @@ in
       runtimePrefix  "services.<svc>.runtime" -- for error messages
       resources      collection name -> overlay (see below)
       unsupported    schema resource type -> non-empty reason for not modelling it
+      omitEverywhere dotted paths dropped from every collection that declares
+                     them. For dialect artifacts that repeat across the whole
+                     provider -- the sdk/v2 synthetic `id`, say -- not as a
+                     shortcut for per-collection `omit`.
 
     An overlay's first six fields are mandatory; the rest default to empty and
     exist only to correct things a schema cannot state. There is deliberately no
@@ -103,6 +107,7 @@ in
       runtimePrefix,
       resources,
       unsupported ? { },
+      omitEverywhere ? [ ],
     }:
     let
       check = cond: msg: if cond then null else throw "${runtimePrefix}: ${msg}";
@@ -143,7 +148,10 @@ in
           # collection key and generation fills these in, so they must not also
           # be settable options.
           refConsumed = mapAttrsToList (_: r: r.attr) o.refs;
-          droppedPaths = o.omit ++ refConsumed;
+          # the global list is filtered to what this resource has, so it needs
+          # no per-collection opt-in; the check that it names something real
+          # runs once, provider-wide.
+          droppedPaths = o.omit ++ refConsumed ++ filter (p: paths ? ${p}) omitEverywhere;
           isDropped = path: lib.any (d: path == d || lib.hasPrefix "${d}." path) droppedPaths;
 
           isSecret =
@@ -368,7 +376,12 @@ in
           };
         in
         {
-          inherit spec checks coverage;
+          inherit
+            spec
+            checks
+            coverage
+            allPaths
+            ;
         };
 
       built = lib.mapAttrs mkOne resources;
@@ -384,6 +397,11 @@ in
 
       unclaimed = subtractLists (allTypes ++ unsupportedTypes) schemaTypes;
 
+      # a path is worth omitting provider-wide only while some resource still
+      # declares it; once none does, the entry is stale.
+      claimedPaths = unique (lib.concatLists (mapAttrsToList (_: r: r.allPaths) built));
+      staleOmit = subtractLists claimedPaths omitEverywhere;
+
       globalChecks = [
         # identity: the cheap guards that fire the instant nixpkgs moves the
         # provider under us. `<svc>-schema-current` is the authoritative check
@@ -395,6 +413,10 @@ in
           "vendored schema is for ${source} ${schema.version}, but the packaged provider is ${provider.version}; run `nix run .#update-provider-schemas`"
         )
         (check (elem schema.format_version knownFormatVersions) "unrecognized schema `format_version` `${schema.format_version}` (known: ${quoteList knownFormatVersions})")
+
+        (check (staleOmit == [ ])
+          "`omitEverywhere` lists ${quoteList staleOmit}, which no modelled resource of ${source} ${provider.version} declares"
+        )
 
         (check (
           duplicates allTypes == [ ]
@@ -437,6 +459,7 @@ in
           source
           runtimePrefix
           unsupported
+          omitEverywhere
           ;
         inherit (provider) version;
         schemaResources = length schemaTypes;
