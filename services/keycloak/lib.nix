@@ -17,6 +17,8 @@ let
 
   provider = pkgs.terraform-providers.keycloak_keycloak;
   providerVersion = provider.version;
+  # provider source address; also keys the vendored provider schema.
+  providerSource = "keycloak/keycloak";
 
   # tf-var names for the service-account oauth2 client the reconciler uses.
   tokenVar = "keycloak_client_secret";
@@ -3138,9 +3140,13 @@ let
   };
 
   keycloakTfConfig = genlib.mkTfConfig {
-    inherit resourceTypes providerVersion tokenVar;
+    inherit
+      resourceTypes
+      providerVersion
+      providerSource
+      tokenVar
+      ;
     providerName = "keycloak";
-    providerSource = "keycloak/keycloak";
     runtimePrefix = "services.keycloak.runtime";
     extraSensitiveVars = [ clientIdVar ];
     providerBlock = cfg: {
@@ -3152,7 +3158,13 @@ let
   };
 in
 {
-  inherit resourceTypes keycloakTfConfig clientIdVar;
+  inherit
+    provider
+    providerSource
+    resourceTypes
+    keycloakTfConfig
+    clientIdVar
+    ;
   resourceOptions = genlib.resourceOptions resourceTypes;
   mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
 }

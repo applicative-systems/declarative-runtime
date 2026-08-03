@@ -17,6 +17,8 @@ let
 
   provider = import ./pkg.nix { inherit pkgs; };
   providerVersion = provider.version;
+  # provider source address; also keys the vendored provider schema.
+  providerSource = "svalabs/forgejo";
   tokenVar = "forgejo_api_token";
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
 
@@ -421,9 +423,13 @@ let
     if scopes == [ ] then "write:organization" else lib.concatStringsSep "," scopes;
 
   forgejoTfConfig = genlib.mkTfConfig {
-    inherit resourceTypes providerVersion tokenVar;
+    inherit
+      resourceTypes
+      providerVersion
+      providerSource
+      tokenVar
+      ;
     providerName = "forgejo";
-    providerSource = "svalabs/forgejo";
     runtimePrefix = "services.forgejo.runtime";
     providerBlock = cfg: {
       host = cfg.baseUrl;
@@ -432,7 +438,13 @@ let
   };
 in
 {
-  inherit resourceTypes requiredScopes forgejoTfConfig;
+  inherit
+    provider
+    providerSource
+    resourceTypes
+    requiredScopes
+    forgejoTfConfig
+    ;
   resourceOptions = genlib.resourceOptions resourceTypes;
   mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
 }

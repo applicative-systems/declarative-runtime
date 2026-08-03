@@ -34,6 +34,33 @@
             cfg
           ];
         };
+
+      # the pairings, by service name. each `lib.nix` exposes the packaged
+      # provider and its source address, which is all the schema tooling needs.
+      pairingLibs = pkgs: {
+        forgejo = import ./services/forgejo/lib.nix { inherit pkgs; };
+        keycloak = import ./services/keycloak/lib.nix { inherit pkgs; };
+      };
+
+      # `<svc>-provider-schema`: the normalized schema of the pinned provider,
+      # extracted in a sandbox (`tofu providers schema -json`). This is the
+      # source for the vendored `services/<svc>/provider-schema.json`; it is
+      # never imported at eval time, because the flake evaluates for aarch64 too
+      # and IFD would mean running a foreign-arch provider binary.
+      providerSchemas =
+        pkgs:
+        let
+          conv = pkgs.callPackage "${inputs.nix-tf-schema}/conversion.nix" { };
+        in
+        lib.mapAttrs' (
+          svc: l:
+          lib.nameValuePair "${svc}-provider-schema" (
+            conv.mkProviderSchemaFile {
+              inherit (l) provider;
+              source = l.providerSource;
+            }
+          )
+        ) (pairingLibs pkgs);
     in
     {
       # NixOS module entrypoint: enables a Nixpkgs service and reconciles its
@@ -47,8 +74,34 @@
       ) examples;
 
       packages = lib.mapAttrs (
-        system: _pkgs: lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
+        system: pkgs:
+        lib.mapAttrs (_name: cfg: (exampleSystem system cfg).config.system.build.vm) examples
+        // providerSchemas pkgs
       ) inputs.nixpkgs.legacyPackages;
+
+      # `nix run .#update-provider-schemas` after a nixpkgs bump moves a
+      # provider: refresh the vendored schemas, then `nix flake check` reports
+      # every resource and attribute that changed.
+      apps = lib.mapAttrs (_system: pkgs: {
+        update-provider-schemas = {
+          type = "app";
+          program = lib.getExe (
+            pkgs.writeShellApplication {
+              name = "update-provider-schemas";
+              runtimeInputs = [ pkgs.git ];
+              text = ''
+                root=$(git rev-parse --show-toplevel)
+                ${lib.concatLines (
+                  lib.mapAttrsToList (name: drv: ''
+                    install -Dm0644 ${drv} "$root/services/${lib.removeSuffix "-provider-schema" name}/provider-schema.json"
+                    echo "updated services/${lib.removeSuffix "-provider-schema" name}/provider-schema.json"
+                  '') (providerSchemas pkgs)
+                )}
+              '';
+            }
+          );
+        };
+      }) inputs.nixpkgs.legacyPackages;
 
       checks = lib.mapAttrs (
         system: pkgs:
