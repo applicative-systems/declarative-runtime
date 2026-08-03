@@ -50,10 +50,35 @@
             };
 
             # owner references the managed organization by key -> ordered after it.
+            # `internal_tracker` is a nested single block (the plugin-framework
+            # dialect: a plain JSON object, no `[ ... ]` wrapping).
             repositories.widgets = {
               owner = "acme";
               description = "Widget factory";
               private = false;
+              has_issues = true;
+              internal_tracker = {
+                enable_time_tracker = true;
+                allow_only_contributors_to_track_time = false;
+                enable_issue_dependencies = true;
+              };
+            };
+
+            # The other two nested blocks. A repository routes issues either to
+            # the built-in tracker or to an external one, never both, so they
+            # need a repository of their own.
+            repositories.gadgets = {
+              owner = "acme";
+              description = "Gadget factory";
+              private = false;
+              has_issues = true;
+              has_wiki = true;
+              external_tracker = {
+                external_tracker_url = "https://tracker.example.com/acme/gadgets";
+                external_tracker_format = "https://tracker.example.com/acme/gadgets/{index}";
+                external_tracker_style = "numeric";
+              };
+              external_wiki.external_wiki_url = "https://wiki.example.com/acme/gadgets";
             };
 
             # organization references the managed org by key (string-name ref).
@@ -106,6 +131,8 @@
       };
 
     testScript = ''
+      import json
+
       machine.start()
 
       # The whole chain must converge at boot with zero manual token handling:
@@ -121,6 +148,25 @@
 
       repo = machine.succeed("curl --fail http://localhost:3000/api/v1/repos/acme/widgets")
       assert '"Widget factory"' in repo, f"repo description not applied: {repo}"
+
+      # Nested single blocks reach Forgejo as plain objects.
+      widgets = json.loads(repo)
+      assert widgets["internal_tracker"] == {
+          "enable_time_tracker": True,
+          "allow_only_contributors_to_track_time": False,
+          "enable_issue_dependencies": True,
+      }, f"internal_tracker not applied: {widgets.get('internal_tracker')}"
+
+      gadgets = json.loads(machine.succeed("curl --fail http://localhost:3000/api/v1/repos/acme/gadgets"))
+      assert gadgets["external_tracker"] == {
+          "external_tracker_url": "https://tracker.example.com/acme/gadgets",
+          "external_tracker_format": "https://tracker.example.com/acme/gadgets/{index}",
+          "external_tracker_style": "numeric",
+          "external_tracker_regexp_pattern": "",
+      }, f"external_tracker not applied: {gadgets.get('external_tracker')}"
+      assert gadgets["external_wiki"] == {
+          "external_wiki_url": "https://wiki.example.com/acme/gadgets",
+      }, f"external_wiki not applied: {gadgets.get('external_wiki')}"
 
       # Per-secret indirection: bob's password was supplied as a host file and
       # must not appear in the generated config; logging in as bob proves the
