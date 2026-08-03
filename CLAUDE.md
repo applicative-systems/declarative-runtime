@@ -1,10 +1,11 @@
 # CLAUDE.md
 
-> Status: the pattern is implemented. **`services/forgejo` is the worked
-> reference pairing** — new pairings are modeled on it, and the "Provider
-> implementation contract" below is exactly what it encodes. Grafana and
-> Keycloak (see "Target pairings") are designed but not yet built; do not
-> present them as implemented.
+> Status: the pattern is implemented, by two pairings. **`services/forgejo` is
+> the worked reference pairing** — new pairings are modeled on it, and the
+> "Provider implementation contract" below is exactly what it encodes.
+> `services/keycloak` is the second, and the one to read for the sdk/v2 schema
+> dialect and for a large resource surface. Grafana (see "Target pairings") is
+> designed but not yet built; do not present it as implemented.
 
 ## Purpose
 
@@ -70,7 +71,7 @@ Provider reality verified against nixpkgs + the public registry:
 | ------------ | --------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Forgejo**  | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
 | **Grafana**  | `grafana` (4.36.0)                | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
-| **Keycloak** | `keycloak` (5.7.0)                | `pkgs.terraform-providers.keycloak`                     | Designed, not yet built. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                                                                       |
+| **Keycloak** | `keycloak` (5.8.0)                | `pkgs.terraform-providers.keycloak`                     | **Implemented.** All 101 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
 
 ## Repository layout
 
