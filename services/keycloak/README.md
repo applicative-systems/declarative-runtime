@@ -73,6 +73,10 @@ attributes are **typed options** named after the upstream resource's
 snake_case attributes (validated at `nix flake check`; an unknown name or
 wrong type is a build error).
 
+Those options are **derived from the provider's own schema** rather than
+hand-written, so they track the pinned provider exactly — see
+[Provider updates](#provider-updates).
+
 ### Self-bootstrap: one realm
 
 ```nix
@@ -230,6 +234,14 @@ a reference accepts either a managed key or a literal name/id (the
 `managedOnly = false` form), built-in / external values just pass
 through.
 
+What each collection accepts comes from the vendored provider schema, not
+from the tables below: the authoritative option list is
+
+```sh
+nix build .#checks.x86_64-linux.keycloak-options-doc     # every option, typed
+nix build .#checks.x86_64-linux.keycloak-schema-coverage # what is covered
+```
+
 ### Realms
 
 | Option   | `keycloak_*` resource | Key defaults |
@@ -288,7 +300,6 @@ optional `client_scope` → openid_client_scopes):
 | `openid_user_realm_role_protocol_mappers`   | `openid_user_realm_role_protocol_mapper`   |
 | `openid_user_client_role_protocol_mappers`  | `openid_user_client_role_protocol_mapper`  |
 | `openid_user_session_note_protocol_mappers` | `openid_user_session_note_protocol_mapper` |
-| `openid_script_protocol_mappers`            | `openid_script_protocol_mapper`            |
 
 SAML mappers (`realm` + optional `client` → saml_clients + optional
 `client_scope` → saml_client_scopes):
@@ -297,7 +308,6 @@ SAML mappers (`realm` + optional `client` → saml_clients + optional
 | -------------------------------------- | ------------------------------------- |
 | `saml_user_attribute_protocol_mappers` | `saml_user_attribute_protocol_mapper` |
 | `saml_user_property_protocol_mappers`  | `saml_user_property_protocol_mapper`  |
-| `saml_script_protocol_mappers`         | `saml_script_protocol_mapper`         |
 
 Generic mappers (`realm` + optional `client` → openid/saml clients +
 optional `client_scope` → openid/saml client_scopes, multi-target):
@@ -311,14 +321,16 @@ optional `client_scope` → openid/saml client_scopes, multi-target):
 
 ### Identity providers + mappers
 
-| Option                             | `keycloak_*` resource             | Key defaults | Reference inputs        |
-| ---------------------------------- | --------------------------------- | ------------ | ----------------------- |
-| `oidc_identity_providers`          | `oidc_identity_provider`          | `alias`      | `realm` (by realm name) |
-| `saml_identity_providers`          | `saml_identity_provider`          | `alias`      | `realm` (by realm name) |
-| `oidc_google_identity_providers`   | `oidc_google_identity_provider`   | `alias`      | `realm` (by realm name) |
-| `oidc_facebook_identity_providers` | `oidc_facebook_identity_provider` | `alias`      | `realm` (by realm name) |
-| `oidc_github_identity_providers`   | `oidc_github_identity_provider`   | `alias`      | `realm` (by realm name) |
-| `kubernetes_identity_providers`    | `kubernetes_identity_provider`    | `alias`      | `realm` (by realm name) |
+| Option                                 | `keycloak_*` resource                 | Key defaults | Reference inputs        |
+| -------------------------------------- | ------------------------------------- | ------------ | ----------------------- |
+| `oidc_identity_providers`              | `oidc_identity_provider`              | `alias`      | `realm` (by realm name) |
+| `saml_identity_providers`              | `saml_identity_provider`              | `alias`      | `realm` (by realm name) |
+| `oidc_google_identity_providers`       | `oidc_google_identity_provider`       | `alias`      | `realm` (by realm name) |
+| `oidc_facebook_identity_providers`     | `oidc_facebook_identity_provider`     | `alias`      | `realm` (by realm name) |
+| `oidc_github_identity_providers`       | `oidc_github_identity_provider`       | `alias`      | `realm` (by realm name) |
+| `kubernetes_identity_providers`        | `kubernetes_identity_provider`        | `alias`      | `realm` (by realm name) |
+| `oidc_openshift_v4_identity_providers` | `oidc_openshift_v4_identity_provider` | `alias`      | `realm` (by realm name) |
+| `spiffe_identity_providers`            | `spiffe_identity_provider`            | `alias`      | `realm` (by realm name) |
 
 Identity-provider mappers (`realm` + `identity_provider` → any IdP
 collection, multi-target with literal fallback):
@@ -354,7 +366,7 @@ collection, multi-target with literal fallback):
 | `openid_client_client_policies`                     | `openid_client_client_policy`                     | `name`       |
 | `openid_client_authorization_client_scope_policies` | `openid_client_authorization_client_scope_policy` | `name`       |
 | `openid_client_group_policies`                      | `openid_client_group_policy`                      | `name`       |
-| `openid_client_js_policies`                         | `openid_client_js_policy`                         | `name`       |
+| `openid_client_regex_policies`                      | `openid_client_regex_policy`                      | `name`       |
 | `openid_client_role_policies`                       | `openid_client_role_policy`                       | `name`       |
 | `openid_client_time_policies`                       | `openid_client_time_policy`                       | `name`       |
 | `openid_client_user_policies`                       | `openid_client_user_policy`                       | `name`       |
@@ -417,6 +429,31 @@ Other federation:
 | `realm_client_policy_profile_policies`               | `realm_client_policy_profile_policy`                | `name`       | `realm`, `profiles` → realm_client_policy_profiles                    |
 | `group_permissions`                                  | `group_permissions`                                 | —            | `realm`, `group` → groups                                             |
 | `users_permissions`                                  | `users_permissions`                                 | —            | `realm`                                                               |
+| `workflows`                                          | `workflow`                                          | `name`       | `realm` (by realm name)                                               |
+
+## Provider updates
+
+The option surface is generated from `provider-schema.json`, a normalized
+dump of the pinned provider's schema, committed next to `module.nix`. The
+provider itself comes from nixpkgs, so it moves when the flake's `nixpkgs`
+input does; after such a bump:
+
+```sh
+nix run .#update-provider-schemas
+nix flake check
+```
+
+The check names every difference the bump introduces: resources added or
+removed, attributes added, removed or retyped, and any correction in
+`lib.nix` that no longer matches the schema. A new resource must either be
+modelled or listed in the pairing's `unsupported` set with a reason — it
+cannot be ignored. Every resource `keycloak/keycloak` 5.8.0 offers is
+currently modelled, so that set is empty.
+
+An upstream attribute that becomes **required** turns into a required
+option, which fails evaluation for configurations that never set it. That
+is usually the right signal, but `forceOptional` in the collection's
+overlay is the release valve when it is not.
 
 ## State directory note
 
