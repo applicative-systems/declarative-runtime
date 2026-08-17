@@ -705,7 +705,7 @@ rec {
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done
-        tofu init -no-color
+        tofu init -upgrade -no-color
         ${lib.optionalString (importEntries != [ ]) ''
           # Reference copy of the generated import plan (see its "//" note).
           # Suffixed `.disabled` so tofu does not auto-load it here: applying
