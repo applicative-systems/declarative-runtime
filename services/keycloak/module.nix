@@ -1,11 +1,11 @@
-# `nixTfSchema` is the schema-conversion library the resource surface is derived
+# `nix-tf-schema` is the schema-conversion library the resource surface is derived
 # from; the flake injects it via `_module.args`, since a NixOS module cannot
 # reach a flake input by path.
 {
   config,
   lib,
   pkgs,
-  nixTfSchema,
+  nix-tf-schema,
   ...
 }:
 let
@@ -19,7 +19,7 @@ let
 
   cfg = config.services.keycloak.runtime;
   keycloak = config.services.keycloak;
-  tflib = import ./lib.nix { inherit pkgs nixTfSchema; };
+  tflib = import ./lib.nix { inherit pkgs nix-tf-schema; };
 
   defaultBaseUrl = "http://localhost:${toString keycloak.settings.http-port}";
 

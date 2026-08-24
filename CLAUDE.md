@@ -120,7 +120,7 @@ keycloak pairings encode.
   `imports` (so it also joins the aggregate `nixosModules.default`), and merge
   `import ./services/<svc>/checks.nix { inherit pkgs self; }` into the flake's
   `checks`.
-- `withSchemaLib` sets `_module.args.nixTfSchema`: a NixOS module cannot reach a
+- `withSchemaLib` sets `_module.args.nix-tf-schema`: a NixOS module cannot reach a
   flake input by path, so the schema library is threaded in as a module argument.
 - Everything (`packages`, `checks`, `formatter`) is produced for both
   `x86_64-linux` and `aarch64-linux`.
@@ -140,9 +140,9 @@ keycloak pairings encode.
 
 ### `lib.nix` — provider specifics
 
-- Signature `{ pkgs, nixTfSchema }:`; pulls
+- Signature `{ pkgs, nix-tf-schema }:`; pulls
   `genlib = import ../../modules/lib { inherit pkgs; }` and
-  `tfSchema = import ../../modules/lib/tf-schema.nix { inherit pkgs nixTfSchema; }`,
+  `tfSchema = import ../../modules/lib/tf-schema.nix { inherit pkgs nix-tf-schema; }`,
   and returns
   `{ resourceTypes; resourceOptions; coverage; <svc>TfConfig; mkReconcileService; provider; providerSource; … }`.
 - Specializes the generic reconciler with the provider's executor and token
@@ -270,8 +270,8 @@ readers are exercised in-tree:
 
 ### `module.nix` — the NixOS module
 
-- `{ config, lib, pkgs, nixTfSchema, ... }:`; `cfg = config.services.<svc>.runtime`;
-  `tflib = import ./lib.nix { inherit pkgs nixTfSchema; }`.
+- `{ config, lib, pkgs, nix-tf-schema, ... }:`; `cfg = config.services.<svc>.runtime`;
+  `tflib = import ./lib.nix { inherit pkgs nix-tf-schema; }`.
 - Options live under `services.<svc>.runtime` — so the pairing reads as a
   transparent extension of the upstream `services.<svc>` module: `enable`
   (`mkEnableOption`), `baseUrl` (default = the local instance), `tokenFile`

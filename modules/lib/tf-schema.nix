@@ -14,12 +14,12 @@
 # renderer in ./default.nix consumes the result unchanged.
 {
   pkgs,
-  nixTfSchema,
+  nix-tf-schema,
 }:
 let
   inherit (pkgs) lib;
   ty = lib.types;
-  conv = pkgs.callPackage "${nixTfSchema}/conversion.nix" { };
+  conv = pkgs.callPackage "${nix-tf-schema}/conversion.nix" { };
 
   inherit (lib)
     attrNames

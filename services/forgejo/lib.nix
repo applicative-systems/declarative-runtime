@@ -9,10 +9,10 @@
 # is then an eval-time error rather than an apply-time surprise.
 #
 # Shared helpers (option helpers, renderer, reconciler) live in modules/lib.
-{ pkgs, nixTfSchema }:
+{ pkgs, nix-tf-schema }:
 let
   genlib = import ../../modules/lib { inherit pkgs; };
-  tfSchema = import ../../modules/lib/tf-schema.nix { inherit pkgs nixTfSchema; };
+  tfSchema = import ../../modules/lib/tf-schema.nix { inherit pkgs nix-tf-schema; };
   inherit (pkgs) lib;
 
   provider = import ./pkg.nix { inherit pkgs; };

@@ -40,11 +40,11 @@
       pairingLibs = pkgs: {
         forgejo = import ./services/forgejo/lib.nix {
           inherit pkgs;
-          nixTfSchema = inputs.nix-tf-schema;
+          inherit (inputs) nix-tf-schema;
         };
         keycloak = import ./services/keycloak/lib.nix {
           inherit pkgs;
-          nixTfSchema = inputs.nix-tf-schema;
+          inherit (inputs) nix-tf-schema;
         };
       };
 
@@ -54,7 +54,9 @@
       # anyone importing them.
       withSchemaLib = module: {
         imports = [ module ];
-        _module.args.nixTfSchema = inputs.nix-tf-schema;
+        _module.args = {
+          inherit (inputs) nix-tf-schema;
+        };
       };
 
       # `<svc>-provider-schema`: the normalized schema of the pinned provider,
