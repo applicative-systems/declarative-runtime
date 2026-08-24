@@ -3,11 +3,11 @@
     "nix-tf-schema": {
       "flake": false,
       "locked": {
-        "lastModified": 1785769754,
-        "narHash": "sha256-MsUM7F5R+44laHsgMXFddZacQ0NXFpN2SN6qHOmVtxc=",
+        "lastModified": 1787497246,
+        "narHash": "sha256-P5DkQx3WCxrRjI/CeLpsB8PY+pYmmmjFlsCIyiYF55Y=",
         "ref": "refs/heads/main",
-        "rev": "5d33a2ce2751e4b407e0269319457e088377077d",
-        "revCount": 8,
+        "rev": "3c0765d6db47e0ea6a9738d3221de8e26cbde093",
+        "revCount": 21,
         "type": "git",
         "url": "https://git.fediversity.eu/fediversity/nix-tf-schema"
       },
