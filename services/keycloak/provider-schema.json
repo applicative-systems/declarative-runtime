@@ -551,6 +551,55 @@
       },
       "version": 0
     },
+    "keycloak_generic_client_authorization_policy": {
+      "block": {
+        "attributes": {
+          "decision_strategy": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "logic": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "resource_server_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "type": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
     "keycloak_generic_client_protocol_mapper": {
       "block": {
         "attributes": {
@@ -793,6 +842,81 @@
             "description_kind": "plain",
             "required": true,
             "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "keycloak_group_admin_permissions": {
+      "block": {
+        "attributes": {
+          "authorization_resource_server_id": {
+            "computed": true,
+            "description": "Resource server id of the admin-permissions client on which this permission is managed",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "decision_strategy": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "group_ids": {
+            "description": "Group UUIDs this permission applies to. Leave empty to target all groups in the realm.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "permission_id": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "policies": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "scopes": {
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "set",
+              "string"
+            ]
           }
         },
         "description_kind": "plain"
@@ -2151,6 +2275,12 @@
             "required": true,
             "type": "string"
           },
+          "relative_create_dn": {
+            "description": "Relative DN of LDAP tree where new users will be created. Keycloak will use the Users DN as the base for the new user's DN.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
           "search_scope": {
             "description": "ONE_LEVEL: only search for users in the DN specified by user_dn. SUBTREE: search entire LDAP subtree.",
             "description_kind": "plain",
@@ -2906,7 +3036,7 @@
             "description": "Version of the Client secret write-only argument",
             "description_kind": "plain",
             "optional": true,
-            "type": "number"
+            "type": "string"
           },
           "default_scopes": {
             "description": "The scopes to be sent when asking for authorization. It can be a space-separated list of scopes. Defaults to 'openid'.",
@@ -3079,6 +3209,185 @@
           },
           "validate_signature": {
             "description": "Enable/disable signature validation of external IDP signatures.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 1
+    },
+    "keycloak_oidc_microsoft_identity_provider": {
+      "block": {
+        "attributes": {
+          "accepts_prompt_none_forward_from_client": {
+            "description": "This is just used together with Identity Provider Authenticator or when kc_idp_hint points to this identity provider. In case that client sends a request with prompt=none and user is not yet authenticated, the error will not be directly returned to client, but the request with prompt=none will be forwarded to this identity provider.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "add_read_token_role_on_create": {
+            "description": "Enable/disable if new users can read any stored tokens. This assigns the broker.read-token role.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "alias": {
+            "computed": true,
+            "description": "The alias uniquely identifies an identity provider and is also used to build the redirect URI. Defaults to microsoft.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "authenticate_by_default": {
+            "description": "Enable/disable authenticate users by default.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "client_id": {
+            "description": "Client ID.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "client_secret": {
+            "description": "Client Secret.",
+            "description_kind": "plain",
+            "required": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "default_scopes": {
+            "description": "The scopes to be sent when asking for authorization. See the documentation for possible values, separator and default value'. Default: 'openid profile email'",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "disable_user_info": {
+            "description": "Disable usage of User Info service to obtain additional user information?  Default is to use this OIDC service.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "display_name": {
+            "computed": true,
+            "description": "The human-friendly name of the identity provider, used in the log in form.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable/disable this identity provider.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "extra_config": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "map",
+              "string"
+            ]
+          },
+          "first_broker_login_flow_alias": {
+            "description": "Alias of authentication flow, which is triggered after first login with this identity provider. Term 'First Login' means that there is not yet existing Keycloak account linked with the authenticated identity provider account.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "gui_order": {
+            "description": "GUI Order",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "hide_on_login_page": {
+            "description": "Hide On Login Page.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "internal_id": {
+            "computed": true,
+            "description": "Internal Identity Provider Id",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "link_only": {
+            "description": "If true, users cannot log in through this provider.  They can only link to this provider.  This is useful if you don't want to allow login from the provider, but want to integrate with a provider",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "org_domain": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "org_redirect_mode_email_matches": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "organization_id": {
+            "description": "ID of organization with which this identity is linked.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "post_broker_login_flow_alias": {
+            "description": "Alias of authentication flow, which is triggered after each login with this identity provider. Useful if you want additional verification of each user authenticated with this identity provider (for example OTP). Leave this empty if you don't want any additional authenticators to be triggered after login with this identity provider. Also note, that authenticator implementations must assume that user is already set in ClientSession as identity provider already set it.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Prompt parameter for Microsoft identity provider. Available options are 'login', 'none', 'consent' and 'select_account'.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "provider_id": {
+            "description": "Provider ID, is always microsoft.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "realm": {
+            "description": "Realm Name",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "store_token": {
+            "description": "Enable/disable if tokens must be stored after authenticating users.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "sync_mode": {
+            "description": "Sync Mode",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "Tenant ID.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "trust_email": {
+            "description": "If enabled then email provided by this provider is not verified even if verification is enabled for the realm.",
             "description_kind": "plain",
             "optional": true,
             "type": "bool"
@@ -3260,6 +3569,12 @@
           },
           "add_to_id_token": {
             "description": "Indicates if this claim should be added to the id token.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "add_to_token_introspection": {
+            "description": "Indicates if the attribute should be a claim in the token introspection response.",
             "description_kind": "plain",
             "optional": true,
             "type": "bool"
@@ -3448,7 +3763,7 @@
             "description": "Version of the Client secret write-only argument",
             "description_kind": "plain",
             "optional": true,
-            "type": "number"
+            "type": "string"
           },
           "client_session_idle_timeout": {
             "computed": true,
@@ -3717,6 +4032,81 @@
             },
             "max_items": 1,
             "nesting_mode": "set"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 1
+    },
+    "keycloak_openid_client_admin_permissions": {
+      "block": {
+        "attributes": {
+          "authorization_resource_server_id": {
+            "computed": true,
+            "description": "Resource server id of the admin-permissions client on which this permission is managed",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "client_ids": {
+            "description": "Client UUIDs (keycloak_openid_client.xxx.id) this permission applies to. Leave empty to target all clients in the realm.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "decision_strategy": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "permission_id": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "policies": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "scopes": {
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "set",
+              "string"
+            ]
           }
         },
         "description_kind": "plain"
@@ -4184,6 +4574,60 @@
       },
       "version": 0
     },
+    "keycloak_openid_client_js_policy": {
+      "block": {
+        "attributes": {
+          "code": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "decision_strategy": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "logic": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "resource_server_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "type": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
     "keycloak_openid_client_optional_scopes": {
       "block": {
         "attributes": {
@@ -4608,6 +5052,11 @@
             "optional": true,
             "type": "string"
           },
+          "include_in_openid_provider_metadata": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
           "include_in_token_scope": {
             "description_kind": "plain",
             "optional": true,
@@ -4909,6 +5358,11 @@
             "type": "bool"
           },
           "add_to_id_token": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "add_to_token_introspection": {
             "description_kind": "plain",
             "optional": true,
             "type": "bool"
@@ -6279,6 +6733,12 @@
                   "optional": true,
                   "type": "number"
                 },
+                "discoverable_credential": {
+                  "description": "Either required, preferred or discouraged. Replaces and takes precedence over the deprecated require_resident_key attribute. Requires Keycloak 26.7 or higher.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
                 "extra_origins": {
                   "description_kind": "plain",
                   "optional": true,
@@ -6304,6 +6764,8 @@
                   "type": "string"
                 },
                 "require_resident_key": {
+                  "deprecated": true,
+                  "deprecation_message": "Deprecated by Keycloak in favor of discoverable_credential. This attribute is only used when discoverable_credential is left as \"not specified\" and is planned to be removed in a future Keycloak version.",
                   "description": "Either Yes or No",
                   "description_kind": "plain",
                   "optional": true,
@@ -6364,6 +6826,12 @@
                   "optional": true,
                   "type": "number"
                 },
+                "discoverable_credential": {
+                  "description": "Either required, preferred or discouraged. Replaces and takes precedence over the deprecated require_resident_key attribute. Requires Keycloak 26.7 or higher.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
                 "extra_origins": {
                   "description_kind": "plain",
                   "optional": true,
@@ -6383,6 +6851,8 @@
                   "type": "string"
                 },
                 "require_resident_key": {
+                  "deprecated": true,
+                  "deprecation_message": "Deprecated by Keycloak in favor of discoverable_credential. This attribute is only used when discoverable_credential is left as \"not specified\" and is planned to be removed in a future Keycloak version.",
                   "description": "Either Yes or No",
                   "description_kind": "plain",
                   "optional": true,
@@ -6526,6 +6996,52 @@
               "description_kind": "plain"
             },
             "nesting_mode": "list"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "keycloak_realm_client_registration_policy": {
+      "block": {
+        "attributes": {
+          "config": {
+            "computed": true,
+            "description": "Policy-specific configuration key-value pairs.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "map",
+              "string"
+            ]
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "provider_id": {
+            "description": "The provider ID of the client registration policy (e.g. 'trusted-hosts', 'consent-required').",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "sub_type": {
+            "description": "Whether this policy applies to anonymous or authenticated client registration.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
           }
         },
         "description_kind": "plain"
@@ -7319,6 +7835,81 @@
             "description_kind": "plain",
             "required": true,
             "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "keycloak_role_admin_permissions": {
+      "block": {
+        "attributes": {
+          "authorization_resource_server_id": {
+            "computed": true,
+            "description": "Resource server id of the admin-permissions client on which this permission is managed",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "decision_strategy": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "permission_id": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "policies": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "role_ids": {
+            "description": "Role UUIDs this permission applies to. Leave empty to target all roles in the realm.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "scopes": {
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "set",
+              "string"
+            ]
           }
         },
         "description_kind": "plain"
@@ -8432,6 +9023,72 @@
       },
       "version": 0
     },
+    "keycloak_users_admin_permissions": {
+      "block": {
+        "attributes": {
+          "authorization_resource_server_id": {
+            "computed": true,
+            "description": "Resource server id of the admin-permissions client on which this permission is managed",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "decision_strategy": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "description": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "permission_id": {
+            "computed": true,
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "policies": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "scopes": {
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
     "keycloak_users_permissions": {
       "block": {
         "attributes": {
@@ -8676,14 +9333,53 @@
             "description_kind": "plain",
             "optional": true,
             "type": "string"
+          },
+          "state": {
+            "computed": true,
+            "description": "Runtime state of the workflow, as reported by Keycloak.",
+            "description_kind": "plain",
+            "type": [
+              "list",
+              [
+                "object",
+                {
+                  "errors": [
+                    "list",
+                    "string"
+                  ]
+                }
+              ]
+            ]
           }
         },
         "block_types": {
+          "schedule": {
+            "block": {
+              "attributes": {
+                "after": {
+                  "description": "Interval between successive scheduled runs, as a duration string (e.g. 30s, 1d) or milliseconds.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "batch_size": {
+                  "description": "Maximum number of resources processed per scheduled batch.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "number"
+                }
+              },
+              "description": "Scheduling configuration for the workflow.",
+              "description_kind": "plain"
+            },
+            "max_items": 1,
+            "nesting_mode": "list"
+          },
           "step": {
             "block": {
               "attributes": {
                 "after": {
-                  "description": "Delay in milliseconds before executing this step.",
+                  "description": "Delay before executing this step, as a duration string (e.g. 7d) or milliseconds (e.g. 2592000000).",
                   "description_kind": "plain",
                   "optional": true,
                   "type": "string"
@@ -8696,6 +9392,24 @@
                     "map",
                     "string"
                   ]
+                },
+                "priority": {
+                  "description": "Execution priority of the step, used to order steps that would otherwise run at the same time.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "scheduled_at": {
+                  "computed": true,
+                  "description": "Epoch timestamp in milliseconds at which the step is scheduled to execute.",
+                  "description_kind": "plain",
+                  "type": "number"
+                },
+                "status": {
+                  "computed": true,
+                  "description": "Execution status of the step, as reported by Keycloak.",
+                  "description_kind": "plain",
+                  "type": "string"
                 },
                 "uses": {
                   "description": "The step type to execute (e.g. disable-user, delete-user, notify-user).",
@@ -8717,5 +9431,5 @@
     }
   },
   "source": "keycloak/keycloak",
-  "version": "5.8.0"
+  "version": "5.9.0"
 }

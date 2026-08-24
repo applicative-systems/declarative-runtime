@@ -131,7 +131,7 @@ let
   };
 
   # IdP mappers reference an IdP by alias; the alias can belong to
-  # any of the eight IdP collections.
+  # any of the nine IdP collections.
   idpAliasRequiredRef = {
     attr = "identity_provider_alias";
     targets = [
@@ -165,6 +165,10 @@ let
       }
       {
         collection = "spiffe_identity_providers";
+        field = "alias";
+      }
+      {
+        collection = "oidc_microsoft_identity_providers";
         field = "alias";
       }
     ];
@@ -219,6 +223,7 @@ let
   #   refs         parent links resolved to references against managed siblings
   #   description  the collection's NixOS option description
   generated = tfSchema.mkResourceTypes {
+    unsupported = { };
     schema = import ./schema.nix;
     inherit provider runtimePrefix;
     source = providerSource;
@@ -954,6 +959,14 @@ let
         refs.realm = realmAliasRef;
         description = "GitHub OIDC identity providers (per-realm), keyed by alias (defaults to 'github').";
       };
+      oidc_microsoft_identity_providers = {
+        type = "keycloak_oidc_microsoft_identity_provider";
+        prefix = "oidc_microsoft_idp";
+        nameAttr = "alias";
+        scope = null;
+        refs.realm = realmAliasRef;
+        description = "Microsoft OIDC identity providers (per-realm), keyed by alias (defaults to 'microsoft').";
+      };
       kubernetes_identity_providers = {
         type = "keycloak_kubernetes_identity_provider";
         prefix = "kubernetes_idp";
@@ -1374,6 +1387,50 @@ let
         };
         description = "Policy granting access within a time window.";
       };
+      generic_client_authorization_policies = {
+        type = "keycloak_generic_client_authorization_policy";
+        prefix = "generic_client_authz_policy";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          resource_server = {
+            attr = "resource_server_id";
+            targets = [
+              {
+                collection = "openid_clients";
+                field = "resource_server_id";
+              }
+            ];
+            managedOnly = true;
+            required = true;
+            description = "Key of the managed openid_client hosting this policy.";
+          };
+        };
+        description = "Generic (provider-typed) authorization policy on an openid_client's resource server, selected by `type`.";
+      };
+      openid_client_js_policies = {
+        type = "keycloak_openid_client_js_policy";
+        prefix = "openid_client_js_policy";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          resource_server = {
+            attr = "resource_server_id";
+            targets = [
+              {
+                collection = "openid_clients";
+                field = "resource_server_id";
+              }
+            ];
+            managedOnly = true;
+            required = true;
+            description = "Key of the managed openid_client hosting this policy.";
+          };
+        };
+        description = "JavaScript-based authorization policy (evaluates `code`) on an openid_client's resource server.";
+      };
       ldap_user_federations = {
         type = "keycloak_ldap_user_federation";
         prefix = "ldap_user_federation";
@@ -1778,6 +1835,91 @@ let
         scope = null;
         refs.realm = realmRef;
         description = "Fine-grained authorization permissions on the realm's users collection; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
+      };
+      group_admin_permissions = {
+        type = "keycloak_group_admin_permissions";
+        prefix = "group_admin_permissions";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          groups = {
+            attr = "group_ids";
+            targets = [
+              {
+                collection = "groups";
+                field = "id";
+              }
+            ];
+            managedOnly = false;
+            required = false;
+            list = true;
+            description = "Groups this admin permission applies to. Each entry is a managed group key (resolved to its id) or a literal group UUID; leave empty to target all groups in the realm.";
+          };
+        };
+        description = "Fine-grained admin permission over groups; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
+      };
+      openid_client_admin_permissions = {
+        type = "keycloak_openid_client_admin_permissions";
+        prefix = "openid_client_admin_permissions";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          clients = {
+            attr = "client_ids";
+            targets = [
+              {
+                collection = "openid_clients";
+                field = "id";
+              }
+            ];
+            managedOnly = false;
+            required = false;
+            list = true;
+            description = "Clients this admin permission applies to. Each entry is a managed openid_client key (resolved to its id) or a literal client UUID; leave empty to target all clients in the realm.";
+          };
+        };
+        description = "Fine-grained admin permission over openid_clients; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
+      };
+      role_admin_permissions = {
+        type = "keycloak_role_admin_permissions";
+        prefix = "role_admin_permissions";
+        nameAttr = "name";
+        scope = null;
+        refs = {
+          realm = realmRef;
+          roles = {
+            attr = "role_ids";
+            targets = [
+              {
+                collection = "roles";
+                field = "id";
+              }
+            ];
+            managedOnly = false;
+            required = false;
+            list = true;
+            description = "Roles this admin permission applies to. Each entry is a managed role key (resolved to its id) or a literal role UUID; leave empty to target all roles in the realm.";
+          };
+        };
+        description = "Fine-grained admin permission over roles; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
+      };
+      users_admin_permissions = {
+        type = "keycloak_users_admin_permissions";
+        prefix = "users_admin_permissions";
+        nameAttr = "name";
+        scope = null;
+        refs.realm = realmRef;
+        description = "Fine-grained admin permission over the realm's users; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
+      };
+      realm_client_registration_policies = {
+        type = "keycloak_realm_client_registration_policy";
+        prefix = "realm_client_registration_policy";
+        nameAttr = "name";
+        scope = null;
+        refs.realm = realmRef;
+        description = "Per-realm client-registration policy (`provider_id` selects the policy type, `sub_type` its anonymous/authenticated scope, `config` its settings), keyed by name.";
       };
       workflows = {
         type = "keycloak_workflow";
