@@ -563,7 +563,7 @@ rec {
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done
-        tofu init -no-color
+        tofu init -upgrade -no-color
         tofu apply -auto-approve -input=false -no-color
       '';
     };
