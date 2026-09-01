@@ -10,7 +10,9 @@
 #     a repository by its numeric id — so a successful apply proves reference
 #     resolution and apply ordering. A user with a `passwordFile` also proves
 #     per-secret credential indirection — the value is loaded from a host file
-#     and kept out of the generated `.tf.json`. Requires KVM (a NixOS VM test).
+#     and kept out of the generated `.tf.json`. A stale
+#     .terraform.lock.hcl is then planted to prove the reconciler re-locks
+#     offline after a provider version bump. Requires KVM (a NixOS VM test).
 { pkgs, self }:
 {
   forgejo = pkgs.testers.runNixOSTest {
@@ -144,6 +146,21 @@
       assert apply_lines, "no 'Apply complete!' line in journal"
       assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
           f"reapply was not a no-op: {apply_lines[-1]}"
+
+      # A provider version bump moves the generated required_providers
+      # constraint while .terraform.lock.hcl -- host state under the service's
+      # state dir -- still pins the old version. Simulate that skew by
+      # rewriting the recorded version: a plain `tofu init` aborts with
+      # "locked provider ... does not match configured version constraint",
+      # so this is what the reconciler's `-upgrade` buys. The VM has no
+      # network, so re-locking here also proves the re-selection stays offline
+      # (the plugin dir baked in by withPlugins is the only source).
+      lock = "/var/lib/forgejo/declarative-terraform/.terraform.lock.hcl"
+      machine.succeed(f"sed -i 's/version *=.*/version = \"0.0.1\"/' {lock}")
+      machine.succeed(f"grep -q 0.0.1 {lock}")
+      machine.succeed("systemctl restart declarative-forgejo.service")
+      relocked = machine.succeed(f"cat {lock}")
+      assert "0.0.1" not in relocked, f"stale lock was not re-locked: {relocked}"
 
       # Adding an admin-scoped resource (a user needs write:admin + read:user)
       # mus work because the scopen is the maximal "all" token
