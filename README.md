@@ -149,6 +149,28 @@ VM with the pairing enabled, let the reconciler apply, then assert the runtime
 state by querying the live service API — not the Terraform state. Eval-only or
 build-only success is not evidence the reconciliation works.
 
+## Troubleshooting
+
+**`declarative-<svc>.service` fails with `locked provider … does not match
+configured version constraint`.** The reconciler's `.terraform.lock.hcl` is host
+state under the service's state directory and survives redeployments, while the
+generated `required_providers` constraint is pinned to whatever provider version
+nixpkgs packages — so bumping the `nixpkgs` input moves the constraint out from
+under the lock. The reconciler runs `tofu init -upgrade` to re-lock by itself
+(still offline: the plugin dir baked in by `opentofu.withPlugins` is the only
+available source). On a host still stuck from an older revision, drop the lock
+and re-run:
+
+```sh
+rm /var/lib/<svc>/declarative-terraform/.terraform.lock.hcl
+systemctl restart declarative-<svc>.service
+```
+
+The `terraform.tfstate` next to it is untouched, so the next apply reconciles
+against the existing state rather than recreating resources. For a
+`DynamicUser=` service such as Keycloak the real directory lives under
+`/var/lib/private/`, reachable as root through the `/var/lib/<svc>` symlink.
+
 ## Design decisions
 
 - **Executor:** OpenTofu (MPL 2.0); `terraform` (BSL 1.1, unfree) is not used.
