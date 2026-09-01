@@ -563,7 +563,13 @@ rec {
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
         done
-        tofu init -no-color
+        # -upgrade: the provider version is pinned to whatever nixpkgs
+        # packages, so a nixpkgs bump moves the required_providers
+        # constraint while .terraform.lock.hcl in the state dir still pins
+        # the old version -- a plain init would fail. re-selecting stays
+        # offline: the plugin dir baked in by withPlugins is the only
+        # available source.
+        tofu init -upgrade -no-color
         tofu apply -auto-approve -input=false -no-color
       '';
     };
