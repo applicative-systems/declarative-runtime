@@ -1,0 +1,53 @@
+/* Dunder Mifflin Paper Company -- corporate beige with Scranton blue.
+ */
+
+.login-pf body {
+  background: #f4ede1;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+#kc-header-wrapper {
+  font-size: 0;
+  line-height: normal;
+  text-align: center;
+}
+#kc-header-wrapper::before {
+  content: "DUNDER MIFFLIN";
+  display: block;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #003c8f;
+}
+#kc-header-wrapper::after {
+  content: "Paper Company, Inc.";
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  color: #6c6c6c;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.pf-v5-c-login__main {
+  --keycloak-card-top-color: #003c8f;
+  background: #ffffff;
+  border: 1px solid #003c8f;
+  border-radius: 2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.pf-v5-c-login__main a {
+  color: #003c8f;
+}
+.pf-v5-c-login__main a:hover {
+  color: #002d6b;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: #003c8f;
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: #002d6b;
+  --pf-v5-c-button--m-primary--active--BackgroundColor: #002d6b;
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: #002d6b;
+}
