@@ -72,6 +72,7 @@ Provider reality verified against nixpkgs + the public registry:
 | **Forgejo**  | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
 | **Grafana**  | `grafana` (4.36.0)                | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
 | **Keycloak** | `keycloak` (5.10.0)               | `pkgs.terraform-providers.keycloak_keycloak`            | **Implemented.** All 111 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
+| **Garage**   | `garage` (jkossis/garage 1.0.5)   | `pkgs.terraform-providers.jkossis_garage`               | **Implemented.** All 3 provider resources modelled. Needs Garage 2.x (v2 admin API). The admin token is Garage's own `admin_token_file`; the cluster needs a layout before the reconciler can apply.                                                            |
 
 ## Repository layout
 
@@ -100,6 +101,7 @@ services/                   # one directory per service<->provider pairing
     checks.nix              # the pairing's checks attrset (nixosTest); merged into flake checks
     README.md               # per-pairing usage docs
   keycloak/                 # the Keycloak <-> keycloak/keycloak pairing; same layout, no pkg.nix (provider is in nixpkgs)
+  garage/                   # the Garage <-> jkossis/garage pairing; same layout, no pkg.nix (provider is in nixpkgs)
 ```
 
 ## Provider implementation contract
