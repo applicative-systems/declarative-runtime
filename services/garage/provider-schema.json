@@ -1,0 +1,138 @@
+{
+  "format_version": "1.0",
+  "resource_schemas": {
+    "garage_bucket": {
+      "block": {
+        "attributes": {
+          "global_alias": {
+            "description": "The global alias (name) for the bucket.",
+            "description_kind": "markdown",
+            "required": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "The unique identifier of the bucket.",
+            "description_kind": "markdown",
+            "type": "string"
+          },
+          "max_objects": {
+            "description": "Maximum number of objects in the bucket. Leave unset for unlimited.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "number"
+          },
+          "max_size": {
+            "description": "Maximum size of the bucket in bytes. Leave unset for unlimited.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "number"
+          },
+          "website_enabled": {
+            "computed": true,
+            "description": "Enable website hosting for this bucket.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "bool"
+          },
+          "website_error_document": {
+            "description": "The error document for website hosting (e.g., 'error.html').",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "website_index_document": {
+            "description": "The index document for website hosting (e.g., 'index.html').",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          }
+        },
+        "description": "Manages a Garage S3 bucket.",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "garage_bucket_permission": {
+      "block": {
+        "attributes": {
+          "access_key_id": {
+            "description": "The ID of the access key.",
+            "description_kind": "markdown",
+            "required": true,
+            "type": "string"
+          },
+          "bucket_id": {
+            "description": "The ID of the bucket.",
+            "description_kind": "markdown",
+            "required": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "The unique identifier of the permission (format: bucket_id/access_key_id).",
+            "description_kind": "markdown",
+            "type": "string"
+          },
+          "owner": {
+            "computed": true,
+            "description": "Grant owner permission to the access key.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "bool"
+          },
+          "read": {
+            "computed": true,
+            "description": "Grant read permission to the access key.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "bool"
+          },
+          "write": {
+            "computed": true,
+            "description": "Grant write permission to the access key.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "bool"
+          }
+        },
+        "description": "Manages permissions for an access key on a Garage S3 bucket.",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    },
+    "garage_key": {
+      "block": {
+        "attributes": {
+          "id": {
+            "computed": true,
+            "description": "The access key ID. If not provided, one will be generated.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "computed": true,
+            "description": "A human-friendly name for the access key.",
+            "description_kind": "markdown",
+            "optional": true,
+            "type": "string"
+          },
+          "secret_access_key": {
+            "computed": true,
+            "description": "The secret access key. If not provided, one will be generated (only available on creation).",
+            "description_kind": "markdown",
+            "optional": true,
+            "sensitive": true,
+            "type": "string"
+          }
+        },
+        "description": "Manages a Garage access key.",
+        "description_kind": "markdown"
+      },
+      "version": 0
+    }
+  },
+  "source": "jkossis/garage",
+  "version": "1.0.5"
+}
