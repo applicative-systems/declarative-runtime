@@ -212,7 +212,6 @@ let
       keycloak_realm = {
         prefix = "realm";
         nameAttr = "realm";
-        refs = { };
         # Computed identity attribute; nothing to declare.
         omit = [ "internal_id" ];
       };

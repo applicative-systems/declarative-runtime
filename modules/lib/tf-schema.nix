@@ -95,14 +95,14 @@ in
     `<name>` is the resource type without the provider's name, in the plural
     (`keycloak_realm` -> `realms`, `forgejo_repository` -> `repositories`).
 
-    An overlay's first two fields are mandatory; the rest default and exist
-    only to state what a schema cannot. There is deliberately no way to declare
+    Only `prefix` is mandatory; the other fields default and exist only to
+    state what a schema cannot. There is deliberately no way to declare
     an option with no schema counterpart -- `refs` is the sole exception, and
     that is what makes the drift check total.
 
       prefix         unique Terraform label prefix
-      refs           schema attribute -> reference spec (see below)
 
+      refs           schema attribute -> reference spec (see below)
       description    what the resource is, for the collection's NixOS option.
                      Defaults to the provider's own description, else to a
                      stub; the sentence on what a key means is always
@@ -171,6 +171,7 @@ in
         o:
         {
           scope = null;
+          refs = { };
           oneOfRefs = [ ];
           omit = [ ];
           extraSecrets = [ ];

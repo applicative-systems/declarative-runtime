@@ -86,7 +86,6 @@ let
       forgejo_organization = {
         prefix = "org";
         scope = "write:organization";
-        refs = { };
       };
       forgejo_user = {
         prefix = "user";
@@ -97,7 +96,6 @@ let
           "write:admin"
           "read:user"
         ];
-        refs = { };
       };
       forgejo_repository = {
         prefix = "repo";
@@ -193,7 +191,6 @@ let
       forgejo_gpg_key = {
         prefix = "gpg_key";
         scope = "write:user";
-        refs = { };
         description = "Forgejo GPG keys for the authenticated user.";
       };
     };
