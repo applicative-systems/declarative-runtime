@@ -3,8 +3,8 @@
 # The resource surface is *derived* from the vendored provider schema
 # (./provider-schema.json, parsed by ./schema.nix) via
 # ../../modules/lib/tf-schema.nix. What stays hand-written is only what a schema
-# cannot state: the NixOS-facing collection descriptions, the reference graph
-# between collections, the Forgejo token scope each resource needs, and the odd
+# cannot state: the reference graph between collections, the Forgejo token
+# scope each resource needs, the odd description that adds a fact, and the odd
 # documented correction. A provider bump that adds, removes or retypes anything
 # is then an eval-time error rather than an apply-time surprise.
 #
@@ -76,7 +76,7 @@ let
   #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   scope        Forgejo token scope(s) required to manage the resource
   #   refs         parent links resolved to references against managed siblings
-  #   description  the collection's NixOS option description
+  #   description  replaces the generated description, only to add a fact
   generated = tfSchema.mkResourceTypes {
     schema = import ./schema.nix;
     inherit provider runtimePrefix;

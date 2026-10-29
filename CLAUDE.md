@@ -167,7 +167,7 @@ keycloak pairings encode.
   | every settable attribute, its Nix type and optionality               | `refs` — the reference graph, which no schema carries               |
   | the collection name: `keycloak_realm` -> `realms`                    | `nameAttr`, only where the key fills an attribute other than `name` |
   | nested blocks as submodules, `blockAttrs` wrapping                   | `scope`, where the provider's token has scopes                      |
-  | `secrets` (schema `sensitive`) and `requiredSecrets`                 | `description`, only to replace the provider's own                   |
+  | `secrets` (schema `sensitive`) and `requiredSecrets`                 | `description`, only to add a fact the generated one lacks           |
   | descriptions: the provider's own (else a stub), plus a docs link     | corrections: see the next bullet                                    |
   | each reference's option name, list-ness, optionality and description |                                                                     |
 

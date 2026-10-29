@@ -4,9 +4,9 @@
 # attribute added, removed or retyped upstream only surfaces when `tofu apply`
 # fails on someone's machine -- if at all. reflecting the schema instead turns
 # every such change into an eval-time error at `nix flake check`, and leaves a
-# pairing carrying only what a schema cannot express: the NixOS-facing
-# descriptions, the reference graph between collections, and a short list of
-# documented corrections (the "overlay").
+# pairing carrying only what a schema cannot express: the reference graph
+# between collections, the odd description that adds a fact, and a short list
+# of documented corrections (the "overlay").
 #
 # split of responsibility: `nix-tf-schema` knows schema facts (which attributes
 # are settable, both nesting dialects, TF type -> Nix type). everything here is
