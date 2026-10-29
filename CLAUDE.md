@@ -162,14 +162,14 @@ keycloak pairings encode.
   `modules/lib/default.nix` already consumes. `resources` is keyed by resource
   type, and `{ }` models a type as the schema has it. Split of responsibility:
 
-  | Derived from the schema                                             | Hand-written in the overlay                                         |
-  | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-  | every settable attribute, its Nix type and optionality              | `refs` — the reference graph, which no schema carries               |
-  | the collection name: `keycloak_realm` -> `realms`                   | `nameAttr`, only where the key fills an attribute other than `name` |
-  | nested blocks as submodules, `blockAttrs` wrapping                  | `scope`, where the provider's token has scopes                      |
-  | `secrets` (schema `sensitive`) and `requiredSecrets`                | `description`, only to replace the provider's own                   |
-  | attribute and collection descriptions (provider's own, else a stub) | corrections: see the next bullet                                    |
-  | each reference's option name, list-ness and optionality             |                                                                     |
+  | Derived from the schema                                              | Hand-written in the overlay                                         |
+  | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+  | every settable attribute, its Nix type and optionality               | `refs` — the reference graph, which no schema carries               |
+  | the collection name: `keycloak_realm` -> `realms`                    | `nameAttr`, only where the key fills an attribute other than `name` |
+  | nested blocks as submodules, `blockAttrs` wrapping                   | `scope`, where the provider's token has scopes                      |
+  | `secrets` (schema `sensitive`) and `requiredSecrets`                 | `description`, only to replace the provider's own                   |
+  | attribute and collection descriptions (provider's own, else a stub)  | corrections: see the next bullet                                    |
+  | each reference's option name, list-ness, optionality and description |                                                                     |
 
 - Corrections a collection may declare, all of them optional and all validated
   against the schema: `omit` (dotted paths to drop), `extraSecrets` /
@@ -238,11 +238,12 @@ readers are exercised in-tree:
   to `${type.key.field}` interpolations — this both wires the numeric `*_id`
   attributes a user cannot know _and_ orders `tofu apply`. `refs` is keyed by
   the schema attribute a reference fills, and an entry is
-  `{ targets; managedOnly; required ? <schema>; description; }`, each target a
-  `{ type; field; }`. The option the user sets is named after the attribute
-  (`realm_id` -> `realm`, `group_ids` -> `groups`), and its list-ness and
-  optionality come from the schema; `required` may only be set to differ from
-  it. `managedOnly` references (numeric ids) must resolve to a managed sibling
+  `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`, each
+  target a `{ type; field; }`. The option the user sets is named after the
+  attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and its list-ness,
+  optionality and description come from the schema; `required` may only be set
+  to differ from it, and `description` only replaces the attribute's own text --
+  the sentences on which keys the option takes are generated. `managedOnly` references (numeric ids) must resolve to a managed sibling
   (generation throws otherwise); name references accept a managed key _or_ a
   literal.
 - `<svc>TfConfig cfg` returns `{ config; credentials; }`. `config` carries **no

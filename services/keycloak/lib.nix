@@ -35,7 +35,19 @@ let
       }
     ];
     managedOnly = true;
-    description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) this belongs to.";
+  };
+
+  # authorization resources, scopes, permissions and policies live on an
+  # openid_client's resource server.
+  resourceServerRef = {
+    targets = [
+      {
+        type = "keycloak_openid_client";
+        field = "resource_server_id";
+      }
+    ];
+    managedOnly = true;
+    description = "The OpenID client that hosts this, as an authorization resource server. The client must enable authorization.";
   };
 
   # optional refs to a managed openid_client / openid_client_scope, used by
@@ -48,7 +60,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Optional managed OpenID client this mapper attaches to.";
   };
   openidClientScopeOptionalRef = {
     targets = [
@@ -58,7 +69,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Optional managed OpenID client scope this mapper attaches to.";
   };
   # protocol mappers attach to a client *or* a client scope -- never
   # both, never neither (the provider rejects either).
@@ -78,7 +88,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Optional managed SAML client this mapper attaches to.";
   };
   samlClientScopeOptionalRef = {
     targets = [
@@ -88,7 +97,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Optional managed SAML client scope this mapper attaches to.";
   };
 
   # identity providers reference the realm by its alias (name) -- the
@@ -101,7 +109,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
   };
 
   # every ldap_*_mapper resolves its parent federation by id.
@@ -113,7 +120,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Key of the managed LDAP user federation (services.keycloak.runtime.ldap_user_federations.<name>) this mapper attaches to.";
   };
 
   # IdP mappers reference an IdP by alias; the alias can belong to
@@ -158,7 +164,6 @@ let
       }
     ];
     managedOnly = false;
-    description = "Alias of the managed identity provider (in any IdP collection) this mapper attaches to, or a literal alias.";
   };
 
   # generic mappers attach to either an openid or a saml client/scope.
@@ -176,7 +181,6 @@ let
       }
     ];
     managedOnly = false;
-    description = "Optional managed client (openid or saml) this mapper attaches to.";
   };
   anyClientScopeOptionalRef = {
     targets = [
@@ -190,7 +194,6 @@ let
       }
     ];
     managedOnly = false;
-    description = "Optional managed client scope (openid or saml) this mapper attaches to.";
   };
   # The keycloak/keycloak resource surface, keyed by resource type. Each type
   # becomes the collection `services.keycloak.runtime.<plural>`
@@ -224,7 +227,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Roles composited into this role. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
           # a role scoped to a client rather than to the realm.
           client_id = anyClientOptionalRef;
@@ -242,7 +244,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Role names auto-granted to every new user. Each entry is a managed role key (resolved to its name) or a literal role name (built-ins like 'offline_access' work as literals).";
           };
         };
         description = "Realm-level default roles auto-granted to new users.";
@@ -258,7 +259,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Optional parent group (key of another managed group) for nested groups.";
           };
           organization_id = {
             targets = [
@@ -268,7 +268,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Optional organization (key of a managed organization) this group belongs to.";
           };
         };
       };
@@ -283,7 +282,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Groups new users auto-join. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
         description = "Realm-level default groups auto-joined by new users.";
@@ -302,7 +300,6 @@ let
             # the schema marks `group_id` optional, but a membership needs a
             # group to add its members to.
             required = true;
-            description = "Key of the managed group (services.keycloak.runtime.groups.<name>) the members are added to.";
           };
           members = {
             targets = [
@@ -312,7 +309,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Users to add to the group. Each entry is a managed user key (resolved to its username) or a literal username.";
           };
         };
       };
@@ -327,7 +323,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed group (services.keycloak.runtime.groups.<name>) to assign roles to.";
           };
           role_ids = {
             targets = [
@@ -337,7 +332,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Roles granted to the group. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
         description = "Role assignments for a group.";
@@ -358,7 +352,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed user (services.keycloak.runtime.users.<name>) to assign roles to.";
           };
           role_ids = {
             targets = [
@@ -368,7 +361,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Roles granted to the user. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
         description = "Role assignments for a user.";
@@ -384,7 +376,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed user (services.keycloak.runtime.users.<name>) to add to groups.";
           };
           group_ids = {
             targets = [
@@ -394,7 +385,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Groups the user joins. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
         description = "Group memberships for a user.";
@@ -427,7 +417,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
           };
           default_scopes = {
             targets = [
@@ -437,7 +426,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Scopes attached by default. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name (built-ins like 'profile' / 'email' work as literals).";
           };
         };
         description = "Default OAuth2 scopes auto-attached to a client.";
@@ -453,7 +441,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
           };
           optional_scopes = {
             targets = [
@@ -463,7 +450,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Optionally-attached scopes. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
         description = "Optional OAuth2 scopes available to a client.";
@@ -479,7 +465,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed target client whose role is granted.";
           };
         };
         description = "Grant a per-client role to a service-account user.";
@@ -508,7 +493,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed SAML client (services.keycloak.runtime.saml_clients.<name>) the scope binding applies to.";
           };
           default_scopes = {
             targets = [
@@ -518,7 +502,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "SAML scopes attached by default. Each entry is a managed saml_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
         description = "Default SAML scopes auto-attached to a SAML client.";
@@ -804,7 +787,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Alias of the parent flow (managed key or literal alias).";
           };
         };
         description = "Authentication subflows nested under a parent flow.";
@@ -824,7 +806,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Alias of the parent flow / subflow (managed key or literal alias).";
           };
         };
         description = "Authentication executions inside a flow / subflow.";
@@ -841,7 +822,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed authentication_execution (services.keycloak.runtime.authentication_executions.<name>) this config attaches to.";
           };
         };
         description = "Per-execution configuration map.";
@@ -853,80 +833,35 @@ let
       keycloak_openid_client_authorization_resource = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client (with authorization enabled) hosting this resource.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Authorization resources hosted on an openid_client's resource server.";
       };
       keycloak_openid_client_authorization_scope = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client (with authorization enabled) hosting this scope.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Authorization scopes on an openid_client's resource server.";
       };
       keycloak_openid_client_authorization_permission = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client (with authorization enabled) hosting this permission.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Authorization permissions tying resources/scopes to policies.";
       };
       keycloak_openid_client_aggregate_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this aggregate policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Aggregate policy combining other policies under a decision strategy.";
       };
       keycloak_openid_client_client_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access to a specific set of clients.";
         requiredAttrs = [
@@ -936,16 +871,7 @@ let
       keycloak_openid_client_authorization_client_scope_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access by client scope membership; each scope block is `{ id; required = false; }`.";
         requiredAttrs = [
@@ -955,48 +881,21 @@ let
       keycloak_openid_client_group_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access by group membership; each group block is `{ id; path; extend_children; }`.";
       };
       keycloak_openid_client_regex_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access when a token claim matches a regular expression.";
       };
       keycloak_openid_client_role_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access by realm or client role membership; each role block is `{ id; required = false; }`.";
         requiredAttrs = [
@@ -1006,48 +905,21 @@ let
       keycloak_openid_client_time_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access within a time window.";
       };
       keycloak_generic_client_authorization_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Generic (provider-typed) authorization policy on an openid_client's resource server, selected by `type`.";
       };
       keycloak_openid_client_js_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "JavaScript-based authorization policy (evaluates `code`) on an openid_client's resource server.";
       };
@@ -1172,16 +1044,7 @@ let
       keycloak_openid_client_user_policy = {
         refs = {
           realm_id = realmRef;
-          resource_server_id = {
-            targets = [
-              {
-                type = "keycloak_openid_client";
-                field = "resource_server_id";
-              }
-            ];
-            managedOnly = true;
-            description = "Key of the managed openid_client hosting this policy.";
-          };
+          resource_server_id = resourceServerRef;
         };
         description = "Policy granting access to a specific set of users.";
       };
@@ -1212,7 +1075,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Scope names auto-attached as default to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
         description = "Realm-wide default client-scope binding (set of scope names). Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
@@ -1232,7 +1094,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Scope names available as optional to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
         description = "Realm-wide optional client-scope binding (set of scope names).";
@@ -1266,7 +1127,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Names of client-policy profiles this policy applies. Each entry is a managed realm_client_policy_profile key (resolved to its name) or a literal profile name.";
           };
         };
         description = "Realm client-policy policy binding a set of profiles to a set of conditions.";
@@ -1282,7 +1142,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed group these fine-grained permissions apply to.";
           };
         };
         # every scope_* attr is a MaxItems:1 nested block.
@@ -1299,7 +1158,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed openid_client these fine-grained permissions apply to.";
           };
         };
         description = "Fine-grained authorization permissions on an openid_client; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
@@ -1319,7 +1177,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Groups this admin permission applies to. Each entry is a managed group key (resolved to its id) or a literal group UUID; leave empty to target all groups in the realm.";
           };
         };
         description = "Fine-grained admin permission over groups; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
@@ -1335,7 +1192,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Clients this admin permission applies to. Each entry is a managed openid_client key (resolved to its id) or a literal client UUID; leave empty to target all clients in the realm.";
           };
         };
         description = "Fine-grained admin permission over openid_clients; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
@@ -1351,7 +1207,6 @@ let
               }
             ];
             managedOnly = false;
-            description = "Roles this admin permission applies to. Each entry is a managed role key (resolved to its id) or a literal role UUID; leave empty to target all roles in the realm.";
           };
         };
         description = "Fine-grained admin permission over roles; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";

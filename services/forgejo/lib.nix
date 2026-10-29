@@ -27,8 +27,8 @@ let
   # they fill. `targets` are the managed collections (in priority order) whose
   # key the user names; `field` is the referenced attribute. `managedOnly`
   # references (numeric ids) MUST resolve to a managed sibling -- there is no
-  # literal a user could supply. Option name, list-ness and optionality come
-  # from the schema.
+  # literal a user could supply. Option name, list-ness, optionality and
+  # description come from the schema.
   repoRef = {
     targets = [
       {
@@ -37,7 +37,6 @@ let
       }
     ];
     managedOnly = true;
-    description = "Key of the managed repository (services.forgejo.runtime.repositories.<name>) this belongs to.";
   };
   orgNameRef = {
     targets = [
@@ -50,7 +49,9 @@ let
     # the schema marks `organization` optional because `organization_id` may
     # stand in for it; with `organization_id` omitted, it is the only way.
     required = true;
-    description = "Owning organization: the key of a managed organization, or a literal organization name.";
+    # the provider's own text tells the user to set `organization_id` as an
+    # alternative, which this module omits.
+    description = "Name of the owning organization. Changing this forces a new resource to be created.";
   };
   userRef = {
     targets = [
@@ -60,7 +61,6 @@ let
       }
     ];
     managedOnly = false;
-    description = "Target user: the key of a managed user, or a literal username.";
   };
 
   # The provider accepts an owning organization either by name or by numeric id
@@ -108,7 +108,7 @@ let
             }
           ];
           managedOnly = false;
-          description = "Repository owner: the key of a managed organization or user, a literal owner name, or null for the authenticated user.";
+          description = "Owner of the repository (user or organization), or null for the authenticated user. Changing this forces a new resource to be created.";
         };
       };
       forgejo_team = {
@@ -127,7 +127,6 @@ let
               }
             ];
             managedOnly = true;
-            description = "Key of the managed team (services.forgejo.runtime.teams.<name>) the member is added to.";
           };
           user = userRef;
         };

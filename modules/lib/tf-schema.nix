@@ -121,14 +121,17 @@ in
       requiredAttrs  extra non-empty checks
       extraAttrs     last-resort typed overrides; keys must name real attributes
 
-    A reference spec is `{ targets; managedOnly; description; required ? <schema>; }`,
+    A reference spec is
+    `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`,
     keyed by the schema attribute it fills. Each target is
     `{ type; field; }`: a modelled resource type, and the attribute of it that
     the reference resolves to. The option the user sets is named
     after that attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and
     whether it takes a list comes from the attribute's type. `required` defaults
     to the attribute's own flag and may only be set to differ from it -- for
-    a reference that stands in for an `ExactlyOneOf` pair, say.
+    a reference that stands in for an `ExactlyOneOf` pair, say. `description`
+    replaces the attribute's own description, and only that: the sentences on
+    which keys the option takes, and on any `oneOfRefs` group, are generated.
 
     Returns `{ resourceTypes; checks; coverage; }`. `checks` is a list of
     null-or-throw, `deepSeq`'d into `resourceTypes`, so merely forcing the
@@ -437,15 +440,7 @@ in
             attr: r:
             let
               node = tree.${attr} or null;
-            in
-            lib.nameValuePair (refOptionName attr) {
-              inherit attr;
-              inherit (r) managedOnly description;
-              # the renderer addresses a target by its collection.
-              targets = map (t: {
-                collection = collectionName t.type;
-                inherit (t) field;
-              }) r.targets;
+              option = refOptionName attr;
               list =
                 node != null
                 && node.kind == "attr"
@@ -453,6 +448,40 @@ in
                   "list"
                   "set"
                 ];
+              # what the attribute is, then how the user names it.
+              what = r.description or (if node != null then node.description else "");
+              targetList = concatStringsSep " or " (
+                map (
+                  t: "`${runtimePrefix}.${collectionName t.type}.<key>` (resolved to its `${t.field}`)"
+                ) r.targets
+              );
+              how = concatStringsSep " " (
+                [
+                  "${if list then "Each entry is the" else "The"} key of a managed ${targetList}${
+                    lib.optionalString (!r.managedOnly)
+                      ", or a literal `${attr}` ${if list then "element" else "value"}"
+                  }."
+                ]
+                ++ lib.optional (option != attr) "It fills the provider attribute `${attr}`."
+                ++ map (
+                  group: "Set exactly one of ${concatStringsSep " and " (map (a: "`${refOptionName a}`") group)}."
+                ) (filter (elem attr) o.oneOfRefs)
+              );
+            in
+            lib.nameValuePair option {
+              inherit attr list;
+              inherit (r) managedOnly;
+              description = concatStringsSep "\n\n" (
+                filter (s: s != "") [
+                  what
+                  how
+                ]
+              );
+              # the renderer addresses a target by its collection.
+              targets = map (t: {
+                collection = collectionName t.type;
+                inherit (t) field;
+              }) r.targets;
               required = r.required or (node != null && node.required);
             }
           ) o.refs;
