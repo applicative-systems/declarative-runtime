@@ -87,7 +87,6 @@ let
         prefix = "org";
         scope = "write:organization";
         refs = { };
-        description = "Forgejo organizations, keyed by organization name.";
       };
       forgejo_user = {
         prefix = "user";
@@ -99,7 +98,6 @@ let
           "read:user"
         ];
         refs = { };
-        description = "Forgejo users, keyed by login. Requires administrative privileges.";
       };
       forgejo_repository = {
         prefix = "repo";
@@ -118,14 +116,12 @@ let
           managedOnly = false;
           description = "Repository owner: the key of a managed organization or user, a literal owner name, or null for the authenticated user.";
         };
-        description = "Forgejo repositories, keyed by repository name.";
       };
       forgejo_team = {
         prefix = "team";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
-        description = "Forgejo organization teams, keyed by team name.";
       };
       forgejo_team_member = {
         prefix = "team_member";
@@ -143,7 +139,6 @@ let
           };
           user = userRef;
         };
-        description = "Forgejo team memberships, keyed by an arbitrary label.";
       };
       forgejo_collaborator = {
         prefix = "collab";
@@ -152,63 +147,54 @@ let
           repository_id = repoRef;
           user = userRef;
         };
-        description = "Forgejo repository collaborators, keyed by an arbitrary label.";
       };
       forgejo_branch_protection = {
         prefix = "branch_protection";
         scope = "write:repository";
         refs.repository_id = repoRef;
-        description = "Forgejo branch protections, keyed by an arbitrary label.";
       };
       forgejo_deploy_key = {
         prefix = "deploy_key";
         scope = "write:repository";
         refs.repository_id = repoRef;
-        description = "Forgejo repository deploy keys, keyed by an arbitrary label.";
       };
       forgejo_repository_webhook = {
         prefix = "repo_webhook";
         scope = "write:repository";
         refs.repository_id = repoRef;
-        description = "Forgejo repository webhooks, keyed by an arbitrary label.";
       };
       forgejo_repository_action_secret = {
         prefix = "repo_action_secret";
         scope = "write:repository";
         refs.repository_id = repoRef;
-        description = "Forgejo repository Actions secrets, keyed by secret name.";
       };
       forgejo_repository_action_variable = {
         prefix = "repo_action_var";
         scope = "write:repository";
         refs.repository_id = repoRef;
-        description = "Forgejo repository Actions variables, keyed by variable name.";
       };
       forgejo_organization_action_secret = {
         prefix = "org_action_secret";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
-        description = "Forgejo organization Actions secrets, keyed by secret name.";
       };
       forgejo_organization_action_variable = {
         prefix = "org_action_var";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
-        description = "Forgejo organization Actions variables, keyed by variable name.";
       };
       forgejo_ssh_key = {
         prefix = "ssh_key";
         scope = "write:admin";
         refs.user = userRef;
-        description = "Forgejo user SSH keys, keyed by an arbitrary label. Requires administrative privileges.";
       };
       forgejo_gpg_key = {
         prefix = "gpg_key";
         scope = "write:user";
         refs = { };
-        description = "Forgejo GPG keys for the authenticated user, keyed by an arbitrary label.";
+        description = "Forgejo GPG keys for the authenticated user.";
       };
     };
   };

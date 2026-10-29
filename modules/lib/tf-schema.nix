@@ -95,14 +95,18 @@ in
     `<name>` is the resource type without the provider's name, in the plural
     (`keycloak_realm` -> `realms`, `forgejo_repository` -> `repositories`).
 
-    An overlay's first three fields are mandatory; the rest default and exist
+    An overlay's first two fields are mandatory; the rest default and exist
     only to state what a schema cannot. There is deliberately no way to declare
     an option with no schema counterpart -- `refs` is the sole exception, and
     that is what makes the drift check total.
 
       prefix         unique Terraform label prefix
       refs           schema attribute -> reference spec (see below)
-      description    the collection's NixOS option description
+
+      description    what the resource is, for the collection's NixOS option.
+                     Defaults to the provider's own description, else to a
+                     stub; the sentence on what a key means is always
+                     generated, so it does not go here.
 
       nameAttr       attribute the collection key fills in. Defaults to `name`
                      when the resource has a settable string `name`, else null;
@@ -203,6 +207,16 @@ in
             attr: tree ? ${attr} && tree.${attr}.kind == "attr" && flatten tree.${attr}.tfType == [ "string" ];
           defaultNameAttr = if isStringAttr "name" then "name" else null;
           nameAttr = o.nameAttr or defaultNameAttr;
+
+          description = concatStringsSep "\n\n" [
+            (o.description or resourceSchema.block.description or "`${type}` resources.")
+            (
+              if nameAttr == null then
+                "Each key is an arbitrary label."
+              else
+                "Each key sets the instance's `${nameAttr}`, unless the instance sets `${nameAttr}` itself."
+            )
+          ];
 
           # attributes the reference inputs occupy: the user names a sibling
           # collection key and generation fills these in, so they must not also
@@ -450,9 +464,8 @@ in
               type
               prefix
               scope
-              description
               ;
-            inherit nameAttr refs;
+            inherit nameAttr description refs;
             oneOfRefs = map (map refOptionName) o.oneOfRefs;
             inherit
               secrets
@@ -465,7 +478,8 @@ in
 
           # what the pairing covers, for the generated coverage report.
           coverage = {
-            inherit (o) type prefix description;
+            inherit (o) type prefix;
+            inherit description;
             options = length (attrNames spec.attrs);
             attributes = length (attrNames tree);
             omitted = sortStrings o.omit;

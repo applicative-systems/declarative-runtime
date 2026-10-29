@@ -213,7 +213,6 @@ let
         prefix = "realm";
         nameAttr = "realm";
         refs = { };
-        description = "Keycloak realms, keyed by realm name.";
         # Computed identity attribute; nothing to declare.
         omit = [ "internal_id" ];
       };
@@ -234,7 +233,7 @@ let
           # a role scoped to a client rather than to the realm.
           client_id = anyClientOptionalRef;
         };
-        description = "Keycloak roles (realm-level by default), keyed by role name.";
+        description = "Keycloak roles (realm-level by default).";
       };
       keycloak_default_roles = {
         prefix = "default_roles";
@@ -251,7 +250,7 @@ let
             description = "Role names auto-granted to every new user. Each entry is a managed role key (resolved to its name) or a literal role name (built-ins like 'offline_access' work as literals).";
           };
         };
-        description = "Realm-level default roles auto-granted to new users, keyed by an arbitrary label.";
+        description = "Realm-level default roles auto-granted to new users.";
       };
       keycloak_group = {
         prefix = "group";
@@ -278,7 +277,6 @@ let
             description = "Optional organization (key of a managed organization) this group belongs to.";
           };
         };
-        description = "Keycloak groups, keyed by group name.";
       };
       keycloak_default_groups = {
         prefix = "default_groups";
@@ -295,7 +293,7 @@ let
             description = "Groups new users auto-join. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
-        description = "Realm-level default groups auto-joined by new users, keyed by an arbitrary label.";
+        description = "Realm-level default groups auto-joined by new users.";
       };
       keycloak_group_memberships = {
         prefix = "group_membership";
@@ -325,7 +323,6 @@ let
             description = "Users to add to the group. Each entry is a managed user key (resolved to its username) or a literal username.";
           };
         };
-        description = "Keycloak group memberships, keyed by an arbitrary label.";
       };
       keycloak_group_roles = {
         prefix = "group_roles";
@@ -352,13 +349,13 @@ let
             description = "Roles granted to the group. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
-        description = "Role assignments for a group, keyed by an arbitrary label.";
+        description = "Role assignments for a group.";
       };
       keycloak_user = {
         prefix = "user";
         nameAttr = "username";
         refs.realm_id = realmRef;
-        description = "Keycloak users, keyed by username (must be lowercase).";
+        description = "Keycloak users. A username must be lowercase.";
       };
       keycloak_user_roles = {
         prefix = "user_roles";
@@ -385,7 +382,7 @@ let
             description = "Roles granted to the user. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
-        description = "Role assignments for a user, keyed by an arbitrary label.";
+        description = "Role assignments for a user.";
       };
       keycloak_user_groups = {
         prefix = "user_groups";
@@ -412,23 +409,20 @@ let
             description = "Groups the user joins. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
-        description = "Group memberships for a user, keyed by an arbitrary label.";
+        description = "Group memberships for a user.";
       };
       keycloak_openid_client_scope = {
         prefix = "openid_client_scope";
         refs.realm_id = realmRef;
-        description = "OpenID client scopes (per-realm), keyed by scope name.";
       };
       keycloak_saml_client_scope = {
         prefix = "saml_client_scope";
         refs.realm_id = realmRef;
-        description = "SAML client scopes (per-realm), keyed by scope name.";
       };
       keycloak_openid_client = {
         prefix = "openid_client";
         nameAttr = "client_id";
         refs.realm_id = realmRef;
-        description = "OpenID Connect clients (per-realm), keyed by clientId.";
         # Write-only twins of `client_secret`: they take an ephemeral value,
         # which a rendered `.tf.json` cannot carry. `client_secretFile` covers
         # the same ground through `LoadCredential=`.
@@ -462,7 +456,7 @@ let
             description = "Scopes attached by default. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name (built-ins like 'profile' / 'email' work as literals).";
           };
         };
-        description = "Default OAuth2 scopes auto-attached to a client, keyed by an arbitrary label.";
+        description = "Default OAuth2 scopes auto-attached to a client.";
       };
       keycloak_openid_client_optional_scopes = {
         prefix = "openid_client_optional_scopes";
@@ -489,7 +483,7 @@ let
             description = "Optionally-attached scopes. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
-        description = "Optional OAuth2 scopes available to a client, keyed by an arbitrary label.";
+        description = "Optional OAuth2 scopes available to a client.";
       };
       keycloak_openid_client_service_account_role = {
         prefix = "openid_client_sa_role";
@@ -506,12 +500,12 @@ let
             description = "Key of the managed target client whose role is granted.";
           };
         };
-        description = "Grant a per-client role to a service-account user, keyed by an arbitrary label.";
+        description = "Grant a per-client role to a service-account user.";
       };
       keycloak_openid_client_service_account_realm_role = {
         prefix = "openid_client_sa_realm_role";
         refs.realm_id = realmRef;
-        description = "Grant a realm-level role to a service-account user, keyed by an arbitrary label.";
+        description = "Grant a realm-level role to a service-account user.";
       };
       keycloak_saml_client = {
         prefix = "saml_client";
@@ -519,7 +513,6 @@ let
         refs.realm_id = realmRef;
         # signing_private_key isn't marked Sensitive upstream but is a
         # private key; expose <attr>File so it stays out of the store.
-        description = "SAML clients (per-realm), keyed by clientId.";
         extraSecrets = [
           "signing_private_key"
         ];
@@ -549,7 +542,7 @@ let
             description = "SAML scopes attached by default. Each entry is a managed saml_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
-        description = "Default SAML scopes auto-attached to a SAML client, keyed by an arbitrary label.";
+        description = "Default SAML scopes auto-attached to a SAML client.";
       };
       # OpenID protocol mappers: one collection per mapper type. all share
       # realm + (client | client_scope) refs.
@@ -723,7 +716,7 @@ let
           client_id = anyClientOptionalRef;
           client_scope_id = anyClientScopeOptionalRef;
         };
-        description = "Generic role-scope mapper that attaches a role to a client / client scope, keyed by an arbitrary label.";
+        description = "Generic role-scope mapper that attaches a role to a client / client scope.";
         oneOfRefs = clientOrScopeOneOf;
       };
       keycloak_generic_client_role_mapper = {
@@ -740,7 +733,7 @@ let
         prefix = "oidc_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "Generic OIDC identity providers (per-realm), keyed by alias.";
+        description = "Generic OIDC identity providers.";
         # Write-only twins of `client_secret`: they take an ephemeral value,
         # which a rendered `.tf.json` cannot carry. `client_secretFile` covers
         # the same ground through `LoadCredential=`.
@@ -753,49 +746,41 @@ let
         prefix = "saml_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "SAML identity providers (per-realm), keyed by alias.";
       };
       keycloak_oidc_google_identity_provider = {
         prefix = "oidc_google_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "Google OIDC identity providers (per-realm), keyed by alias (defaults to 'google').";
       };
       keycloak_oidc_facebook_identity_provider = {
         prefix = "oidc_facebook_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "Facebook OIDC identity providers (per-realm), keyed by alias (defaults to 'facebook').";
       };
       keycloak_oidc_github_identity_provider = {
         prefix = "oidc_github_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "GitHub OIDC identity providers (per-realm), keyed by alias (defaults to 'github').";
       };
       keycloak_oidc_microsoft_identity_provider = {
         prefix = "oidc_microsoft_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "Microsoft OIDC identity providers (per-realm), keyed by alias (defaults to 'microsoft').";
       };
       keycloak_kubernetes_identity_provider = {
         prefix = "kubernetes_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "Kubernetes OIDC identity providers (per-realm), keyed by alias.";
       };
       keycloak_oidc_openshift_v4_identity_provider = {
         prefix = "oidc_openshift_v4_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "OpenShift 4 OIDC identity providers (per-realm), keyed by alias (defaults to 'openshift-v4').";
       };
       keycloak_spiffe_identity_provider = {
         prefix = "spiffe_idp";
         nameAttr = "alias";
         refs.realm = realmAliasRef;
-        description = "SPIFFE identity providers (per-realm), keyed by alias.";
       };
       keycloak_hardcoded_attribute_identity_provider_mapper = {
         prefix = "hardcoded_attribute_idp_mapper";
@@ -857,7 +842,7 @@ let
         prefix = "authentication_flow";
         nameAttr = "alias";
         refs.realm_id = realmRef;
-        description = "Top-level authentication flows (per-realm), keyed by alias.";
+        description = "Top-level authentication flows.";
       };
       keycloak_authentication_subflow = {
         prefix = "authentication_subflow";
@@ -879,7 +864,7 @@ let
             description = "Alias of the parent flow (managed key or literal alias).";
           };
         };
-        description = "Authentication subflows nested under a parent flow, keyed by alias.";
+        description = "Authentication subflows nested under a parent flow.";
       };
       keycloak_authentication_execution = {
         prefix = "authentication_execution";
@@ -900,7 +885,7 @@ let
             description = "Alias of the parent flow / subflow (managed key or literal alias).";
           };
         };
-        description = "Authentication executions inside a flow / subflow, keyed by an arbitrary label.";
+        description = "Authentication executions inside a flow / subflow.";
       };
       keycloak_authentication_execution_config = {
         prefix = "authentication_execution_config";
@@ -918,12 +903,12 @@ let
             description = "Key of the managed authentication_execution (services.keycloak.runtime.authentication_executions.<name>) this config attaches to.";
           };
         };
-        description = "Per-execution configuration map, keyed by config alias.";
+        description = "Per-execution configuration map.";
       };
       keycloak_authentication_bindings = {
         prefix = "authentication_bindings";
         refs.realm_id = realmRef;
-        description = "Realm-level authentication flow bindings (browser / registration / direct grant / etc.), keyed by an arbitrary label.";
+        description = "Realm-level authentication flow bindings (browser / registration / direct grant / etc.).";
       };
       keycloak_openid_client_authorization_resource = {
         prefix = "openid_client_authz_resource";
@@ -1141,7 +1126,6 @@ let
       keycloak_ldap_user_federation = {
         prefix = "ldap_user_federation";
         refs.realm_id = realmRef;
-        description = "LDAP user federations (per-realm), keyed by name.";
       };
       keycloak_ldap_user_attribute_mapper = {
         prefix = "ldap_user_attribute_mapper";
@@ -1297,18 +1281,16 @@ let
         prefix = "required_action";
         nameAttr = "alias";
         refs.realm_id = realmRef;
-        description = "Realm required actions (per-realm), keyed by alias.";
       };
       keycloak_realm_events = {
         prefix = "realm_events";
         refs.realm_id = realmRef;
-        description = "Per-realm event logging configuration, keyed by an arbitrary label.";
+        description = "Per-realm event logging configuration.";
       };
       keycloak_realm_localization = {
         prefix = "realm_localization";
         nameAttr = "locale";
         refs.realm_id = realmRef;
-        description = "Per-realm i18n message bundle, keyed by locale.";
       };
       keycloak_realm_default_client_scopes = {
         prefix = "realm_default_client_scopes";
@@ -1329,7 +1311,7 @@ let
             description = "Scope names auto-attached as default to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
-        description = "Realm-wide default client-scope binding (set of scope names), keyed by an arbitrary label. Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
+        description = "Realm-wide default client-scope binding (set of scope names). Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
       };
       keycloak_realm_optional_client_scopes = {
         prefix = "realm_optional_client_scopes";
@@ -1350,12 +1332,12 @@ let
             description = "Scope names available as optional to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
-        description = "Realm-wide optional client-scope binding (set of scope names), keyed by an arbitrary label.";
+        description = "Realm-wide optional client-scope binding (set of scope names).";
       };
       keycloak_organization = {
         prefix = "organization";
         refs.realm = realmAliasRef;
-        description = "Keycloak organizations (per-realm, requires the organizations feature), keyed by name.";
+        description = "Keycloak organizations. They require the organizations feature.";
       };
       keycloak_identity_provider_token_exchange_scope_permission = {
         prefix = "idp_token_exchange_perm";
@@ -1367,7 +1349,7 @@ let
         refs.realm_id = realmRef;
         # nested block inside a list element; wrapBlocks recurses through
         # the list, so the dotted path matches.
-        description = "Per-realm user-profile schema (attribute declarations + groups). Keyed by an arbitrary label (one resource per realm).";
+        description = "Per-realm user-profile schema (attribute declarations + groups). Declare one resource per realm.";
       };
       keycloak_realm_client_policy_profile = {
         prefix = "realm_client_policy_profile";
@@ -1490,12 +1472,12 @@ let
       keycloak_realm_client_registration_policy = {
         prefix = "realm_client_registration_policy";
         refs.realm_id = realmRef;
-        description = "Per-realm client-registration policy (`provider_id` selects the policy type, `sub_type` its anonymous/authenticated scope, `config` its settings), keyed by name.";
+        description = "Per-realm client-registration policy (`provider_id` selects the policy type, `sub_type` its anonymous/authenticated scope, `config` its settings).";
       };
       keycloak_workflow = {
         prefix = "workflow";
         refs.realm = realmAliasRef;
-        description = "Realm workflows: an event trigger (`on`) plus an ordered list of `step` actions, keyed by workflow name.";
+        description = "Realm workflows: an event trigger (`on`) plus an ordered list of `step` actions.";
       };
     };
   };
