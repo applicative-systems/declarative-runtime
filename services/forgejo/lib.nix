@@ -32,7 +32,7 @@ let
   repoRef = {
     targets = [
       {
-        type = "forgejo_repository";
+        type = "repository";
         field = "id";
       }
     ];
@@ -41,7 +41,7 @@ let
   orgNameRef = {
     targets = [
       {
-        type = "forgejo_organization";
+        type = "organization";
         field = "name";
       }
     ];
@@ -56,7 +56,7 @@ let
   userRef = {
     targets = [
       {
-        type = "forgejo_user";
+        type = "user";
         field = "login";
       }
     ];
@@ -69,10 +69,11 @@ let
   # than offered as a way to violate that constraint.
   omitOrgId = [ "organization_id" ];
 
-  # The svalabs/forgejo resource surface, keyed by resource type. Each type
+  # The svalabs/forgejo resource surface, keyed by resource name: the resource
+  # type without `forgejo_`, as the provider docs give it. Each resource
   # becomes the collection `services.forgejo.runtime.<plural>`
-  # (`forgejo_repository` -> `repositories`). Per type, only the facts the schema does not
-  # carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
+  # (`repository` -> `repositories`). Per resource, only the facts the
+  # schema does not carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
   #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   scope        Forgejo token scope(s) required to manage the resource
   #   refs         parent links resolved to references against managed siblings
@@ -82,10 +83,10 @@ let
     inherit provider runtimePrefix;
     source = providerSource;
     resources = {
-      forgejo_organization = {
+      organization = {
         scope = "write:organization";
       };
-      forgejo_user = {
+      user = {
         nameAttr = "login";
         # Create goes through the admin API (write:admin); the provider reads the
         # user back via /users/search (read:user), a separate scope category.
@@ -94,16 +95,16 @@ let
           "read:user"
         ];
       };
-      forgejo_repository = {
+      repository = {
         scope = "write:repository";
         refs.owner = {
           targets = [
             {
-              type = "forgejo_organization";
+              type = "organization";
               field = "name";
             }
             {
-              type = "forgejo_user";
+              type = "user";
               field = "login";
             }
           ];
@@ -111,18 +112,18 @@ let
           description = "Owner of the repository (user or organization), or null for the authenticated user. Changing this forces a new resource to be created.";
         };
       };
-      forgejo_team = {
+      team = {
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
-      forgejo_team_member = {
+      team_member = {
         scope = "write:organization";
         refs = {
           team_id = {
             targets = [
               {
-                type = "forgejo_team";
+                type = "team";
                 field = "id";
               }
             ];
@@ -131,48 +132,48 @@ let
           user = userRef;
         };
       };
-      forgejo_collaborator = {
+      collaborator = {
         scope = "write:repository";
         refs = {
           repository_id = repoRef;
           user = userRef;
         };
       };
-      forgejo_branch_protection = {
+      branch_protection = {
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
-      forgejo_deploy_key = {
+      deploy_key = {
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
-      forgejo_repository_webhook = {
+      repository_webhook = {
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
-      forgejo_repository_action_secret = {
+      repository_action_secret = {
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
-      forgejo_repository_action_variable = {
+      repository_action_variable = {
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
-      forgejo_organization_action_secret = {
+      organization_action_secret = {
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
-      forgejo_organization_action_variable = {
+      organization_action_variable = {
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
-      forgejo_ssh_key = {
+      ssh_key = {
         scope = "write:admin";
         refs.user = userRef;
       };
-      forgejo_gpg_key = {
+      gpg_key = {
         scope = "write:user";
         description = "Forgejo GPG keys for the authenticated user.";
       };

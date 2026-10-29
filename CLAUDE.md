@@ -160,7 +160,9 @@ keycloak pairings encode.
   `tfSchema.mkResourceTypes { schema; provider; source; runtimePrefix; resources; unsupported ? {}; omitEverywhere ? []; }`
   returns `{ resourceTypes; checks; coverage; }` in exactly the shape
   `modules/lib/default.nix` already consumes. `resources` is keyed by resource
-  type, and `{ }` models a type as the schema has it. Split of responsibility:
+  name -- the resource type without the provider's name, as the provider docs
+  give it (`realm` for `keycloak_realm`) -- and `{ }` models a resource as the
+  schema has it. `unsupported` and reference targets use the same names. Split of responsibility:
 
   | Derived from the schema                                              | Hand-written in the overlay                                         |
   | -------------------------------------------------------------------- | ------------------------------------------------------------------- |

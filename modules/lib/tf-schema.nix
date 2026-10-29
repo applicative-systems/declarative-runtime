@@ -84,16 +84,17 @@ in
                      the vendored schema
       source         provider source address, e.g. "svalabs/forgejo"
       runtimePrefix  "services.<svc>.runtime" -- for error messages
-      resources      schema resource type -> overlay (see below)
-      unsupported    schema resource type -> non-empty reason for not modelling it
+      resources      resource name -> overlay (see below)
+      unsupported    resource name -> non-empty reason for not modelling it
       omitEverywhere dotted paths dropped from every collection that declares
                      them. For dialect artifacts that repeat across the whole
                      provider -- the sdk/v2 synthetic `id`, say -- not as a
                      shortcut for per-collection `omit`.
 
-    Each resource becomes the collection `services.<svc>.runtime.<name>`, where
-    `<name>` is the resource type without the provider's name, in the plural
-    (`keycloak_realm` -> `realms`, `forgejo_repository` -> `repositories`).
+    A resource name is the schema's resource type without the provider's
+    name, as the provider docs give it: `realm` for `keycloak_realm`. Each
+    resource becomes the collection `services.<svc>.runtime.<names>`, its name
+    in the plural (`realm` -> `realms`, `repository` -> `repositories`).
 
     Every field is optional and exists only to state what a schema cannot;
     `{ }` models a resource as the schema has it. The collection key is the
@@ -126,7 +127,7 @@ in
     A reference spec is
     `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`,
     keyed by the schema attribute it fills. Each target is
-    `{ type; field; }`: a modelled resource type, and the attribute of it that
+    `{ type; field; }`: a modelled resource name, and the attribute of it that
     the reference resolves to. The option the user sets is named
     after that attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and
     whether it takes a list comes from the attribute's type. `required` defaults
@@ -170,6 +171,20 @@ in
           "${s}s";
 
       collectionName = type: pluralize (lib.removePrefix "${providerName}_" type);
+
+      # the overlay names a resource without the provider's name, as the
+      # provider docs do; the schema and the generated JSON name it in full.
+      typeOf = name: "${providerName}_${name}";
+      withFullTargets =
+        o:
+        o
+        // lib.optionalAttrs (o ? refs) {
+          refs = lib.mapAttrs (
+            _: refSpec: refSpec // { targets = map (t: t // { type = typeOf t.type; }) refSpec.targets; }
+          ) o.refs;
+        };
+      modelled = lib.mapAttrs' (name: o: lib.nameValuePair (typeOf name) (withFullTargets o)) resources;
+      unsupportedByType = lib.mapAttrs' (name: lib.nameValuePair (typeOf name)) unsupported;
 
       withDefaults =
         o:
@@ -418,9 +433,9 @@ in
           ]
           ++ mapAttrsToList (
             attr: refSpec:
-            check (lib.all (t: resources ? ${t.type}) refSpec.targets)
+            check (lib.all (t: modelled ? ${t.type}) refSpec.targets)
               "${ctx}: ref `${attr}` targets ${
-                quoteList (filter (t: !(resources ? ${t})) (map (t: t.type) refSpec.targets))
+                quoteList (filter (t: !(modelled ? ${t})) (map (t: t.type) refSpec.targets))
               }, which ${runtimePrefix} does not model"
           ) o.refs
           ++ mapAttrsToList (
@@ -527,17 +542,16 @@ in
             ;
         };
 
-      built = lib.mapAttrs' (type: o: lib.nameValuePair (collectionName type) (mkOne type o)) resources;
+      built = lib.mapAttrs' (type: o: lib.nameValuePair (collectionName type) (mkOne type o)) modelled;
 
       # -----------------------------------------------------------------------
       # provider-wide assertions
       # -----------------------------------------------------------------------
 
-      allTypes = attrNames resources;
+      allTypes = attrNames modelled;
       allCollections = map collectionName allTypes;
-      foreignTypes = filter (t: !(lib.hasPrefix "${providerName}_" t)) allTypes;
       schemaTypes = attrNames schema.resource_schemas;
-      unsupportedTypes = attrNames unsupported;
+      unsupportedTypes = attrNames unsupportedByType;
 
       unclaimed = subtractLists (allTypes ++ unsupportedTypes) schemaTypes;
 
@@ -562,11 +576,6 @@ in
           "`omitEverywhere` lists ${quoteList staleOmit}, which no modelled resource of ${source} ${provider.version} declares"
         )
 
-        (check (foreignTypes == [ ])
-          "`resources` names ${quoteList foreignTypes}, which ${
-            if length foreignTypes == 1 then "does" else "do"
-          } not start with `${providerName}_`"
-        )
         (check (
           duplicates allCollections == [ ]
         ) "collection ${quoteList (duplicates allCollections)} would hold more than one resource type")
@@ -583,11 +592,11 @@ in
             if length (filter (t: elem t allTypes) unsupportedTypes) == 1 then "is" else "are"
           } both modelled and listed in `unsupported`"
         )
-        (check (filter (t: unsupported.${t} == "") unsupportedTypes == [ ])
+        (check (filter (t: unsupportedByType.${t} == "") unsupportedTypes == [ ])
           "`unsupported` entries need a non-empty reason; ${
-            quoteList (filter (t: unsupported.${t} == "") unsupportedTypes)
+            quoteList (filter (t: unsupportedByType.${t} == "") unsupportedTypes)
           } ${
-            if length (filter (t: unsupported.${t} == "") unsupportedTypes) == 1 then "has" else "have"
+            if length (filter (t: unsupportedByType.${t} == "") unsupportedTypes) == 1 then "has" else "have"
           } none"
         )
       ];
@@ -604,9 +613,9 @@ in
         inherit
           source
           runtimePrefix
-          unsupported
           omitEverywhere
           ;
+        unsupported = unsupportedByType;
         inherit (provider) version;
         schemaResources = length schemaTypes;
         collections = lib.mapAttrs (_: r: r.coverage) built;
