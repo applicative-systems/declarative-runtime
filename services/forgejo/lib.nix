@@ -23,13 +23,13 @@ let
   tokenVar = "forgejo_api_token";
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
 
-  # Reference specs, reused across resources. `attr` is the Terraform attribute
-  # emitted; `targets` are the managed collections (in priority order) whose key
-  # the user names; `field` is the referenced attribute. `managedOnly` references
-  # (numeric ids) MUST resolve to a managed sibling -- there is no literal a user
-  # could supply. `required` declares the reference input as a required option.
+  # Reference specs, reused across resources and keyed there by the attribute
+  # they fill. `targets` are the managed collections (in priority order) whose
+  # key the user names; `field` is the referenced attribute. `managedOnly`
+  # references (numeric ids) MUST resolve to a managed sibling -- there is no
+  # literal a user could supply. Option name, list-ness and optionality come
+  # from the schema.
   repoRef = {
-    attr = "repository_id";
     targets = [
       {
         collection = "repositories";
@@ -37,11 +37,9 @@ let
       }
     ];
     managedOnly = true;
-    required = true;
     description = "Key of the managed repository (services.forgejo.runtime.repositories.<name>) this belongs to.";
   };
   orgNameRef = {
-    attr = "organization";
     targets = [
       {
         collection = "organizations";
@@ -49,11 +47,12 @@ let
       }
     ];
     managedOnly = false;
+    # the schema marks `organization` optional because `organization_id` may
+    # stand in for it; with `organization_id` omitted, it is the only way.
     required = true;
     description = "Owning organization: the key of a managed organization, or a literal organization name.";
   };
   userRef = {
-    attr = "user";
     targets = [
       {
         collection = "users";
@@ -61,7 +60,6 @@ let
       }
     ];
     managedOnly = false;
-    required = true;
     description = "Target user: the key of a managed user, or a literal username.";
   };
 
@@ -112,7 +110,6 @@ let
         nameAttr = "name";
         scope = "write:repository";
         refs.owner = {
-          attr = "owner";
           targets = [
             {
               collection = "organizations";
@@ -124,7 +121,6 @@ let
             }
           ];
           managedOnly = false;
-          required = false;
           description = "Repository owner: the key of a managed organization or user, a literal owner name, or null for the authenticated user.";
         };
         description = "Forgejo repositories, keyed by repository name.";
@@ -144,8 +140,7 @@ let
         nameAttr = null;
         scope = "write:organization";
         refs = {
-          team = {
-            attr = "team_id";
+          team_id = {
             targets = [
               {
                 collection = "teams";
@@ -153,7 +148,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed team (services.forgejo.runtime.teams.<name>) the member is added to.";
           };
           user = userRef;
@@ -166,7 +160,7 @@ let
         nameAttr = null;
         scope = "write:repository";
         refs = {
-          repository = repoRef;
+          repository_id = repoRef;
           user = userRef;
         };
         description = "Forgejo repository collaborators, keyed by an arbitrary label.";
@@ -176,7 +170,7 @@ let
         prefix = "branch_protection";
         nameAttr = null;
         scope = "write:repository";
-        refs.repository = repoRef;
+        refs.repository_id = repoRef;
         description = "Forgejo branch protections, keyed by an arbitrary label.";
       };
       deploy_keys = {
@@ -184,7 +178,7 @@ let
         prefix = "deploy_key";
         nameAttr = null;
         scope = "write:repository";
-        refs.repository = repoRef;
+        refs.repository_id = repoRef;
         description = "Forgejo repository deploy keys, keyed by an arbitrary label.";
       };
       repository_webhooks = {
@@ -192,7 +186,7 @@ let
         prefix = "repo_webhook";
         nameAttr = null;
         scope = "write:repository";
-        refs.repository = repoRef;
+        refs.repository_id = repoRef;
         description = "Forgejo repository webhooks, keyed by an arbitrary label.";
       };
       repository_action_secrets = {
@@ -200,7 +194,7 @@ let
         prefix = "repo_action_secret";
         nameAttr = "name";
         scope = "write:repository";
-        refs.repository = repoRef;
+        refs.repository_id = repoRef;
         description = "Forgejo repository Actions secrets, keyed by secret name.";
       };
       repository_action_variables = {
@@ -208,7 +202,7 @@ let
         prefix = "repo_action_var";
         nameAttr = "name";
         scope = "write:repository";
-        refs.repository = repoRef;
+        refs.repository_id = repoRef;
         description = "Forgejo repository Actions variables, keyed by variable name.";
       };
       organization_action_secrets = {

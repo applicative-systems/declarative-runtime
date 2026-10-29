@@ -55,6 +55,23 @@ let
   duplicates = xs: unique (filter (x: lib.count (y: y == x) xs > 1) xs);
 
   quoteList = xs: concatStringsSep ", " (map (x: "`${x}`") xs);
+
+  # the option name a reference input takes, from the attribute it fills: the
+  # user names a managed key, not an id, so the id suffix goes.
+  #   realm_id -> realm, parent_flow_alias -> parent_flow, group_ids -> groups
+  refOptionName =
+    attr:
+    let
+      strip = suffix: lib.removeSuffix suffix attr;
+    in
+    if lib.hasSuffix "_ids" attr then
+      "${strip "_ids"}s"
+    else if lib.hasSuffix "_id" attr then
+      strip "_id"
+    else if lib.hasSuffix "_alias" attr then
+      strip "_alias"
+    else
+      attr;
 in
 {
   /*
@@ -83,16 +100,24 @@ in
       prefix         unique Terraform label prefix
       nameAttr       attribute defaulted from the collection key, or null
       scope          provider token scope(s) the resource needs, or null
-      refs           parent links (shape unchanged; see ./default.nix)
+      refs           schema attribute -> reference spec (see below)
       description    the collection's NixOS option description
 
-      oneOfRefs      ExactlyOneOf ref groups (a Go validator, absent from schemas)
+      oneOfRefs      ExactlyOneOf groups of `refs` attributes (a Go validator,
+                     absent from schemas)
       omit           dotted paths to drop entirely
       extraSecrets   paths to treat as secret although not marked `sensitive`
       notSecrets     `sensitive` paths not to treat as secret
       forceOptional  paths required upstream but nullable here
       requiredAttrs  extra non-empty checks
       extraAttrs     last-resort typed overrides; keys must name real attributes
+
+    A reference spec is `{ targets; managedOnly; description; required ? <schema>; }`,
+    keyed by the schema attribute it fills. The option the user sets is named
+    after that attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and
+    whether it takes a list comes from the attribute's type. `required` defaults
+    to the attribute's own flag and may only be set to differ from it -- for
+    a reference that stands in for an `ExactlyOneOf` pair, say.
 
     Returns `{ resourceTypes; checks; coverage; }`. `checks` is a list of
     null-or-throw, `deepSeq`'d into `resourceTypes`, so merely forcing the
@@ -147,7 +172,7 @@ in
           # attributes the reference inputs occupy: the user names a sibling
           # collection key and generation fills these in, so they must not also
           # be settable options.
-          refConsumed = mapAttrsToList (_: r: r.attr) o.refs;
+          refConsumed = attrNames o.refs;
           # the global list is filtered to what this resource has, so it needs
           # no per-collection opt-in; the check that it names something real
           # runs once, provider-wide.
@@ -308,7 +333,15 @@ in
             (namesPaths "`forceOptional`" o.forceOptional allPaths)
             (namesPaths "`requiredAttrs`" o.requiredAttrs (attrNames tree))
             (namesPaths "`extraAttrs`" (attrNames o.extraAttrs) (attrNames tree))
-            (namesPaths "`refs.*.attr`" refConsumed (attrNames tree))
+            (namesPaths "`refs`" refConsumed (attrNames tree))
+            (check (duplicates refOptionNames == [ ])
+              "${ctx}: refs ${quoteList refConsumed} derive the same option name ${quoteList (duplicates refOptionNames)}"
+            )
+            (check (filter (n: elem n topLevel) refOptionNames == [ ])
+              "${ctx}: ref option ${
+                quoteList (filter (n: elem n topLevel) refOptionNames)
+              } would shadow a settable attribute of the same name"
+            )
             (check (filter (p: elem p sensitivePaths) o.extraSecrets == [ ])
               "${ctx}: `extraSecrets` lists ${
                 quoteList (filter (p: elem p sensitivePaths) o.extraSecrets)
@@ -332,11 +365,16 @@ in
             )
           ]
           ++ mapAttrsToList (
-            refName: refSpec:
+            attr: refSpec:
             check (lib.all (t: resources ? ${t.collection}) refSpec.targets)
-              "${ctx}: ref `${refName}` targets ${
+              "${ctx}: ref `${attr}` targets ${
                 quoteList (filter (c: !(resources ? ${c})) (map (t: t.collection) refSpec.targets))
               }, which ${runtimePrefix} does not define"
+          ) o.refs
+          ++ mapAttrsToList (
+            attr: refSpec:
+            check (!(refSpec ? required) || !(tree ? ${attr}) || refSpec.required != tree.${attr}.required)
+              "${ctx}: ref `${attr}` sets `required = ${lib.boolToString refSpec.required}`, which the schema already says; drop it"
           ) o.refs
           ++ map (
             group:
@@ -346,16 +384,40 @@ in
               }, which ${ctx} does not declare as refs"
           ) o.oneOfRefs;
 
+          # the overlay keys refs by schema attribute; the renderer wants them
+          # keyed by the option the user sets, with list-ness and optionality
+          # read off the schema.
+          refs = lib.mapAttrs' (
+            attr: r:
+            let
+              node = tree.${attr} or null;
+            in
+            lib.nameValuePair (refOptionName attr) {
+              inherit attr;
+              inherit (r) targets managedOnly description;
+              list =
+                node != null
+                && node.kind == "attr"
+                && elem (lib.head (flatten node.tfType)) [
+                  "list"
+                  "set"
+                ];
+              required = r.required or (node != null && node.required);
+            }
+          ) o.refs;
+
+          refOptionNames = map refOptionName refConsumed;
+
           spec = {
             inherit (o)
               type
               prefix
               nameAttr
               scope
-              refs
               description
-              oneOfRefs
               ;
+            inherit refs;
+            oneOfRefs = map (map refOptionName) o.oneOfRefs;
             inherit
               secrets
               requiredSecrets

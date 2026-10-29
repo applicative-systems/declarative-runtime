@@ -169,7 +169,7 @@ nested-secret indirection at once.
       group_roles.eng = {
         realm = "staff";
         group = "eng";
-        role_ids = [ "engineer" ];   # managed key, resolved to id
+        roles = [ "engineer" ];   # managed key, resolved to id
       };
 
       users.alice = {
@@ -254,17 +254,17 @@ blocks `smtp_server`, `internationalization`, `security_defenses`,
 
 ### Roles, groups, users
 
-| Option              | `keycloak_*` resource | Key defaults | Reference inputs                              |
-| ------------------- | --------------------- | ------------ | --------------------------------------------- |
-| `roles`             | `role`                | `name`       | `realm`, `composite_roles` → roles            |
-| `default_roles`     | `default_roles`       | —            | `realm`, `default_roles` → roles              |
-| `groups`            | `group`               | `name`       | `realm`, `parent` → groups                    |
-| `default_groups`    | `default_groups`      | —            | `realm`, `group_ids` → groups                 |
-| `group_memberships` | `group_memberships`   | —            | `realm`, `group` → groups, `members` → users  |
-| `group_roles`       | `group_roles`         | —            | `realm`, `group` → groups, `role_ids` → roles |
-| `users`             | `user`                | `username`   | `realm`                                       |
-| `user_roles`        | `user_roles`          | —            | `realm`, `user` → users, `role_ids` → roles   |
-| `user_groups`       | `user_groups`         | —            | `realm`, `user` → users, `group_ids` → groups |
+| Option              | `keycloak_*` resource | Key defaults | Reference inputs                             |
+| ------------------- | --------------------- | ------------ | -------------------------------------------- |
+| `roles`             | `role`                | `name`       | `realm`, `composite_roles` → roles           |
+| `default_roles`     | `default_roles`       | —            | `realm`, `default_roles` → roles             |
+| `groups`            | `group`               | `name`       | `realm`, `parent` → groups                   |
+| `default_groups`    | `default_groups`      | —            | `realm`, `groups` → groups                   |
+| `group_memberships` | `group_memberships`   | —            | `realm`, `group` → groups, `members` → users |
+| `group_roles`       | `group_roles`         | —            | `realm`, `group` → groups, `roles` → roles   |
+| `users`             | `user`                | `username`   | `realm`                                      |
+| `user_roles`        | `user_roles`          | —            | `realm`, `user` → users, `roles` → roles     |
+| `user_groups`       | `user_groups`         | —            | `realm`, `user` → users, `groups` → groups   |
 
 ### Clients, scopes, service accounts
 

@@ -50,7 +50,7 @@
     group_roles.acme_eng_admins = {
       realm = "acme";
       group = "acme_eng";
-      role_ids = [ "acme_engineer" ]; # managed key
+      roles = [ "acme_engineer" ]; # managed key
       exhaustive = true;
     };
 
@@ -66,13 +66,13 @@
     user_roles.acme_alice = {
       realm = "acme";
       user = "acme_alice";
-      role_ids = [ "acme_engineer" ];
+      roles = [ "acme_engineer" ];
       exhaustive = false;
     };
     user_groups.acme_alice = {
       realm = "acme";
       user = "acme_alice";
-      group_ids = [ "acme_eng" ]; # managed key
+      groups = [ "acme_eng" ]; # managed key
       exhaustive = false;
     };
   };

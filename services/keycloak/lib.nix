@@ -28,7 +28,6 @@ let
   # most non-realm resources reference their realm by numeric id, which
   # the user can't know up front -- resolve it by managed key instead.
   realmRef = {
-    attr = "realm_id";
     targets = [
       {
         collection = "realms";
@@ -36,14 +35,12 @@ let
       }
     ];
     managedOnly = true;
-    required = true;
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) this belongs to.";
   };
 
   # optional refs to a managed openid_client / openid_client_scope, used by
   # all openid protocol mappers (mutually exclusive at the provider).
   openidClientOptionalRef = {
-    attr = "client_id";
     targets = [
       {
         collection = "openid_clients";
@@ -51,11 +48,9 @@ let
       }
     ];
     managedOnly = true;
-    required = false;
     description = "Optional managed OpenID client this mapper attaches to.";
   };
   openidClientScopeOptionalRef = {
-    attr = "client_scope_id";
     targets = [
       {
         collection = "openid_client_scopes";
@@ -63,21 +58,19 @@ let
       }
     ];
     managedOnly = true;
-    required = false;
     description = "Optional managed OpenID client scope this mapper attaches to.";
   };
   # protocol mappers attach to a client *or* a client scope -- never
   # both, never neither (the provider rejects either).
   clientOrScopeOneOf = [
     [
-      "client"
-      "client_scope"
+      "client_id"
+      "client_scope_id"
     ]
   ];
 
   # SAML counterparts of the openid refs above.
   samlClientOptionalRef = {
-    attr = "client_id";
     targets = [
       {
         collection = "saml_clients";
@@ -85,11 +78,9 @@ let
       }
     ];
     managedOnly = true;
-    required = false;
     description = "Optional managed SAML client this mapper attaches to.";
   };
   samlClientScopeOptionalRef = {
-    attr = "client_scope_id";
     targets = [
       {
         collection = "saml_client_scopes";
@@ -97,14 +88,12 @@ let
       }
     ];
     managedOnly = true;
-    required = false;
     description = "Optional managed SAML client scope this mapper attaches to.";
   };
 
   # identity providers reference the realm by its alias (name) -- the
   # provider's `realm` attribute, not `realm_id`.
   realmAliasRef = {
-    attr = "realm";
     targets = [
       {
         collection = "realms";
@@ -112,13 +101,11 @@ let
       }
     ];
     managedOnly = true;
-    required = true;
     description = "Key of the managed realm (services.keycloak.runtime.realms.<name>) the IdP lives in.";
   };
 
   # every ldap_*_mapper resolves its parent federation by id.
   ldapFederationIdRef = {
-    attr = "ldap_user_federation_id";
     targets = [
       {
         collection = "ldap_user_federations";
@@ -126,14 +113,12 @@ let
       }
     ];
     managedOnly = true;
-    required = true;
     description = "Key of the managed LDAP user federation (services.keycloak.runtime.ldap_user_federations.<name>) this mapper attaches to.";
   };
 
   # IdP mappers reference an IdP by alias; the alias can belong to
   # any of the nine IdP collections.
   idpAliasRequiredRef = {
-    attr = "identity_provider_alias";
     targets = [
       {
         collection = "oidc_identity_providers";
@@ -173,7 +158,6 @@ let
       }
     ];
     managedOnly = false;
-    required = true;
     description = "Alias of the managed identity provider (in any IdP collection) this mapper attaches to, or a literal alias.";
   };
 
@@ -181,7 +165,6 @@ let
   # multi-target: a managed key from either collection resolves; an
   # unknown string falls through as a literal.
   anyClientOptionalRef = {
-    attr = "client_id";
     targets = [
       {
         collection = "openid_clients";
@@ -193,11 +176,9 @@ let
       }
     ];
     managedOnly = false;
-    required = false;
     description = "Optional managed client (openid or saml) this mapper attaches to.";
   };
   anyClientScopeOptionalRef = {
-    attr = "client_scope_id";
     targets = [
       {
         collection = "openid_client_scopes";
@@ -209,7 +190,6 @@ let
       }
     ];
     managedOnly = false;
-    required = false;
     description = "Optional managed client scope (openid or saml) this mapper attaches to.";
   };
   # The keycloak/keycloak resource surface. Per collection, only the facts the
@@ -247,9 +227,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           composite_roles = {
-            attr = "composite_roles";
             targets = [
               {
                 collection = "roles";
@@ -257,12 +236,10 @@ let
               }
             ];
             managedOnly = false;
-            required = false;
-            list = true;
             description = "Roles composited into this role. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
           # a role scoped to a client rather than to the realm.
-          client = anyClientOptionalRef;
+          client_id = anyClientOptionalRef;
         };
         description = "Keycloak roles (realm-level by default), keyed by role name.";
       };
@@ -272,9 +249,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           default_roles = {
-            attr = "default_roles";
             targets = [
               {
                 collection = "roles";
@@ -282,8 +258,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Role names auto-granted to every new user. Each entry is a managed role key (resolved to its name) or a literal role name (built-ins like 'offline_access' work as literals).";
           };
         };
@@ -295,9 +269,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          parent = {
-            attr = "parent_id";
+          realm_id = realmRef;
+          parent_id = {
             targets = [
               {
                 collection = "groups";
@@ -305,11 +278,9 @@ let
               }
             ];
             managedOnly = true;
-            required = false;
             description = "Optional parent group (key of another managed group) for nested groups.";
           };
-          organization = {
-            attr = "organization_id";
+          organization_id = {
             targets = [
               {
                 collection = "organizations";
@@ -317,7 +288,6 @@ let
               }
             ];
             managedOnly = true;
-            required = false;
             description = "Optional organization (key of a managed organization) this group belongs to.";
           };
         };
@@ -329,9 +299,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           group_ids = {
-            attr = "group_ids";
             targets = [
               {
                 collection = "groups";
@@ -339,8 +308,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Groups new users auto-join. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
@@ -352,9 +319,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          group = {
-            attr = "group_id";
+          realm_id = realmRef;
+          group_id = {
             targets = [
               {
                 collection = "groups";
@@ -362,11 +328,12 @@ let
               }
             ];
             managedOnly = true;
+            # the schema marks `group_id` optional, but a membership needs a
+            # group to add its members to.
             required = true;
             description = "Key of the managed group (services.keycloak.runtime.groups.<name>) the members are added to.";
           };
           members = {
-            attr = "members";
             targets = [
               {
                 collection = "users";
@@ -374,8 +341,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Users to add to the group. Each entry is a managed user key (resolved to its username) or a literal username.";
           };
         };
@@ -387,9 +352,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          group = {
-            attr = "group_id";
+          realm_id = realmRef;
+          group_id = {
             targets = [
               {
                 collection = "groups";
@@ -397,11 +361,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed group (services.keycloak.runtime.groups.<name>) to assign roles to.";
           };
           role_ids = {
-            attr = "role_ids";
             targets = [
               {
                 collection = "roles";
@@ -409,8 +371,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Roles granted to the group. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
@@ -421,7 +381,7 @@ let
         prefix = "user";
         nameAttr = "username";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Keycloak users, keyed by username (must be lowercase).";
       };
       user_roles = {
@@ -430,9 +390,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          user = {
-            attr = "user_id";
+          realm_id = realmRef;
+          user_id = {
             targets = [
               {
                 collection = "users";
@@ -440,11 +399,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed user (services.keycloak.runtime.users.<name>) to assign roles to.";
           };
           role_ids = {
-            attr = "role_ids";
             targets = [
               {
                 collection = "roles";
@@ -452,8 +409,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Roles granted to the user. Each entry is a managed role key (resolved to its id) or a literal role UUID.";
           };
         };
@@ -465,9 +420,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          user = {
-            attr = "user_id";
+          realm_id = realmRef;
+          user_id = {
             targets = [
               {
                 collection = "users";
@@ -475,11 +429,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed user (services.keycloak.runtime.users.<name>) to add to groups.";
           };
           group_ids = {
-            attr = "group_ids";
             targets = [
               {
                 collection = "groups";
@@ -487,8 +439,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Groups the user joins. Each entry is a managed group key (resolved to its id) or a literal group UUID.";
           };
         };
@@ -499,7 +449,7 @@ let
         prefix = "openid_client_scope";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "OpenID client scopes (per-realm), keyed by scope name.";
       };
       saml_client_scopes = {
@@ -507,7 +457,7 @@ let
         prefix = "saml_client_scope";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "SAML client scopes (per-realm), keyed by scope name.";
       };
       openid_clients = {
@@ -515,7 +465,7 @@ let
         prefix = "openid_client";
         nameAttr = "client_id";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "OpenID Connect clients (per-realm), keyed by clientId.";
         # Write-only twins of `client_secret`: they take an ephemeral value,
         # which a rendered `.tf.json` cannot carry. `client_secretFile` covers
@@ -531,9 +481,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = {
-            attr = "client_id";
+          realm_id = realmRef;
+          client_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -541,11 +490,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
           };
           default_scopes = {
-            attr = "default_scopes";
             targets = [
               {
                 collection = "openid_client_scopes";
@@ -553,8 +500,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Scopes attached by default. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name (built-ins like 'profile' / 'email' work as literals).";
           };
         };
@@ -566,9 +511,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = {
-            attr = "client_id";
+          realm_id = realmRef;
+          client_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -576,11 +520,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed OpenID client (services.keycloak.runtime.openid_clients.<name>) the scope binding applies to.";
           };
           optional_scopes = {
-            attr = "optional_scopes";
             targets = [
               {
                 collection = "openid_client_scopes";
@@ -588,8 +530,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Optionally-attached scopes. Each entry is a managed openid_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
@@ -601,9 +541,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = {
-            attr = "client_id";
+          realm_id = realmRef;
+          client_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -611,7 +550,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed target client whose role is granted.";
           };
         };
@@ -622,7 +560,7 @@ let
         prefix = "openid_client_sa_realm_role";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Grant a realm-level role to a service-account user, keyed by an arbitrary label.";
       };
       saml_clients = {
@@ -630,7 +568,7 @@ let
         prefix = "saml_client";
         nameAttr = "client_id";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         # signing_private_key isn't marked Sensitive upstream but is a
         # private key; expose <attr>File so it stays out of the store.
         description = "SAML clients (per-realm), keyed by clientId.";
@@ -644,9 +582,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = {
-            attr = "client_id";
+          realm_id = realmRef;
+          client_id = {
             targets = [
               {
                 collection = "saml_clients";
@@ -654,11 +591,9 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed SAML client (services.keycloak.runtime.saml_clients.<name>) the scope binding applies to.";
           };
           default_scopes = {
-            attr = "default_scopes";
             targets = [
               {
                 collection = "saml_client_scopes";
@@ -666,8 +601,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "SAML scopes attached by default. Each entry is a managed saml_client_scope key (resolved to its name) or a literal scope name.";
           };
         };
@@ -681,9 +614,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps a user attribute to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -694,9 +627,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps a built-in user property (e.g. `email`, `username`) to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -707,9 +640,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps group memberships to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -720,9 +653,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that emits the user's full name as a single claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -733,9 +666,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper for the `sub` claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -746,9 +679,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that adds a hardcoded claim with a fixed value.";
         oneOfRefs = clientOrScopeOneOf;
@@ -759,9 +692,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that adds an audience to issued tokens (exactly one of `included_client_audience` / `included_custom_audience`).";
         oneOfRefs = clientOrScopeOneOf;
@@ -772,9 +705,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID audience-resolve mapper (derives audience from client roles).";
         oneOfRefs = clientOrScopeOneOf;
@@ -785,9 +718,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that adds a hardcoded role to issued tokens.";
         oneOfRefs = clientOrScopeOneOf;
@@ -798,9 +731,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps the user's realm roles to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -811,9 +744,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps the user's roles on a specific client to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -824,9 +757,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = openidClientOptionalRef;
-          client_scope = openidClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = openidClientOptionalRef;
+          client_scope_id = openidClientScopeOptionalRef;
         };
         description = "OpenID protocol mapper that maps a user session note to a claim.";
         oneOfRefs = clientOrScopeOneOf;
@@ -840,9 +773,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = samlClientOptionalRef;
-          client_scope = samlClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = samlClientOptionalRef;
+          client_scope_id = samlClientScopeOptionalRef;
         };
         description = "SAML mapper that exposes a user attribute as a SAML attribute.";
         oneOfRefs = clientOrScopeOneOf;
@@ -853,9 +786,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = samlClientOptionalRef;
-          client_scope = samlClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = samlClientOptionalRef;
+          client_scope_id = samlClientScopeOptionalRef;
         };
         description = "SAML mapper that exposes a built-in user property as a SAML attribute.";
         oneOfRefs = clientOrScopeOneOf;
@@ -866,9 +799,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = anyClientOptionalRef;
-          client_scope = anyClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = anyClientOptionalRef;
+          client_scope_id = anyClientScopeOptionalRef;
         };
         description = "Generic protocol mapper escape hatch (for mappers without a dedicated typed resource).";
         oneOfRefs = clientOrScopeOneOf;
@@ -879,9 +812,9 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          client = anyClientOptionalRef;
-          client_scope = anyClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = anyClientOptionalRef;
+          client_scope_id = anyClientScopeOptionalRef;
         };
         description = "Generic protocol mapper attached to a specific client (without a dedicated typed resource).";
         oneOfRefs = clientOrScopeOneOf;
@@ -892,9 +825,9 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = anyClientOptionalRef;
-          client_scope = anyClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = anyClientOptionalRef;
+          client_scope_id = anyClientScopeOptionalRef;
         };
         description = "Generic role-scope mapper that attaches a role to a client / client scope, keyed by an arbitrary label.";
         oneOfRefs = clientOrScopeOneOf;
@@ -905,9 +838,9 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = anyClientOptionalRef;
-          client_scope = anyClientScopeOptionalRef;
+          realm_id = realmRef;
+          client_id = anyClientOptionalRef;
+          client_scope_id = anyClientScopeOptionalRef;
         };
         description = "Generic role-scope mapper attached to a specific client (deprecated alias kept for completeness).";
         oneOfRefs = clientOrScopeOneOf;
@@ -998,7 +931,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Sets a hardcoded user (or session-note) attribute on every federated user.";
       };
@@ -1009,7 +942,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Adds every federated user to a hardcoded group.";
       };
@@ -1020,7 +953,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Grants a hardcoded role to every federated user.";
       };
@@ -1031,7 +964,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Imports an attribute / claim from the IdP onto the federated user.";
       };
@@ -1042,7 +975,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Grants a role to federated users whose IdP attribute / claim matches a value.";
       };
@@ -1053,7 +986,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Derives the federated user's username from a Mustache-style template over IdP claims.";
       };
@@ -1064,7 +997,7 @@ let
         scope = null;
         refs = {
           realm = realmAliasRef;
-          identity_provider = idpAliasRequiredRef;
+          identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Escape hatch for an IdP mapper implementation without a dedicated typed resource.";
       };
@@ -1073,7 +1006,7 @@ let
         prefix = "authentication_flow";
         nameAttr = "alias";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Top-level authentication flows (per-realm), keyed by alias.";
       };
       authentication_subflows = {
@@ -1082,9 +1015,8 @@ let
         nameAttr = "alias";
         scope = null;
         refs = {
-          realm = realmRef;
-          parent_flow = {
-            attr = "parent_flow_alias";
+          realm_id = realmRef;
+          parent_flow_alias = {
             targets = [
               {
                 collection = "authentication_flows";
@@ -1096,7 +1028,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
             description = "Alias of the parent flow (managed key or literal alias).";
           };
         };
@@ -1108,9 +1039,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          parent_flow = {
-            attr = "parent_flow_alias";
+          realm_id = realmRef;
+          parent_flow_alias = {
             targets = [
               {
                 collection = "authentication_flows";
@@ -1122,7 +1052,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
             description = "Alias of the parent flow / subflow (managed key or literal alias).";
           };
         };
@@ -1134,9 +1063,8 @@ let
         nameAttr = "alias";
         scope = null;
         refs = {
-          realm = realmRef;
-          execution = {
-            attr = "execution_id";
+          realm_id = realmRef;
+          execution_id = {
             targets = [
               {
                 collection = "authentication_executions";
@@ -1144,7 +1072,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed authentication_execution (services.keycloak.runtime.authentication_executions.<name>) this config attaches to.";
           };
         };
@@ -1155,7 +1082,7 @@ let
         prefix = "authentication_bindings";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Realm-level authentication flow bindings (browser / registration / direct grant / etc.), keyed by an arbitrary label.";
       };
       openid_client_authorization_resources = {
@@ -1164,9 +1091,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1174,7 +1100,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client (with authorization enabled) hosting this resource.";
           };
         };
@@ -1186,9 +1111,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1196,7 +1120,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client (with authorization enabled) hosting this scope.";
           };
         };
@@ -1208,9 +1131,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1218,7 +1140,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client (with authorization enabled) hosting this permission.";
           };
         };
@@ -1230,9 +1151,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1240,7 +1160,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this aggregate policy.";
           };
         };
@@ -1252,9 +1171,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1262,7 +1180,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1277,9 +1194,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1287,7 +1203,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1302,9 +1217,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1312,7 +1226,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1324,9 +1237,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1334,7 +1246,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1346,9 +1257,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1356,7 +1266,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1371,9 +1280,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1381,7 +1289,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1393,9 +1300,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1403,7 +1309,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1415,9 +1320,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1425,7 +1329,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1436,7 +1339,7 @@ let
         prefix = "ldap_user_federation";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "LDAP user federations (per-realm), keyed by name.";
       };
       ldap_user_attribute_mappers = {
@@ -1445,8 +1348,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps a keycloak user attribute to an LDAP attribute.";
       };
@@ -1456,8 +1359,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps LDAP groups onto keycloak groups.";
       };
@@ -1467,8 +1370,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps LDAP roles onto keycloak realm or client roles.";
       };
@@ -1478,8 +1381,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Grants a hardcoded role to every LDAP-federated user.";
       };
@@ -1489,8 +1392,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Sets a hardcoded user attribute on every LDAP-federated user.";
       };
@@ -1500,8 +1403,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Adds every LDAP-federated user to a hardcoded group.";
       };
@@ -1511,8 +1414,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "MSAD userAccountControl integration mapper (enables / disables and locks out users).";
       };
@@ -1522,8 +1425,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "MSAD LDS userAccountControl integration mapper.";
       };
@@ -1533,8 +1436,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Splits/joins a single LDAP full-name attribute into keycloak's first / last name fields.";
       };
@@ -1544,8 +1447,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Escape hatch for an LDAP mapper implementation without a dedicated typed resource.";
       };
@@ -1554,7 +1457,7 @@ let
         prefix = "custom_user_federation";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Custom user federation backed by a JPA / SPI provider.";
       };
       realm_keystore_aes_generateds = {
@@ -1562,7 +1465,7 @@ let
         prefix = "realm_keystore_aes_generated";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "AES keystore generated by Keycloak.";
       };
       realm_keystore_ecdsa_generateds = {
@@ -1570,7 +1473,7 @@ let
         prefix = "realm_keystore_ecdsa_generated";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "ECDSA keystore generated by Keycloak.";
       };
       realm_keystore_hmac_generateds = {
@@ -1578,7 +1481,7 @@ let
         prefix = "realm_keystore_hmac_generated";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "HMAC keystore generated by Keycloak.";
       };
       realm_keystore_java_keystores = {
@@ -1586,7 +1489,7 @@ let
         prefix = "realm_keystore_java_keystore";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Keystore backed by a Java KeyStore (JKS) file.";
         extraSecrets = [
           "key_password"
@@ -1598,7 +1501,7 @@ let
         prefix = "realm_keystore_rsa";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         # private_key and certificate are PEM material; expose <attr>File
         # for both even though only private_key is technically secret.
         description = "Keystore backed by an externally-provided RSA private key / certificate pair.";
@@ -1612,7 +1515,7 @@ let
         prefix = "realm_keystore_rsa_generated";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "RSA keystore generated by Keycloak.";
       };
       hardcoded_attribute_mappers = {
@@ -1621,8 +1524,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          ldap_user_federation = ldapFederationIdRef;
+          realm_id = realmRef;
+          ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Sets a hardcoded user attribute on every federated user. Distinct from ldap_hardcoded_attribute_mapper and hardcoded_attribute_identity_provider_mapper.";
       };
@@ -1632,9 +1535,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          resource_server = {
-            attr = "resource_server_id";
+          realm_id = realmRef;
+          resource_server_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1642,7 +1544,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client hosting this policy.";
           };
         };
@@ -1653,7 +1554,7 @@ let
         prefix = "required_action";
         nameAttr = "alias";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Realm required actions (per-realm), keyed by alias.";
       };
       realm_events = {
@@ -1661,7 +1562,7 @@ let
         prefix = "realm_events";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Per-realm event logging configuration, keyed by an arbitrary label.";
       };
       realm_localizations = {
@@ -1669,7 +1570,7 @@ let
         prefix = "realm_localization";
         nameAttr = "locale";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Per-realm i18n message bundle, keyed by locale.";
       };
       realm_default_client_scopes = {
@@ -1678,9 +1579,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           default_scopes = {
-            attr = "default_scopes";
             targets = [
               {
                 collection = "openid_client_scopes";
@@ -1692,8 +1592,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Scope names auto-attached as default to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
@@ -1705,9 +1603,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           optional_scopes = {
-            attr = "optional_scopes";
             targets = [
               {
                 collection = "openid_client_scopes";
@@ -1719,8 +1616,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Scope names available as optional to every new client. Each entry is a managed openid/saml client_scope key (resolved to its name) or a literal scope name.";
           };
         };
@@ -1739,7 +1634,7 @@ let
         prefix = "idp_token_exchange_perm";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Per-IdP token-exchange permission policy granting a set of clients access to the IdP's token-exchange scope.";
       };
       realm_user_profiles = {
@@ -1747,7 +1642,7 @@ let
         prefix = "realm_user_profile";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         # nested block inside a list element; wrapBlocks recurses through
         # the list, so the dotted path matches.
         description = "Per-realm user-profile schema (attribute declarations + groups). Keyed by an arbitrary label (one resource per realm).";
@@ -1757,7 +1652,7 @@ let
         prefix = "realm_client_policy_profile";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Realm client-policy profile, listing executors that enforce a client policy.";
       };
       realm_client_policy_profile_policies = {
@@ -1766,9 +1661,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
+          realm_id = realmRef;
           profiles = {
-            attr = "profiles";
             targets = [
               {
                 collection = "realm_client_policy_profiles";
@@ -1776,8 +1670,6 @@ let
               }
             ];
             managedOnly = false;
-            required = true;
-            list = true;
             description = "Names of client-policy profiles this policy applies. Each entry is a managed realm_client_policy_profile key (resolved to its name) or a literal profile name.";
           };
         };
@@ -1789,9 +1681,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          group = {
-            attr = "group_id";
+          realm_id = realmRef;
+          group_id = {
             targets = [
               {
                 collection = "groups";
@@ -1799,7 +1690,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed group these fine-grained permissions apply to.";
           };
         };
@@ -1812,9 +1702,8 @@ let
         nameAttr = null;
         scope = null;
         refs = {
-          realm = realmRef;
-          client = {
-            attr = "client_id";
+          realm_id = realmRef;
+          client_id = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1822,7 +1711,6 @@ let
               }
             ];
             managedOnly = true;
-            required = true;
             description = "Key of the managed openid_client these fine-grained permissions apply to.";
           };
         };
@@ -1833,7 +1721,7 @@ let
         prefix = "users_permissions";
         nameAttr = null;
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Fine-grained authorization permissions on the realm's users collection; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
       };
       group_admin_permissions = {
@@ -1842,9 +1730,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          groups = {
-            attr = "group_ids";
+          realm_id = realmRef;
+          group_ids = {
             targets = [
               {
                 collection = "groups";
@@ -1852,8 +1739,6 @@ let
               }
             ];
             managedOnly = false;
-            required = false;
-            list = true;
             description = "Groups this admin permission applies to. Each entry is a managed group key (resolved to its id) or a literal group UUID; leave empty to target all groups in the realm.";
           };
         };
@@ -1865,9 +1750,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          clients = {
-            attr = "client_ids";
+          realm_id = realmRef;
+          client_ids = {
             targets = [
               {
                 collection = "openid_clients";
@@ -1875,8 +1759,6 @@ let
               }
             ];
             managedOnly = false;
-            required = false;
-            list = true;
             description = "Clients this admin permission applies to. Each entry is a managed openid_client key (resolved to its id) or a literal client UUID; leave empty to target all clients in the realm.";
           };
         };
@@ -1888,9 +1770,8 @@ let
         nameAttr = "name";
         scope = null;
         refs = {
-          realm = realmRef;
-          roles = {
-            attr = "role_ids";
+          realm_id = realmRef;
+          role_ids = {
             targets = [
               {
                 collection = "roles";
@@ -1898,8 +1779,6 @@ let
               }
             ];
             managedOnly = false;
-            required = false;
-            list = true;
             description = "Roles this admin permission applies to. Each entry is a managed role key (resolved to its id) or a literal role UUID; leave empty to target all roles in the realm.";
           };
         };
@@ -1910,7 +1789,7 @@ let
         prefix = "users_admin_permissions";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Fine-grained admin permission over the realm's users; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
       };
       realm_client_registration_policies = {
@@ -1918,7 +1797,7 @@ let
         prefix = "realm_client_registration_policy";
         nameAttr = "name";
         scope = null;
-        refs.realm = realmRef;
+        refs.realm_id = realmRef;
         description = "Per-realm client-registration policy (`provider_id` selects the policy type, `sub_type` its anonymous/authenticated scope, `config` its settings), keyed by name.";
       };
       workflows = {
