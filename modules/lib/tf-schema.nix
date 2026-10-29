@@ -84,24 +84,30 @@ in
                      the vendored schema
       source         provider source address, e.g. "svalabs/forgejo"
       runtimePrefix  "services.<svc>.runtime" -- for error messages
-      resources      collection name -> overlay (see below)
+      resources      schema resource type -> overlay (see below)
       unsupported    schema resource type -> non-empty reason for not modelling it
       omitEverywhere dotted paths dropped from every collection that declares
                      them. For dialect artifacts that repeat across the whole
                      provider -- the sdk/v2 synthetic `id`, say -- not as a
                      shortcut for per-collection `omit`.
 
-    An overlay's first six fields are mandatory; the rest default to empty and
-    exist only to correct things a schema cannot state. There is deliberately no
-    way to declare an option with no schema counterpart -- `refs` is the sole
-    exception, and that is what makes the drift check total.
+    Each resource becomes the collection `services.<svc>.runtime.<name>`, where
+    `<name>` is the resource type without the provider's name, in the plural
+    (`keycloak_realm` -> `realms`, `forgejo_repository` -> `repositories`).
 
-      type           schema key; must exist and be claimed exactly once
+    An overlay's first three fields are mandatory; the rest default and exist
+    only to state what a schema cannot. There is deliberately no way to declare
+    an option with no schema counterpart -- `refs` is the sole exception, and
+    that is what makes the drift check total.
+
       prefix         unique Terraform label prefix
-      nameAttr       attribute defaulted from the collection key, or null
-      scope          provider token scope(s) the resource needs, or null
       refs           schema attribute -> reference spec (see below)
       description    the collection's NixOS option description
+
+      nameAttr       attribute the collection key fills in. Defaults to `name`
+                     when the resource has a settable string `name`, else null;
+                     set it only to differ from that default.
+      scope          provider token scope(s) the resource needs, or null
 
       oneOfRefs      ExactlyOneOf groups of `refs` attributes (a Go validator,
                      absent from schemas)
@@ -113,7 +119,9 @@ in
       extraAttrs     last-resort typed overrides; keys must name real attributes
 
     A reference spec is `{ targets; managedOnly; description; required ? <schema>; }`,
-    keyed by the schema attribute it fills. The option the user sets is named
+    keyed by the schema attribute it fills. Each target is
+    `{ type; field; }`: a modelled resource type, and the attribute of it that
+    the reference resolves to. The option the user sets is named
     after that attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and
     whether it takes a list comes from the attribute's type. `required` defaults
     to the attribute's own flag and may only be set to differ from it -- for
@@ -137,9 +145,28 @@ in
     let
       check = cond: msg: if cond then null else throw "${runtimePrefix}: ${msg}";
 
+      # `svalabs/forgejo` -> `forgejo`: every resource type starts with it.
+      providerName = lib.last (lib.splitString "/" source);
+
+      # the English plural of the snake_case resource name, which is what a
+      # NixOS user expects to read as an attrset of instances.
+      pluralize =
+        s:
+        if lib.hasSuffix "s" s then
+          s
+        else if builtins.match ".*[^aeiou]y" s != null then
+          "${lib.removeSuffix "y" s}ies"
+        else if builtins.match ".*(sh|ch|x)" s != null then
+          "${s}es"
+        else
+          "${s}s";
+
+      collectionName = type: pluralize (lib.removePrefix "${providerName}_" type);
+
       withDefaults =
         o:
         {
+          scope = null;
           oneOfRefs = [ ];
           omit = [ ];
           extraSecrets = [ ];
@@ -155,19 +182,27 @@ in
       # -----------------------------------------------------------------------
 
       mkOne =
-        collection: rawOverlay:
+        type: rawOverlay:
         let
-          o = withDefaults rawOverlay;
+          o = withDefaults rawOverlay // {
+            inherit type;
+          };
+          collection = collectionName type;
           ctx = "${runtimePrefix}.${collection}";
           # the type check has to come first: everything below indexes the
           # schema by it.
           resourceSchema =
-            schema.resource_schemas.${o.type}
-              or (throw "${runtimePrefix}: collection '${collection}' models resource `${o.type}`, which provider ${source} ${provider.version} does not have");
+            schema.resource_schemas.${type}
+              or (throw "${runtimePrefix}: `resources` models `${type}`, which provider ${source} ${provider.version} does not have");
 
           # top-level nodes, and every node by dotted path.
           tree = conv.settableTree resourceSchema;
           paths = conv.settablePaths resourceSchema;
+
+          isStringAttr =
+            attr: tree ? ${attr} && tree.${attr}.kind == "attr" && flatten tree.${attr}.tfType == [ "string" ];
+          defaultNameAttr = if isStringAttr "name" then "name" else null;
+          nameAttr = o.nameAttr or defaultNameAttr;
 
           # attributes the reference inputs occupy: the user names a sibling
           # collection key and generation fills these in, so they must not also
@@ -190,7 +225,7 @@ in
             else
               !node.singleBlock && elem node.nesting collectionTypes;
 
-          isNameAttr = path: o.nameAttr != null && path == o.nameAttr;
+          isNameAttr = path: nameAttr != null && path == nameAttr;
 
           # an option is emitted required (no default) only when nothing else
           # can supply it later. the four escapes:
@@ -352,24 +387,21 @@ in
                 if length (subtractLists sensitivePaths o.notSecrets) == 1 then "is" else "are"
               } not sensitive"
             )
-            (check
-              (
-                o.nameAttr == null
-                || (
-                  tree ? ${o.nameAttr}
-                  && tree.${o.nameAttr}.kind == "attr"
-                  && flatten tree.${o.nameAttr}.tfType == [ "string" ]
-                )
-              )
-              "${ctx}: `nameAttr` must name a settable top-level string attribute; `${toString o.nameAttr}` is not one"
+            (check (nameAttr == null || isStringAttr nameAttr)
+              "${ctx}: `nameAttr` must name a settable top-level string attribute; `${toString nameAttr}` is not one"
+            )
+            (check (!(o ? nameAttr) || o.nameAttr != defaultNameAttr)
+              "${ctx}: `nameAttr = ${
+                if defaultNameAttr == null then "null" else ''"${defaultNameAttr}"''
+              }` is the default; drop it"
             )
           ]
           ++ mapAttrsToList (
             attr: refSpec:
-            check (lib.all (t: resources ? ${t.collection}) refSpec.targets)
+            check (lib.all (t: resources ? ${t.type}) refSpec.targets)
               "${ctx}: ref `${attr}` targets ${
-                quoteList (filter (c: !(resources ? ${c})) (map (t: t.collection) refSpec.targets))
-              }, which ${runtimePrefix} does not define"
+                quoteList (filter (t: !(resources ? ${t})) (map (t: t.type) refSpec.targets))
+              }, which ${runtimePrefix} does not model"
           ) o.refs
           ++ mapAttrsToList (
             attr: refSpec:
@@ -394,7 +426,12 @@ in
             in
             lib.nameValuePair (refOptionName attr) {
               inherit attr;
-              inherit (r) targets managedOnly description;
+              inherit (r) managedOnly description;
+              # the renderer addresses a target by its collection.
+              targets = map (t: {
+                collection = collectionName t.type;
+                inherit (t) field;
+              }) r.targets;
               list =
                 node != null
                 && node.kind == "attr"
@@ -412,11 +449,10 @@ in
             inherit (o)
               type
               prefix
-              nameAttr
               scope
               description
               ;
-            inherit refs;
+            inherit nameAttr refs;
             oneOfRefs = map (map refOptionName) o.oneOfRefs;
             inherit
               secrets
@@ -446,13 +482,15 @@ in
             ;
         };
 
-      built = lib.mapAttrs mkOne resources;
+      built = lib.mapAttrs' (type: o: lib.nameValuePair (collectionName type) (mkOne type o)) resources;
 
       # -----------------------------------------------------------------------
       # provider-wide assertions
       # -----------------------------------------------------------------------
 
-      allTypes = mapAttrsToList (_: o: o.type) resources;
+      allTypes = attrNames resources;
+      allCollections = map collectionName allTypes;
+      foreignTypes = filter (t: !(lib.hasPrefix "${providerName}_" t)) allTypes;
       allPrefixes = mapAttrsToList (_: o: o.prefix) resources;
       schemaTypes = attrNames schema.resource_schemas;
       unsupportedTypes = attrNames unsupported;
@@ -480,9 +518,14 @@ in
           "`omitEverywhere` lists ${quoteList staleOmit}, which no modelled resource of ${source} ${provider.version} declares"
         )
 
+        (check (foreignTypes == [ ])
+          "`resources` names ${quoteList foreignTypes}, which ${
+            if length foreignTypes == 1 then "does" else "do"
+          } not start with `${providerName}_`"
+        )
         (check (
-          duplicates allTypes == [ ]
-        ) "resource ${quoteList (duplicates allTypes)} claimed by more than one collection")
+          duplicates allCollections == [ ]
+        ) "collection ${quoteList (duplicates allCollections)} would hold more than one resource type")
         (check (
           duplicates allPrefixes == [ ]
         ) "label prefix ${quoteList (duplicates allPrefixes)} used by more than one collection")

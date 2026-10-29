@@ -30,7 +30,7 @@ let
   realmRef = {
     targets = [
       {
-        collection = "realms";
+        type = "keycloak_realm";
         field = "id";
       }
     ];
@@ -43,7 +43,7 @@ let
   openidClientOptionalRef = {
     targets = [
       {
-        collection = "openid_clients";
+        type = "keycloak_openid_client";
         field = "id";
       }
     ];
@@ -53,7 +53,7 @@ let
   openidClientScopeOptionalRef = {
     targets = [
       {
-        collection = "openid_client_scopes";
+        type = "keycloak_openid_client_scope";
         field = "id";
       }
     ];
@@ -73,7 +73,7 @@ let
   samlClientOptionalRef = {
     targets = [
       {
-        collection = "saml_clients";
+        type = "keycloak_saml_client";
         field = "id";
       }
     ];
@@ -83,7 +83,7 @@ let
   samlClientScopeOptionalRef = {
     targets = [
       {
-        collection = "saml_client_scopes";
+        type = "keycloak_saml_client_scope";
         field = "id";
       }
     ];
@@ -96,7 +96,7 @@ let
   realmAliasRef = {
     targets = [
       {
-        collection = "realms";
+        type = "keycloak_realm";
         field = "realm";
       }
     ];
@@ -108,7 +108,7 @@ let
   ldapFederationIdRef = {
     targets = [
       {
-        collection = "ldap_user_federations";
+        type = "keycloak_ldap_user_federation";
         field = "id";
       }
     ];
@@ -121,39 +121,39 @@ let
   idpAliasRequiredRef = {
     targets = [
       {
-        collection = "oidc_identity_providers";
+        type = "keycloak_oidc_identity_provider";
         field = "alias";
       }
       {
-        collection = "saml_identity_providers";
+        type = "keycloak_saml_identity_provider";
         field = "alias";
       }
       {
-        collection = "oidc_google_identity_providers";
+        type = "keycloak_oidc_google_identity_provider";
         field = "alias";
       }
       {
-        collection = "oidc_facebook_identity_providers";
+        type = "keycloak_oidc_facebook_identity_provider";
         field = "alias";
       }
       {
-        collection = "oidc_github_identity_providers";
+        type = "keycloak_oidc_github_identity_provider";
         field = "alias";
       }
       {
-        collection = "kubernetes_identity_providers";
+        type = "keycloak_kubernetes_identity_provider";
         field = "alias";
       }
       {
-        collection = "oidc_openshift_v4_identity_providers";
+        type = "keycloak_oidc_openshift_v4_identity_provider";
         field = "alias";
       }
       {
-        collection = "spiffe_identity_providers";
+        type = "keycloak_spiffe_identity_provider";
         field = "alias";
       }
       {
-        collection = "oidc_microsoft_identity_providers";
+        type = "keycloak_oidc_microsoft_identity_provider";
         field = "alias";
       }
     ];
@@ -167,11 +167,11 @@ let
   anyClientOptionalRef = {
     targets = [
       {
-        collection = "openid_clients";
+        type = "keycloak_openid_client";
         field = "id";
       }
       {
-        collection = "saml_clients";
+        type = "keycloak_saml_client";
         field = "id";
       }
     ];
@@ -181,25 +181,23 @@ let
   anyClientScopeOptionalRef = {
     targets = [
       {
-        collection = "openid_client_scopes";
+        type = "keycloak_openid_client_scope";
         field = "id";
       }
       {
-        collection = "saml_client_scopes";
+        type = "keycloak_saml_client_scope";
         field = "id";
       }
     ];
     managedOnly = false;
     description = "Optional managed client scope (openid or saml) this mapper attaches to.";
   };
-  # The keycloak/keycloak resource surface. Per collection, only the facts the
-  # schema does not carry (see modules/lib/tf-schema.nix for the full overlay
-  # vocabulary):
-  #   type         the `keycloak_*` resource type in the schema
+  # The keycloak/keycloak resource surface, keyed by resource type. Each type
+  # becomes the collection `services.keycloak.runtime.<plural>`
+  # (`keycloak_realm` -> `realms`). Per type, only the facts the schema does not
+  # carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
   #   prefix       unique Terraform label prefix
-  #   nameAttr     attribute defaulted from the collection key (or null)
-  #   scope        unused here -- keycloak authenticates a service account, not
-  #                a scoped token
+  #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   refs         parent links resolved to references against managed siblings
   #   description  the collection's NixOS option description
   generated = tfSchema.mkResourceTypes {
@@ -211,27 +209,22 @@ let
     # identity, computed on apply, and nothing a configuration declares.
     omitEverywhere = [ "id" ];
     resources = {
-      realms = {
-        type = "keycloak_realm";
+      keycloak_realm = {
         prefix = "realm";
         nameAttr = "realm";
-        scope = null;
         refs = { };
         description = "Keycloak realms, keyed by realm name.";
         # Computed identity attribute; nothing to declare.
         omit = [ "internal_id" ];
       };
-      roles = {
-        type = "keycloak_role";
+      keycloak_role = {
         prefix = "role";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           composite_roles = {
             targets = [
               {
-                collection = "roles";
+                type = "keycloak_role";
                 field = "id";
               }
             ];
@@ -243,17 +236,14 @@ let
         };
         description = "Keycloak roles (realm-level by default), keyed by role name.";
       };
-      default_roles = {
-        type = "keycloak_default_roles";
+      keycloak_default_roles = {
         prefix = "default_roles";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           default_roles = {
             targets = [
               {
-                collection = "roles";
+                type = "keycloak_role";
                 field = "name";
               }
             ];
@@ -263,17 +253,14 @@ let
         };
         description = "Realm-level default roles auto-granted to new users, keyed by an arbitrary label.";
       };
-      groups = {
-        type = "keycloak_group";
+      keycloak_group = {
         prefix = "group";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           parent_id = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -283,7 +270,7 @@ let
           organization_id = {
             targets = [
               {
-                collection = "organizations";
+                type = "keycloak_organization";
                 field = "id";
               }
             ];
@@ -293,17 +280,14 @@ let
         };
         description = "Keycloak groups, keyed by group name.";
       };
-      default_groups = {
-        type = "keycloak_default_groups";
+      keycloak_default_groups = {
         prefix = "default_groups";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           group_ids = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -313,17 +297,14 @@ let
         };
         description = "Realm-level default groups auto-joined by new users, keyed by an arbitrary label.";
       };
-      group_memberships = {
-        type = "keycloak_group_memberships";
+      keycloak_group_memberships = {
         prefix = "group_membership";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           group_id = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -336,7 +317,7 @@ let
           members = {
             targets = [
               {
-                collection = "users";
+                type = "keycloak_user";
                 field = "username";
               }
             ];
@@ -346,17 +327,14 @@ let
         };
         description = "Keycloak group memberships, keyed by an arbitrary label.";
       };
-      group_roles = {
-        type = "keycloak_group_roles";
+      keycloak_group_roles = {
         prefix = "group_roles";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           group_id = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -366,7 +344,7 @@ let
           role_ids = {
             targets = [
               {
-                collection = "roles";
+                type = "keycloak_role";
                 field = "id";
               }
             ];
@@ -376,25 +354,20 @@ let
         };
         description = "Role assignments for a group, keyed by an arbitrary label.";
       };
-      users = {
-        type = "keycloak_user";
+      keycloak_user = {
         prefix = "user";
         nameAttr = "username";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Keycloak users, keyed by username (must be lowercase).";
       };
-      user_roles = {
-        type = "keycloak_user_roles";
+      keycloak_user_roles = {
         prefix = "user_roles";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           user_id = {
             targets = [
               {
-                collection = "users";
+                type = "keycloak_user";
                 field = "id";
               }
             ];
@@ -404,7 +377,7 @@ let
           role_ids = {
             targets = [
               {
-                collection = "roles";
+                type = "keycloak_role";
                 field = "id";
               }
             ];
@@ -414,17 +387,14 @@ let
         };
         description = "Role assignments for a user, keyed by an arbitrary label.";
       };
-      user_groups = {
-        type = "keycloak_user_groups";
+      keycloak_user_groups = {
         prefix = "user_groups";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           user_id = {
             targets = [
               {
-                collection = "users";
+                type = "keycloak_user";
                 field = "id";
               }
             ];
@@ -434,7 +404,7 @@ let
           group_ids = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -444,27 +414,19 @@ let
         };
         description = "Group memberships for a user, keyed by an arbitrary label.";
       };
-      openid_client_scopes = {
-        type = "keycloak_openid_client_scope";
+      keycloak_openid_client_scope = {
         prefix = "openid_client_scope";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "OpenID client scopes (per-realm), keyed by scope name.";
       };
-      saml_client_scopes = {
-        type = "keycloak_saml_client_scope";
+      keycloak_saml_client_scope = {
         prefix = "saml_client_scope";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "SAML client scopes (per-realm), keyed by scope name.";
       };
-      openid_clients = {
-        type = "keycloak_openid_client";
+      keycloak_openid_client = {
         prefix = "openid_client";
         nameAttr = "client_id";
-        scope = null;
         refs.realm_id = realmRef;
         description = "OpenID Connect clients (per-realm), keyed by clientId.";
         # Write-only twins of `client_secret`: they take an ephemeral value,
@@ -475,17 +437,14 @@ let
           "client_secret_wo_version"
         ];
       };
-      openid_client_default_scopes = {
-        type = "keycloak_openid_client_default_scopes";
+      keycloak_openid_client_default_scopes = {
         prefix = "openid_client_default_scopes";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "id";
               }
             ];
@@ -495,7 +454,7 @@ let
           default_scopes = {
             targets = [
               {
-                collection = "openid_client_scopes";
+                type = "keycloak_openid_client_scope";
                 field = "name";
               }
             ];
@@ -505,17 +464,14 @@ let
         };
         description = "Default OAuth2 scopes auto-attached to a client, keyed by an arbitrary label.";
       };
-      openid_client_optional_scopes = {
-        type = "keycloak_openid_client_optional_scopes";
+      keycloak_openid_client_optional_scopes = {
         prefix = "openid_client_optional_scopes";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "id";
               }
             ];
@@ -525,7 +481,7 @@ let
           optional_scopes = {
             targets = [
               {
-                collection = "openid_client_scopes";
+                type = "keycloak_openid_client_scope";
                 field = "name";
               }
             ];
@@ -535,17 +491,14 @@ let
         };
         description = "Optional OAuth2 scopes available to a client, keyed by an arbitrary label.";
       };
-      openid_client_service_account_roles = {
-        type = "keycloak_openid_client_service_account_role";
+      keycloak_openid_client_service_account_role = {
         prefix = "openid_client_sa_role";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "id";
               }
             ];
@@ -555,19 +508,14 @@ let
         };
         description = "Grant a per-client role to a service-account user, keyed by an arbitrary label.";
       };
-      openid_client_service_account_realm_roles = {
-        type = "keycloak_openid_client_service_account_realm_role";
+      keycloak_openid_client_service_account_realm_role = {
         prefix = "openid_client_sa_realm_role";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         description = "Grant a realm-level role to a service-account user, keyed by an arbitrary label.";
       };
-      saml_clients = {
-        type = "keycloak_saml_client";
+      keycloak_saml_client = {
         prefix = "saml_client";
         nameAttr = "client_id";
-        scope = null;
         refs.realm_id = realmRef;
         # signing_private_key isn't marked Sensitive upstream but is a
         # private key; expose <attr>File so it stays out of the store.
@@ -576,17 +524,14 @@ let
           "signing_private_key"
         ];
       };
-      saml_client_default_scopes = {
-        type = "keycloak_saml_client_default_scopes";
+      keycloak_saml_client_default_scopes = {
         prefix = "saml_client_default_scopes";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = {
             targets = [
               {
-                collection = "saml_clients";
+                type = "keycloak_saml_client";
                 field = "id";
               }
             ];
@@ -596,7 +541,7 @@ let
           default_scopes = {
             targets = [
               {
-                collection = "saml_client_scopes";
+                type = "keycloak_saml_client_scope";
                 field = "name";
               }
             ];
@@ -608,11 +553,8 @@ let
       };
       # OpenID protocol mappers: one collection per mapper type. all share
       # realm + (client | client_scope) refs.
-      openid_user_attribute_protocol_mappers = {
-        type = "keycloak_openid_user_attribute_protocol_mapper";
+      keycloak_openid_user_attribute_protocol_mapper = {
         prefix = "openid_user_attribute_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -621,11 +563,8 @@ let
         description = "OpenID protocol mapper that maps a user attribute to a claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_user_property_protocol_mappers = {
-        type = "keycloak_openid_user_property_protocol_mapper";
+      keycloak_openid_user_property_protocol_mapper = {
         prefix = "openid_user_property_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -634,11 +573,8 @@ let
         description = "OpenID protocol mapper that maps a built-in user property (e.g. `email`, `username`) to a claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_group_membership_protocol_mappers = {
-        type = "keycloak_openid_group_membership_protocol_mapper";
+      keycloak_openid_group_membership_protocol_mapper = {
         prefix = "openid_group_membership_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -647,11 +583,8 @@ let
         description = "OpenID protocol mapper that maps group memberships to a claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_full_name_protocol_mappers = {
-        type = "keycloak_openid_full_name_protocol_mapper";
+      keycloak_openid_full_name_protocol_mapper = {
         prefix = "openid_full_name_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -660,11 +593,8 @@ let
         description = "OpenID protocol mapper that emits the user's full name as a single claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_sub_protocol_mappers = {
-        type = "keycloak_openid_sub_protocol_mapper";
+      keycloak_openid_sub_protocol_mapper = {
         prefix = "openid_sub_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -673,11 +603,8 @@ let
         description = "OpenID protocol mapper for the `sub` claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_hardcoded_claim_protocol_mappers = {
-        type = "keycloak_openid_hardcoded_claim_protocol_mapper";
+      keycloak_openid_hardcoded_claim_protocol_mapper = {
         prefix = "openid_hardcoded_claim_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -686,11 +613,8 @@ let
         description = "OpenID protocol mapper that adds a hardcoded claim with a fixed value.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_audience_protocol_mappers = {
-        type = "keycloak_openid_audience_protocol_mapper";
+      keycloak_openid_audience_protocol_mapper = {
         prefix = "openid_audience_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -699,11 +623,8 @@ let
         description = "OpenID protocol mapper that adds an audience to issued tokens (exactly one of `included_client_audience` / `included_custom_audience`).";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_audience_resolve_protocol_mappers = {
-        type = "keycloak_openid_audience_resolve_protocol_mapper";
+      keycloak_openid_audience_resolve_protocol_mapper = {
         prefix = "openid_audience_resolve_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -712,11 +633,8 @@ let
         description = "OpenID audience-resolve mapper (derives audience from client roles).";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_hardcoded_role_protocol_mappers = {
-        type = "keycloak_openid_hardcoded_role_protocol_mapper";
+      keycloak_openid_hardcoded_role_protocol_mapper = {
         prefix = "openid_hardcoded_role_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -725,11 +643,8 @@ let
         description = "OpenID protocol mapper that adds a hardcoded role to issued tokens.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_user_realm_role_protocol_mappers = {
-        type = "keycloak_openid_user_realm_role_protocol_mapper";
+      keycloak_openid_user_realm_role_protocol_mapper = {
         prefix = "openid_user_realm_role_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -738,11 +653,8 @@ let
         description = "OpenID protocol mapper that maps the user's realm roles to a claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_user_client_role_protocol_mappers = {
-        type = "keycloak_openid_user_client_role_protocol_mapper";
+      keycloak_openid_user_client_role_protocol_mapper = {
         prefix = "openid_user_client_role_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -751,11 +663,8 @@ let
         description = "OpenID protocol mapper that maps the user's roles on a specific client to a claim.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      openid_user_session_note_protocol_mappers = {
-        type = "keycloak_openid_user_session_note_protocol_mapper";
+      keycloak_openid_user_session_note_protocol_mapper = {
         prefix = "openid_user_session_note_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = openidClientOptionalRef;
@@ -767,11 +676,8 @@ let
           "session_note"
         ];
       };
-      saml_user_attribute_protocol_mappers = {
-        type = "keycloak_saml_user_attribute_protocol_mapper";
+      keycloak_saml_user_attribute_protocol_mapper = {
         prefix = "saml_user_attribute_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = samlClientOptionalRef;
@@ -780,11 +686,8 @@ let
         description = "SAML mapper that exposes a user attribute as a SAML attribute.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      saml_user_property_protocol_mappers = {
-        type = "keycloak_saml_user_property_protocol_mapper";
+      keycloak_saml_user_property_protocol_mapper = {
         prefix = "saml_user_property_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = samlClientOptionalRef;
@@ -793,11 +696,8 @@ let
         description = "SAML mapper that exposes a built-in user property as a SAML attribute.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      generic_protocol_mappers = {
-        type = "keycloak_generic_protocol_mapper";
+      keycloak_generic_protocol_mapper = {
         prefix = "generic_protocol_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = anyClientOptionalRef;
@@ -806,11 +706,8 @@ let
         description = "Generic protocol mapper escape hatch (for mappers without a dedicated typed resource).";
         oneOfRefs = clientOrScopeOneOf;
       };
-      generic_client_protocol_mappers = {
-        type = "keycloak_generic_client_protocol_mapper";
+      keycloak_generic_client_protocol_mapper = {
         prefix = "generic_client_protocol_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = anyClientOptionalRef;
@@ -819,11 +716,8 @@ let
         description = "Generic protocol mapper attached to a specific client (without a dedicated typed resource).";
         oneOfRefs = clientOrScopeOneOf;
       };
-      generic_role_mappers = {
-        type = "keycloak_generic_role_mapper";
+      keycloak_generic_role_mapper = {
         prefix = "generic_role_mapper";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = anyClientOptionalRef;
@@ -832,11 +726,8 @@ let
         description = "Generic role-scope mapper that attaches a role to a client / client scope, keyed by an arbitrary label.";
         oneOfRefs = clientOrScopeOneOf;
       };
-      generic_client_role_mappers = {
-        type = "keycloak_generic_client_role_mapper";
+      keycloak_generic_client_role_mapper = {
         prefix = "generic_client_role_mapper";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = anyClientOptionalRef;
@@ -845,11 +736,9 @@ let
         description = "Generic role-scope mapper attached to a specific client (deprecated alias kept for completeness).";
         oneOfRefs = clientOrScopeOneOf;
       };
-      oidc_identity_providers = {
-        type = "keycloak_oidc_identity_provider";
+      keycloak_oidc_identity_provider = {
         prefix = "oidc_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Generic OIDC identity providers (per-realm), keyed by alias.";
         # Write-only twins of `client_secret`: they take an ephemeral value,
@@ -860,170 +749,129 @@ let
           "client_secret_wo_version"
         ];
       };
-      saml_identity_providers = {
-        type = "keycloak_saml_identity_provider";
+      keycloak_saml_identity_provider = {
         prefix = "saml_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "SAML identity providers (per-realm), keyed by alias.";
       };
-      oidc_google_identity_providers = {
-        type = "keycloak_oidc_google_identity_provider";
+      keycloak_oidc_google_identity_provider = {
         prefix = "oidc_google_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Google OIDC identity providers (per-realm), keyed by alias (defaults to 'google').";
       };
-      oidc_facebook_identity_providers = {
-        type = "keycloak_oidc_facebook_identity_provider";
+      keycloak_oidc_facebook_identity_provider = {
         prefix = "oidc_facebook_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Facebook OIDC identity providers (per-realm), keyed by alias (defaults to 'facebook').";
       };
-      oidc_github_identity_providers = {
-        type = "keycloak_oidc_github_identity_provider";
+      keycloak_oidc_github_identity_provider = {
         prefix = "oidc_github_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "GitHub OIDC identity providers (per-realm), keyed by alias (defaults to 'github').";
       };
-      oidc_microsoft_identity_providers = {
-        type = "keycloak_oidc_microsoft_identity_provider";
+      keycloak_oidc_microsoft_identity_provider = {
         prefix = "oidc_microsoft_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Microsoft OIDC identity providers (per-realm), keyed by alias (defaults to 'microsoft').";
       };
-      kubernetes_identity_providers = {
-        type = "keycloak_kubernetes_identity_provider";
+      keycloak_kubernetes_identity_provider = {
         prefix = "kubernetes_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Kubernetes OIDC identity providers (per-realm), keyed by alias.";
       };
-      oidc_openshift_v4_identity_providers = {
-        type = "keycloak_oidc_openshift_v4_identity_provider";
+      keycloak_oidc_openshift_v4_identity_provider = {
         prefix = "oidc_openshift_v4_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "OpenShift 4 OIDC identity providers (per-realm), keyed by alias (defaults to 'openshift-v4').";
       };
-      spiffe_identity_providers = {
-        type = "keycloak_spiffe_identity_provider";
+      keycloak_spiffe_identity_provider = {
         prefix = "spiffe_idp";
         nameAttr = "alias";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "SPIFFE identity providers (per-realm), keyed by alias.";
       };
-      hardcoded_attribute_identity_provider_mappers = {
-        type = "keycloak_hardcoded_attribute_identity_provider_mapper";
+      keycloak_hardcoded_attribute_identity_provider_mapper = {
         prefix = "hardcoded_attribute_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Sets a hardcoded user (or session-note) attribute on every federated user.";
       };
-      hardcoded_group_identity_provider_mappers = {
-        type = "keycloak_hardcoded_group_identity_provider_mapper";
+      keycloak_hardcoded_group_identity_provider_mapper = {
         prefix = "hardcoded_group_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Adds every federated user to a hardcoded group.";
       };
-      hardcoded_role_identity_provider_mappers = {
-        type = "keycloak_hardcoded_role_identity_provider_mapper";
+      keycloak_hardcoded_role_identity_provider_mapper = {
         prefix = "hardcoded_role_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Grants a hardcoded role to every federated user.";
       };
-      attribute_importer_identity_provider_mappers = {
-        type = "keycloak_attribute_importer_identity_provider_mapper";
+      keycloak_attribute_importer_identity_provider_mapper = {
         prefix = "attribute_importer_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Imports an attribute / claim from the IdP onto the federated user.";
       };
-      attribute_to_role_identity_provider_mappers = {
-        type = "keycloak_attribute_to_role_identity_provider_mapper";
+      keycloak_attribute_to_role_identity_provider_mapper = {
         prefix = "attribute_to_role_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Grants a role to federated users whose IdP attribute / claim matches a value.";
       };
-      user_template_importer_identity_provider_mappers = {
-        type = "keycloak_user_template_importer_identity_provider_mapper";
+      keycloak_user_template_importer_identity_provider_mapper = {
         prefix = "user_template_importer_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Derives the federated user's username from a Mustache-style template over IdP claims.";
       };
-      custom_identity_provider_mappers = {
-        type = "keycloak_custom_identity_provider_mapper";
+      keycloak_custom_identity_provider_mapper = {
         prefix = "custom_idp_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm = realmAliasRef;
           identity_provider_alias = idpAliasRequiredRef;
         };
         description = "Escape hatch for an IdP mapper implementation without a dedicated typed resource.";
       };
-      authentication_flows = {
-        type = "keycloak_authentication_flow";
+      keycloak_authentication_flow = {
         prefix = "authentication_flow";
         nameAttr = "alias";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Top-level authentication flows (per-realm), keyed by alias.";
       };
-      authentication_subflows = {
-        type = "keycloak_authentication_subflow";
+      keycloak_authentication_subflow = {
         prefix = "authentication_subflow";
         nameAttr = "alias";
-        scope = null;
         refs = {
           realm_id = realmRef;
           parent_flow_alias = {
             targets = [
               {
-                collection = "authentication_flows";
+                type = "keycloak_authentication_flow";
                 field = "alias";
               }
               {
-                collection = "authentication_subflows";
+                type = "keycloak_authentication_subflow";
                 field = "alias";
               }
             ];
@@ -1033,21 +881,18 @@ let
         };
         description = "Authentication subflows nested under a parent flow, keyed by alias.";
       };
-      authentication_executions = {
-        type = "keycloak_authentication_execution";
+      keycloak_authentication_execution = {
         prefix = "authentication_execution";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           parent_flow_alias = {
             targets = [
               {
-                collection = "authentication_flows";
+                type = "keycloak_authentication_flow";
                 field = "alias";
               }
               {
-                collection = "authentication_subflows";
+                type = "keycloak_authentication_subflow";
                 field = "alias";
               }
             ];
@@ -1057,17 +902,15 @@ let
         };
         description = "Authentication executions inside a flow / subflow, keyed by an arbitrary label.";
       };
-      authentication_execution_configs = {
-        type = "keycloak_authentication_execution_config";
+      keycloak_authentication_execution_config = {
         prefix = "authentication_execution_config";
         nameAttr = "alias";
-        scope = null;
         refs = {
           realm_id = realmRef;
           execution_id = {
             targets = [
               {
-                collection = "authentication_executions";
+                type = "keycloak_authentication_execution";
                 field = "id";
               }
             ];
@@ -1077,25 +920,19 @@ let
         };
         description = "Per-execution configuration map, keyed by config alias.";
       };
-      authentication_bindings = {
-        type = "keycloak_authentication_bindings";
+      keycloak_authentication_bindings = {
         prefix = "authentication_bindings";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         description = "Realm-level authentication flow bindings (browser / registration / direct grant / etc.), keyed by an arbitrary label.";
       };
-      openid_client_authorization_resources = {
-        type = "keycloak_openid_client_authorization_resource";
+      keycloak_openid_client_authorization_resource = {
         prefix = "openid_client_authz_resource";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1105,17 +942,14 @@ let
         };
         description = "Authorization resources hosted on an openid_client's resource server.";
       };
-      openid_client_authorization_scopes = {
-        type = "keycloak_openid_client_authorization_scope";
+      keycloak_openid_client_authorization_scope = {
         prefix = "openid_client_authz_scope";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1125,17 +959,14 @@ let
         };
         description = "Authorization scopes on an openid_client's resource server.";
       };
-      openid_client_authorization_permissions = {
-        type = "keycloak_openid_client_authorization_permission";
+      keycloak_openid_client_authorization_permission = {
         prefix = "openid_client_authz_permission";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1145,17 +976,14 @@ let
         };
         description = "Authorization permissions tying resources/scopes to policies.";
       };
-      openid_client_aggregate_policies = {
-        type = "keycloak_openid_client_aggregate_policy";
+      keycloak_openid_client_aggregate_policy = {
         prefix = "openid_client_aggregate_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1165,17 +993,14 @@ let
         };
         description = "Aggregate policy combining other policies under a decision strategy.";
       };
-      openid_client_client_policies = {
-        type = "keycloak_openid_client_client_policy";
+      keycloak_openid_client_client_policy = {
         prefix = "openid_client_client_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1188,17 +1013,14 @@ let
           "decision_strategy"
         ];
       };
-      openid_client_authorization_client_scope_policies = {
-        type = "keycloak_openid_client_authorization_client_scope_policy";
+      keycloak_openid_client_authorization_client_scope_policy = {
         prefix = "openid_client_authz_client_scope_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1211,17 +1033,14 @@ let
           "decision_strategy"
         ];
       };
-      openid_client_group_policies = {
-        type = "keycloak_openid_client_group_policy";
+      keycloak_openid_client_group_policy = {
         prefix = "openid_client_group_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1231,17 +1050,14 @@ let
         };
         description = "Policy granting access by group membership; each group block is `{ id; path; extend_children; }`.";
       };
-      openid_client_regex_policies = {
-        type = "keycloak_openid_client_regex_policy";
+      keycloak_openid_client_regex_policy = {
         prefix = "openid_client_regex_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1251,17 +1067,14 @@ let
         };
         description = "Policy granting access when a token claim matches a regular expression.";
       };
-      openid_client_role_policies = {
-        type = "keycloak_openid_client_role_policy";
+      keycloak_openid_client_role_policy = {
         prefix = "openid_client_role_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1274,17 +1087,14 @@ let
           "decision_strategy"
         ];
       };
-      openid_client_time_policies = {
-        type = "keycloak_openid_client_time_policy";
+      keycloak_openid_client_time_policy = {
         prefix = "openid_client_time_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1294,17 +1104,14 @@ let
         };
         description = "Policy granting access within a time window.";
       };
-      generic_client_authorization_policies = {
-        type = "keycloak_generic_client_authorization_policy";
+      keycloak_generic_client_authorization_policy = {
         prefix = "generic_client_authz_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1314,17 +1121,14 @@ let
         };
         description = "Generic (provider-typed) authorization policy on an openid_client's resource server, selected by `type`.";
       };
-      openid_client_js_policies = {
-        type = "keycloak_openid_client_js_policy";
+      keycloak_openid_client_js_policy = {
         prefix = "openid_client_js_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1334,161 +1138,113 @@ let
         };
         description = "JavaScript-based authorization policy (evaluates `code`) on an openid_client's resource server.";
       };
-      ldap_user_federations = {
-        type = "keycloak_ldap_user_federation";
+      keycloak_ldap_user_federation = {
         prefix = "ldap_user_federation";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "LDAP user federations (per-realm), keyed by name.";
       };
-      ldap_user_attribute_mappers = {
-        type = "keycloak_ldap_user_attribute_mapper";
+      keycloak_ldap_user_attribute_mapper = {
         prefix = "ldap_user_attribute_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps a keycloak user attribute to an LDAP attribute.";
       };
-      ldap_group_mappers = {
-        type = "keycloak_ldap_group_mapper";
+      keycloak_ldap_group_mapper = {
         prefix = "ldap_group_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps LDAP groups onto keycloak groups.";
       };
-      ldap_role_mappers = {
-        type = "keycloak_ldap_role_mapper";
+      keycloak_ldap_role_mapper = {
         prefix = "ldap_role_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Maps LDAP roles onto keycloak realm or client roles.";
       };
-      ldap_hardcoded_role_mappers = {
-        type = "keycloak_ldap_hardcoded_role_mapper";
+      keycloak_ldap_hardcoded_role_mapper = {
         prefix = "ldap_hardcoded_role_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Grants a hardcoded role to every LDAP-federated user.";
       };
-      ldap_hardcoded_attribute_mappers = {
-        type = "keycloak_ldap_hardcoded_attribute_mapper";
+      keycloak_ldap_hardcoded_attribute_mapper = {
         prefix = "ldap_hardcoded_attribute_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Sets a hardcoded user attribute on every LDAP-federated user.";
       };
-      ldap_hardcoded_group_mappers = {
-        type = "keycloak_ldap_hardcoded_group_mapper";
+      keycloak_ldap_hardcoded_group_mapper = {
         prefix = "ldap_hardcoded_group_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Adds every LDAP-federated user to a hardcoded group.";
       };
-      ldap_msad_user_account_control_mappers = {
-        type = "keycloak_ldap_msad_user_account_control_mapper";
+      keycloak_ldap_msad_user_account_control_mapper = {
         prefix = "ldap_msad_uac_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "MSAD userAccountControl integration mapper (enables / disables and locks out users).";
       };
-      ldap_msad_lds_user_account_control_mappers = {
-        type = "keycloak_ldap_msad_lds_user_account_control_mapper";
+      keycloak_ldap_msad_lds_user_account_control_mapper = {
         prefix = "ldap_msad_lds_uac_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "MSAD LDS userAccountControl integration mapper.";
       };
-      ldap_full_name_mappers = {
-        type = "keycloak_ldap_full_name_mapper";
+      keycloak_ldap_full_name_mapper = {
         prefix = "ldap_full_name_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Splits/joins a single LDAP full-name attribute into keycloak's first / last name fields.";
       };
-      ldap_custom_mappers = {
-        type = "keycloak_ldap_custom_mapper";
+      keycloak_ldap_custom_mapper = {
         prefix = "ldap_custom_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Escape hatch for an LDAP mapper implementation without a dedicated typed resource.";
       };
-      custom_user_federations = {
-        type = "keycloak_custom_user_federation";
+      keycloak_custom_user_federation = {
         prefix = "custom_user_federation";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Custom user federation backed by a JPA / SPI provider.";
       };
-      realm_keystore_aes_generateds = {
-        type = "keycloak_realm_keystore_aes_generated";
+      keycloak_realm_keystore_aes_generated = {
         prefix = "realm_keystore_aes_generated";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "AES keystore generated by Keycloak.";
       };
-      realm_keystore_ecdsa_generateds = {
-        type = "keycloak_realm_keystore_ecdsa_generated";
+      keycloak_realm_keystore_ecdsa_generated = {
         prefix = "realm_keystore_ecdsa_generated";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "ECDSA keystore generated by Keycloak.";
       };
-      realm_keystore_hmac_generateds = {
-        type = "keycloak_realm_keystore_hmac_generated";
+      keycloak_realm_keystore_hmac_generated = {
         prefix = "realm_keystore_hmac_generated";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "HMAC keystore generated by Keycloak.";
       };
-      realm_keystore_java_keystores = {
-        type = "keycloak_realm_keystore_java_keystore";
+      keycloak_realm_keystore_java_keystore = {
         prefix = "realm_keystore_java_keystore";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Keystore backed by a Java KeyStore (JKS) file.";
         extraSecrets = [
@@ -1496,11 +1252,8 @@ let
           "keystore_password"
         ];
       };
-      realm_keystore_rsas = {
-        type = "keycloak_realm_keystore_rsa";
+      keycloak_realm_keystore_rsa = {
         prefix = "realm_keystore_rsa";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         # private_key and certificate are PEM material; expose <attr>File
         # for both even though only private_key is technically secret.
@@ -1510,36 +1263,27 @@ let
           "private_key"
         ];
       };
-      realm_keystore_rsa_generateds = {
-        type = "keycloak_realm_keystore_rsa_generated";
+      keycloak_realm_keystore_rsa_generated = {
         prefix = "realm_keystore_rsa_generated";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "RSA keystore generated by Keycloak.";
       };
-      hardcoded_attribute_mappers = {
-        type = "keycloak_hardcoded_attribute_mapper";
+      keycloak_hardcoded_attribute_mapper = {
         prefix = "hardcoded_attribute_mapper";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           ldap_user_federation_id = ldapFederationIdRef;
         };
         description = "Sets a hardcoded user attribute on every federated user. Distinct from ldap_hardcoded_attribute_mapper and hardcoded_attribute_identity_provider_mapper.";
       };
-      openid_client_user_policies = {
-        type = "keycloak_openid_client_user_policy";
+      keycloak_openid_client_user_policy = {
         prefix = "openid_client_user_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           resource_server_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "resource_server_id";
               }
             ];
@@ -1549,45 +1293,35 @@ let
         };
         description = "Policy granting access to a specific set of users.";
       };
-      required_actions = {
-        type = "keycloak_required_action";
+      keycloak_required_action = {
         prefix = "required_action";
         nameAttr = "alias";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Realm required actions (per-realm), keyed by alias.";
       };
-      realm_events = {
-        type = "keycloak_realm_events";
+      keycloak_realm_events = {
         prefix = "realm_events";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         description = "Per-realm event logging configuration, keyed by an arbitrary label.";
       };
-      realm_localizations = {
-        type = "keycloak_realm_localization";
+      keycloak_realm_localization = {
         prefix = "realm_localization";
         nameAttr = "locale";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Per-realm i18n message bundle, keyed by locale.";
       };
-      realm_default_client_scopes = {
-        type = "keycloak_realm_default_client_scopes";
+      keycloak_realm_default_client_scopes = {
         prefix = "realm_default_client_scopes";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           default_scopes = {
             targets = [
               {
-                collection = "openid_client_scopes";
+                type = "keycloak_openid_client_scope";
                 field = "name";
               }
               {
-                collection = "saml_client_scopes";
+                type = "keycloak_saml_client_scope";
                 field = "name";
               }
             ];
@@ -1597,21 +1331,18 @@ let
         };
         description = "Realm-wide default client-scope binding (set of scope names), keyed by an arbitrary label. Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
       };
-      realm_optional_client_scopes = {
-        type = "keycloak_realm_optional_client_scopes";
+      keycloak_realm_optional_client_scopes = {
         prefix = "realm_optional_client_scopes";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           optional_scopes = {
             targets = [
               {
-                collection = "openid_client_scopes";
+                type = "keycloak_openid_client_scope";
                 field = "name";
               }
               {
-                collection = "saml_client_scopes";
+                type = "keycloak_saml_client_scope";
                 field = "name";
               }
             ];
@@ -1621,51 +1352,36 @@ let
         };
         description = "Realm-wide optional client-scope binding (set of scope names), keyed by an arbitrary label.";
       };
-      organizations = {
-        type = "keycloak_organization";
+      keycloak_organization = {
         prefix = "organization";
-        nameAttr = "name";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Keycloak organizations (per-realm, requires the organizations feature), keyed by name.";
       };
-      identity_provider_token_exchange_scope_permissions = {
-        type = "keycloak_identity_provider_token_exchange_scope_permission";
+      keycloak_identity_provider_token_exchange_scope_permission = {
         prefix = "idp_token_exchange_perm";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         description = "Per-IdP token-exchange permission policy granting a set of clients access to the IdP's token-exchange scope.";
       };
-      realm_user_profiles = {
-        type = "keycloak_realm_user_profile";
+      keycloak_realm_user_profile = {
         prefix = "realm_user_profile";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         # nested block inside a list element; wrapBlocks recurses through
         # the list, so the dotted path matches.
         description = "Per-realm user-profile schema (attribute declarations + groups). Keyed by an arbitrary label (one resource per realm).";
       };
-      realm_client_policy_profiles = {
-        type = "keycloak_realm_client_policy_profile";
+      keycloak_realm_client_policy_profile = {
         prefix = "realm_client_policy_profile";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Realm client-policy profile, listing executors that enforce a client policy.";
       };
-      realm_client_policy_profile_policies = {
-        type = "keycloak_realm_client_policy_profile_policy";
+      keycloak_realm_client_policy_profile_policy = {
         prefix = "realm_client_policy_profile_policy";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           profiles = {
             targets = [
               {
-                collection = "realm_client_policy_profiles";
+                type = "keycloak_realm_client_policy_profile";
                 field = "name";
               }
             ];
@@ -1675,17 +1391,14 @@ let
         };
         description = "Realm client-policy policy binding a set of profiles to a set of conditions.";
       };
-      group_permissions = {
-        type = "keycloak_group_permissions";
+      keycloak_group_permissions = {
         prefix = "group_permissions";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           group_id = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -1696,17 +1409,14 @@ let
         # every scope_* attr is a MaxItems:1 nested block.
         description = "Fine-grained authorization permissions for a group; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
       };
-      openid_client_permissions = {
-        type = "keycloak_openid_client_permissions";
+      keycloak_openid_client_permissions = {
         prefix = "openid_client_permissions";
-        nameAttr = null;
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_id = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "id";
               }
             ];
@@ -1716,25 +1426,19 @@ let
         };
         description = "Fine-grained authorization permissions on an openid_client; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
       };
-      users_permissions = {
-        type = "keycloak_users_permissions";
+      keycloak_users_permissions = {
         prefix = "users_permissions";
-        nameAttr = null;
-        scope = null;
         refs.realm_id = realmRef;
         description = "Fine-grained authorization permissions on the realm's users collection; each scope_* attr binds a scope to a `{ decision_strategy; policies; description; }` block.";
       };
-      group_admin_permissions = {
-        type = "keycloak_group_admin_permissions";
+      keycloak_group_admin_permissions = {
         prefix = "group_admin_permissions";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           group_ids = {
             targets = [
               {
-                collection = "groups";
+                type = "keycloak_group";
                 field = "id";
               }
             ];
@@ -1744,17 +1448,14 @@ let
         };
         description = "Fine-grained admin permission over groups; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
       };
-      openid_client_admin_permissions = {
-        type = "keycloak_openid_client_admin_permissions";
+      keycloak_openid_client_admin_permissions = {
         prefix = "openid_client_admin_permissions";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           client_ids = {
             targets = [
               {
-                collection = "openid_clients";
+                type = "keycloak_openid_client";
                 field = "id";
               }
             ];
@@ -1764,17 +1465,14 @@ let
         };
         description = "Fine-grained admin permission over openid_clients; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
       };
-      role_admin_permissions = {
-        type = "keycloak_role_admin_permissions";
+      keycloak_role_admin_permissions = {
         prefix = "role_admin_permissions";
-        nameAttr = "name";
-        scope = null;
         refs = {
           realm_id = realmRef;
           role_ids = {
             targets = [
               {
-                collection = "roles";
+                type = "keycloak_role";
                 field = "id";
               }
             ];
@@ -1784,27 +1482,18 @@ let
         };
         description = "Fine-grained admin permission over roles; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
       };
-      users_admin_permissions = {
-        type = "keycloak_users_admin_permissions";
+      keycloak_users_admin_permissions = {
         prefix = "users_admin_permissions";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Fine-grained admin permission over the realm's users; `scopes` names the admin actions granted and `policies` the authorization policies that gate them.";
       };
-      realm_client_registration_policies = {
-        type = "keycloak_realm_client_registration_policy";
+      keycloak_realm_client_registration_policy = {
         prefix = "realm_client_registration_policy";
-        nameAttr = "name";
-        scope = null;
         refs.realm_id = realmRef;
         description = "Per-realm client-registration policy (`provider_id` selects the policy type, `sub_type` its anonymous/authenticated scope, `config` its settings), keyed by name.";
       };
-      workflows = {
-        type = "keycloak_workflow";
+      keycloak_workflow = {
         prefix = "workflow";
-        nameAttr = "name";
-        scope = null;
         refs.realm = realmAliasRef;
         description = "Realm workflows: an event trigger (`on`) plus an ordered list of `step` actions, keyed by workflow name.";
       };

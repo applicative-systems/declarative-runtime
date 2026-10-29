@@ -32,7 +32,7 @@ let
   repoRef = {
     targets = [
       {
-        collection = "repositories";
+        type = "forgejo_repository";
         field = "id";
       }
     ];
@@ -42,7 +42,7 @@ let
   orgNameRef = {
     targets = [
       {
-        collection = "organizations";
+        type = "forgejo_organization";
         field = "name";
       }
     ];
@@ -55,7 +55,7 @@ let
   userRef = {
     targets = [
       {
-        collection = "users";
+        type = "forgejo_user";
         field = "login";
       }
     ];
@@ -69,12 +69,12 @@ let
   # than offered as a way to violate that constraint.
   omitOrgId = [ "organization_id" ];
 
-  # The svalabs/forgejo resource surface. Per collection, only the facts the
-  # schema does not carry (see modules/lib/tf-schema.nix for the full overlay
-  # vocabulary):
-  #   type         the `forgejo_*` resource type in the schema
+  # The svalabs/forgejo resource surface, keyed by resource type. Each type
+  # becomes the collection `services.forgejo.runtime.<plural>`
+  # (`forgejo_repository` -> `repositories`). Per type, only the facts the schema does not
+  # carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
   #   prefix       unique Terraform label prefix
-  #   nameAttr     attribute defaulted from the collection key (or null)
+  #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   scope        Forgejo token scope(s) required to manage the resource
   #   refs         parent links resolved to references against managed siblings
   #   description  the collection's NixOS option description
@@ -83,16 +83,13 @@ let
     inherit provider runtimePrefix;
     source = providerSource;
     resources = {
-      organizations = {
-        type = "forgejo_organization";
+      forgejo_organization = {
         prefix = "org";
-        nameAttr = "name";
         scope = "write:organization";
         refs = { };
         description = "Forgejo organizations, keyed by organization name.";
       };
-      users = {
-        type = "forgejo_user";
+      forgejo_user = {
         prefix = "user";
         nameAttr = "login";
         # Create goes through the admin API (write:admin); the provider reads the
@@ -104,19 +101,17 @@ let
         refs = { };
         description = "Forgejo users, keyed by login. Requires administrative privileges.";
       };
-      repositories = {
-        type = "forgejo_repository";
+      forgejo_repository = {
         prefix = "repo";
-        nameAttr = "name";
         scope = "write:repository";
         refs.owner = {
           targets = [
             {
-              collection = "organizations";
+              type = "forgejo_organization";
               field = "name";
             }
             {
-              collection = "users";
+              type = "forgejo_user";
               field = "login";
             }
           ];
@@ -125,25 +120,21 @@ let
         };
         description = "Forgejo repositories, keyed by repository name.";
       };
-      teams = {
-        type = "forgejo_team";
+      forgejo_team = {
         prefix = "team";
-        nameAttr = "name";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
         description = "Forgejo organization teams, keyed by team name.";
       };
-      team_members = {
-        type = "forgejo_team_member";
+      forgejo_team_member = {
         prefix = "team_member";
-        nameAttr = null;
         scope = "write:organization";
         refs = {
           team_id = {
             targets = [
               {
-                collection = "teams";
+                type = "forgejo_team";
                 field = "id";
               }
             ];
@@ -154,10 +145,8 @@ let
         };
         description = "Forgejo team memberships, keyed by an arbitrary label.";
       };
-      collaborators = {
-        type = "forgejo_collaborator";
+      forgejo_collaborator = {
         prefix = "collab";
-        nameAttr = null;
         scope = "write:repository";
         refs = {
           repository_id = repoRef;
@@ -165,76 +154,58 @@ let
         };
         description = "Forgejo repository collaborators, keyed by an arbitrary label.";
       };
-      branch_protections = {
-        type = "forgejo_branch_protection";
+      forgejo_branch_protection = {
         prefix = "branch_protection";
-        nameAttr = null;
         scope = "write:repository";
         refs.repository_id = repoRef;
         description = "Forgejo branch protections, keyed by an arbitrary label.";
       };
-      deploy_keys = {
-        type = "forgejo_deploy_key";
+      forgejo_deploy_key = {
         prefix = "deploy_key";
-        nameAttr = null;
         scope = "write:repository";
         refs.repository_id = repoRef;
         description = "Forgejo repository deploy keys, keyed by an arbitrary label.";
       };
-      repository_webhooks = {
-        type = "forgejo_repository_webhook";
+      forgejo_repository_webhook = {
         prefix = "repo_webhook";
-        nameAttr = null;
         scope = "write:repository";
         refs.repository_id = repoRef;
         description = "Forgejo repository webhooks, keyed by an arbitrary label.";
       };
-      repository_action_secrets = {
-        type = "forgejo_repository_action_secret";
+      forgejo_repository_action_secret = {
         prefix = "repo_action_secret";
-        nameAttr = "name";
         scope = "write:repository";
         refs.repository_id = repoRef;
         description = "Forgejo repository Actions secrets, keyed by secret name.";
       };
-      repository_action_variables = {
-        type = "forgejo_repository_action_variable";
+      forgejo_repository_action_variable = {
         prefix = "repo_action_var";
-        nameAttr = "name";
         scope = "write:repository";
         refs.repository_id = repoRef;
         description = "Forgejo repository Actions variables, keyed by variable name.";
       };
-      organization_action_secrets = {
-        type = "forgejo_organization_action_secret";
+      forgejo_organization_action_secret = {
         prefix = "org_action_secret";
-        nameAttr = "name";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
         description = "Forgejo organization Actions secrets, keyed by secret name.";
       };
-      organization_action_variables = {
-        type = "forgejo_organization_action_variable";
+      forgejo_organization_action_variable = {
         prefix = "org_action_var";
-        nameAttr = "name";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
         description = "Forgejo organization Actions variables, keyed by variable name.";
       };
-      ssh_keys = {
-        type = "forgejo_ssh_key";
+      forgejo_ssh_key = {
         prefix = "ssh_key";
-        nameAttr = null;
         scope = "write:admin";
         refs.user = userRef;
         description = "Forgejo user SSH keys, keyed by an arbitrary label. Requires administrative privileges.";
       };
-      gpg_keys = {
-        type = "forgejo_gpg_key";
+      forgejo_gpg_key = {
         prefix = "gpg_key";
-        nameAttr = null;
         scope = "write:user";
         refs = { };
         description = "Forgejo GPG keys for the authenticated user, keyed by an arbitrary label.";
