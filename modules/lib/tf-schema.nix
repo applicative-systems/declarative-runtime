@@ -95,12 +95,11 @@ in
     `<name>` is the resource type without the provider's name, in the plural
     (`keycloak_realm` -> `realms`, `forgejo_repository` -> `repositories`).
 
-    Only `prefix` is mandatory; the other fields default and exist only to
-    state what a schema cannot. There is deliberately no way to declare
+    Every field is optional and exists only to state what a schema cannot;
+    `{ }` models a resource as the schema has it. The collection key is the
+    Terraform label. There is deliberately no way to declare
     an option with no schema counterpart -- `refs` is the sole exception, and
     that is what makes the drift check total.
-
-      prefix         unique Terraform label prefix
 
       refs           schema attribute -> reference spec (see below)
       description    what the resource is, for the collection's NixOS option.
@@ -463,7 +462,6 @@ in
           spec = {
             inherit (o)
               type
-              prefix
               scope
               ;
             inherit nameAttr description refs;
@@ -479,7 +477,7 @@ in
 
           # what the pairing covers, for the generated coverage report.
           coverage = {
-            inherit (o) type prefix;
+            inherit (o) type;
             inherit description;
             options = length (attrNames spec.attrs);
             attributes = length (attrNames tree);
@@ -506,7 +504,6 @@ in
       allTypes = attrNames resources;
       allCollections = map collectionName allTypes;
       foreignTypes = filter (t: !(lib.hasPrefix "${providerName}_" t)) allTypes;
-      allPrefixes = mapAttrsToList (_: o: o.prefix) resources;
       schemaTypes = attrNames schema.resource_schemas;
       unsupportedTypes = attrNames unsupported;
 
@@ -541,9 +538,6 @@ in
         (check (
           duplicates allCollections == [ ]
         ) "collection ${quoteList (duplicates allCollections)} would hold more than one resource type")
-        (check (
-          duplicates allPrefixes == [ ]
-        ) "label prefix ${quoteList (duplicates allPrefixes)} used by more than one collection")
 
         # schema -> overlay: a provider bump names every new resource here.
         (check (unclaimed == [ ])

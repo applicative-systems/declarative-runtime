@@ -278,7 +278,7 @@ in
           )
           assert "verysecretpassword" not in tfjson, \
               "smtp_server.auth.password leaked into .tf.json"
-          assert "secret_realm_acme_smtp_server_auth_password" in tfjson, \
+          assert "secret_keycloak_realm_acme_smtp_server_auth_password" in tfjson, \
               "nested-secret var reference missing in .tf.json"
           smtp = acme.get("smtpServer", {})
           assert smtp.get("host") == "smtp.example.com", f"smtp: {smtp}"

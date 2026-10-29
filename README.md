@@ -119,7 +119,7 @@ flake.nix              # outputs: nixosModules, packages (examples), checks, for
 treefmt.nix            # treefmt + nixfmt config
 modules/
   default.nix          # aggregates per-pairing modules into nixosModules.default
-  lib/                 # shared helpers: tf-label/file, run-once reconciler
+  lib/                 # shared helpers: .tf.json generation, run-once reconciler
 services/              # one directory per service<->provider pairing
   forgejo/             # Forgejo <-> svalabs/forgejo
     module.nix         #   NixOS module: services.forgejo.runtime + systemd wiring

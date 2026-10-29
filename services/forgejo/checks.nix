@@ -10,10 +10,13 @@
 #     a repository by its numeric id — so a successful apply proves reference
 #     resolution and apply ordering. A user with a `passwordFile` also proves
 #     per-secret credential indirection — the value is loaded from a host file
-#     and kept out of the generated `.tf.json`. Requires KVM (a NixOS VM test).
+#     and kept out of the generated `.tf.json`. State held under the legacy
+#     Terraform labels (`<prefix>_<key>`) must migrate through the generated
+#     `moved` blocks without a re-create. Requires KVM (a NixOS VM test).
 { pkgs, self }:
 let
   fixtures = import ./fixtures.nix;
+  legacyLabelPrefixes = import ./legacy-label-prefixes.nix;
 in
 {
   forgejo = pkgs.testers.runNixOSTest {
@@ -24,8 +27,12 @@ in
       {
         imports = [ self.nixosModules.default ];
 
-        # curl drives the post-convergence API assertions.
-        environment.systemPackages = [ pkgs.curl ];
+        # curl drives the post-convergence API assertions; the reconciler's
+        # own OpenTofu edits the state to simulate a legacy host.
+        environment.systemPackages = [
+          pkgs.curl
+          (pkgs.opentofu.withPlugins (_: [ (import ./pkg.nix { inherit pkgs; }) ]))
+        ];
 
         # mock agenix secrets: passwords supplied as host files, fed to the
         # reconciler via LoadCredential and never the world-readable store.
@@ -123,6 +130,27 @@ in
       assert apply_lines, "no 'Apply complete!' line in journal"
       assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
           f"reapply was not a no-op: {apply_lines[-1]}"
+
+      # A host that applied an older config holds its resources under the
+      # legacy labels `<prefix>_<key>`. Move the state to those labels: the
+      # next apply must follow the generated `moved` blocks back, and must not
+      # destroy and re-create a resource.
+      legacy = json.loads('${builtins.toJSON legacyLabelPrefixes}')
+      tf = "runuser -u forgejo -- tofu -chdir=/var/lib/forgejo/declarative-terraform"
+      addrs = sorted(machine.succeed(f"{tf} state list").split())
+      assert addrs, "no resources in the state"
+      for addr in addrs:
+          rtype, label = addr.split(".")
+          machine.succeed(f"{tf} state mv {addr} {rtype}.{legacy[rtype]}_{label}")
+      machine.succeed("systemctl restart declarative-forgejo.service")
+      apply_lines = machine.succeed(
+          "journalctl -u declarative-forgejo.service --no-pager --output=cat "
+          "| grep 'Apply complete'"
+      ).strip().splitlines()
+      assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
+          f"legacy-label migration was not a no-op: {apply_lines[-1]}"
+      migrated = sorted(machine.succeed(f"{tf} state list").split())
+      assert migrated == addrs, f"state not moved back to the current labels: {migrated}"
 
       # Adding an admin-scoped resource (a user needs write:admin + read:user)
       # mus work because the scopen is the maximal "all" token

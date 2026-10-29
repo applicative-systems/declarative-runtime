@@ -73,7 +73,6 @@ let
   # becomes the collection `services.forgejo.runtime.<plural>`
   # (`forgejo_repository` -> `repositories`). Per type, only the facts the schema does not
   # carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
-  #   prefix       unique Terraform label prefix
   #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   scope        Forgejo token scope(s) required to manage the resource
   #   refs         parent links resolved to references against managed siblings
@@ -84,11 +83,9 @@ let
     source = providerSource;
     resources = {
       forgejo_organization = {
-        prefix = "org";
         scope = "write:organization";
       };
       forgejo_user = {
-        prefix = "user";
         nameAttr = "login";
         # Create goes through the admin API (write:admin); the provider reads the
         # user back via /users/search (read:user), a separate scope category.
@@ -98,7 +95,6 @@ let
         ];
       };
       forgejo_repository = {
-        prefix = "repo";
         scope = "write:repository";
         refs.owner = {
           targets = [
@@ -116,13 +112,11 @@ let
         };
       };
       forgejo_team = {
-        prefix = "team";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
       forgejo_team_member = {
-        prefix = "team_member";
         scope = "write:organization";
         refs = {
           team_id = {
@@ -139,7 +133,6 @@ let
         };
       };
       forgejo_collaborator = {
-        prefix = "collab";
         scope = "write:repository";
         refs = {
           repository_id = repoRef;
@@ -147,49 +140,40 @@ let
         };
       };
       forgejo_branch_protection = {
-        prefix = "branch_protection";
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
       forgejo_deploy_key = {
-        prefix = "deploy_key";
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
       forgejo_repository_webhook = {
-        prefix = "repo_webhook";
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
       forgejo_repository_action_secret = {
-        prefix = "repo_action_secret";
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
       forgejo_repository_action_variable = {
-        prefix = "repo_action_var";
         scope = "write:repository";
         refs.repository_id = repoRef;
       };
       forgejo_organization_action_secret = {
-        prefix = "org_action_secret";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
       forgejo_organization_action_variable = {
-        prefix = "org_action_var";
         scope = "write:organization";
         refs.organization = orgNameRef;
         omit = omitOrgId;
       };
       forgejo_ssh_key = {
-        prefix = "ssh_key";
         scope = "write:admin";
         refs.user = userRef;
       };
       forgejo_gpg_key = {
-        prefix = "gpg_key";
         scope = "write:user";
         description = "Forgejo GPG keys for the authenticated user.";
       };
@@ -220,6 +204,7 @@ let
       tokenVar
       ;
     providerName = "forgejo";
+    legacyLabelPrefixes = import ./legacy-label-prefixes.nix;
     providerBlock = cfg: {
       host = cfg.baseUrl;
       api_token = "\${var.${tokenVar}}";

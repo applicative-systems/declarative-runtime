@@ -86,12 +86,9 @@ rec {
   # tf-label + tf-json helpers
   # ---------------------------------------------------------------------------
 
-  # turn an arbitrary string into a valid Terraform block label. always
-  # prefixed so the result starts with a letter.
-  tfLabel =
-    prefix: name:
-    "${prefix}_"
-    + lib.stringAsChars (c: if builtins.match "[A-Za-z0-9_-]" c != null then c else "_") name;
+  # a collection key is used as the Terraform block label as-is, so it must
+  # be a valid Terraform identifier.
+  isTfIdentifier = name: builtins.match "[A-Za-z_][A-Za-z0-9_-]*" name != null;
 
   # write the config as a .tf.json file in the nix store. must contain no
   # secrets -- the store is world-readable.
@@ -175,6 +172,9 @@ rec {
   #   runtimePrefix     "services.<svc>.runtime" — for error messages
   #   tokenVar          name of the primary sensitive tf variable
   #   extraSensitiveVars  extra sensitive-tf-var names (default [])
+  #   legacyLabelPrefixes  type -> label prefix of an older label scheme
+  #                     (`<prefix>_<key>`); each declared resource of such a
+  #                     type gets a `moved` block from its old label (default {})
   #
   # returns: cfg -> { config; credentials; }
   mkTfConfig =
@@ -187,6 +187,7 @@ rec {
       runtimePrefix,
       tokenVar,
       extraSensitiveVars ? [ ],
+      legacyLabelPrefixes ? { },
     }:
     cfg:
     let
@@ -194,7 +195,7 @@ rec {
       varSafe = lib.stringAsChars (c: if builtins.match "[A-Za-z0-9_]" c != null then c else "_");
       secretId =
         spec: key: attr:
-        "secret_${spec.prefix}_${varSafe key}_${attr}";
+        "secret_${spec.type}_${varSafe key}_${attr}";
 
       resolveRef =
         refSpec: val:
@@ -205,7 +206,7 @@ rec {
               tspec = resourceTypes.${t.collection};
             in
             if (cfg.${t.collection} or { }) ? ${val} then
-              "\${" + tspec.type + "." + tfLabel tspec.prefix val + "." + t.field + "}"
+              "\${" + tspec.type + "." + val + "." + t.field + "}"
             else
               null;
           hits = builtins.filter (x: x != null) (map tryTarget refSpec.targets);
@@ -395,11 +396,18 @@ rec {
         # deepSeq forces the checks to run.
         # (they're not nixos assertions because we generate the .tf.json
         # outside a full system build too.)
-        builtins.deepSeq [ reqSecretChecks reqAttrChecks oneOfChecks ] {
-          label = tfLabel spec.prefix key;
-          value = wrapped;
-          inherit (substituted) secrets;
-        };
+        if !isTfIdentifier key then
+          throw "${runtimePrefix}.${c}: key `${key}` is not a valid Terraform identifier (letters, digits, `_` and `-`, not starting with a digit)${
+            lib.optionalString (
+              spec.nameAttr != null
+            ) "; use an identifier key and set `${spec.nameAttr}` explicitly"
+          }"
+        else
+          builtins.deepSeq [ reqSecretChecks reqAttrChecks oneOfChecks ] {
+            label = key;
+            value = wrapped;
+            inherit (substituted) secrets;
+          };
 
       nonEmpty = lib.filterAttrs (c: _: (cfg.${c} or { }) != { }) resourceTypes;
       # for each collection: [ { label; value; secrets } ... ].
@@ -412,6 +420,36 @@ rec {
           lib.listToAttrs (map (r: lib.nameValuePair r.label r.value) items)
         )
       ) renderedPerCollection;
+
+      # `moved` blocks from the legacy labels to the current ones. a legacy
+      # address that is also declared would make tofu reject the config.
+      moved = lib.concatLists (
+        lib.mapAttrsToList (
+          c: items:
+          let
+            type = resourceTypes.${c}.type;
+            declared = resourceBlocks.${type};
+          in
+          lib.optionals (legacyLabelPrefixes ? ${type}) (
+            map (
+              r:
+              let
+                old = "${legacyLabelPrefixes.${type}}_${r.label}";
+              in
+              if declared ? ${old} then
+                throw "${runtimePrefix}.${c}: key `${old}` is the legacy label of key `${r.label}`; rename one of them"
+              else
+                {
+                  from = "${type}.${old}";
+                  to = "${type}.${r.label}";
+                }
+            ) items
+          )
+        ) renderedPerCollection
+      );
+      unknownLegacyTypes = lib.subtractLists (lib.mapAttrsToList (_: s: s.type) resourceTypes) (
+        builtins.attrNames legacyLabelPrefixes
+      );
 
       # every secret across the config (for sensitive tf vars + the
       # id -> host path map fed to LoadCredential).
@@ -437,7 +475,8 @@ rec {
         // lib.listToAttrs (map (e: lib.nameValuePair e.id sensitiveVar) allSecrets);
         provider.${providerName} = providerBlock cfg;
       }
-      // lib.optionalAttrs (resourceBlocks != { }) { resource = resourceBlocks; };
+      // lib.optionalAttrs (resourceBlocks != { }) { resource = resourceBlocks; }
+      // lib.optionalAttrs (moved != [ ]) { inherit moved; };
 
       credentials =
         if lib.length secretIds != lib.length (lib.unique secretIds) then
@@ -445,9 +484,12 @@ rec {
         else
           lib.listToAttrs (map (e: lib.nameValuePair e.id e.file) allSecrets);
     in
-    {
-      inherit config credentials;
-    };
+    if unknownLegacyTypes != [ ] then
+      throw "${runtimePrefix}: legacyLabelPrefixes names unmodelled types: ${toString unknownLegacyTypes}"
+    else
+      {
+        inherit config credentials;
+      };
 
   # ---------------------------------------------------------------------------
   # run-once reconciler systemd service

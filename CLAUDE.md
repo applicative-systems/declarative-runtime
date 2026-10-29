@@ -84,7 +84,7 @@ treefmt.nix                 # treefmt + nixfmt config
 modules/
   default.nix               # aggregates per-pairing modules into nixosModules.default
   lib/
-    default.nix             # provider-agnostic helpers: tf-label/file, .tf.json generation, run-once OpenTofu reconciler
+    default.nix             # provider-agnostic helpers: .tf.json generation, run-once OpenTofu reconciler
     tf-schema.nix           # schema-driven resourceTypes generator + drift assertions
     render-fixtures.nix     # renders a pairing's fixtures through the real option system (refactor snapshot)
     schema-report.nix       # the per-pairing coverage table, as a build artifact
@@ -95,6 +95,7 @@ services/                   # one directory per service<->provider pairing
     provider-schema.json    # normalized dump of the pinned provider's schema; the resource surface is derived from it
     schema.nix              # one line: fromJSON (readFile ./provider-schema.json) -- import is memoized, readFile is not
     pkg.nix                 # optional: vendor the provider when it's not in nixpkgs (here svalabs/forgejo via mkProvider)
+    legacy-label-prefixes.nix  # migration only, to remove: type -> old label prefix, rendered as `moved` blocks
     fixtures.nix            # the services.forgejo.runtime blocks the VM tests converge, shared with the rendered-fixtures package
     checks.nix              # the pairing's checks attrset (nixosTest); merged into flake checks
     README.md               # per-pairing usage docs
@@ -160,12 +161,12 @@ keycloak pairings encode.
   returns `{ resourceTypes; checks; coverage; }` in exactly the shape
   `modules/lib/default.nix` already consumes. Split of responsibility:
 
-  | Derived from the schema                                | Hand-written in the overlay                                |
-  | ------------------------------------------------------ | ---------------------------------------------------------- |
-  | every settable attribute, its Nix type and optionality | the collection name, `type`, `prefix`, `nameAttr`, `scope` |
-  | nested blocks as submodules, `blockAttrs` wrapping     | `refs` — the reference graph, which no schema carries      |
-  | `secrets` (schema `sensitive`) and `requiredSecrets`   | `description` — the NixOS-facing prose                     |
-  | attribute descriptions (provider's own, else a stub)   | corrections: see the next bullet                           |
+  | Derived from the schema                                | Hand-written in the overlay                           |
+  | ------------------------------------------------------ | ----------------------------------------------------- |
+  | every settable attribute, its Nix type and optionality | the collection name, `type`, `nameAttr`, `scope`      |
+  | nested blocks as submodules, `blockAttrs` wrapping     | `refs` — the reference graph, which no schema carries |
+  | `secrets` (schema `sensitive`) and `requiredSecrets`   | `description` — the NixOS-facing prose                |
+  | attribute descriptions (provider's own, else a stub)   | corrections: see the next bullet                      |
 
 - Corrections a collection may declare, all of them optional and all validated
   against the schema: `omit` (dotted paths to drop), `extraSecrets` /
@@ -181,8 +182,9 @@ keycloak pairings encode.
   `attrsOf (submodule { options = <attrs> ++ <refs> ++ <attr>File; })` — **no
   `freeformType`**. A wrong name, wrong type, or missing required field is an
   eval-time error at `nix flake check`, not an apply-time one. Computed /
-  output-only attributes are dropped. The attrset key becomes the Terraform
-  label and defaults `nameAttr`. Reference inputs and `<attr>File` secret inputs
+  output-only attributes are dropped. The attrset key is the Terraform label
+  as-is, so it must be a valid Terraform identifier (an eval-time error
+  otherwise), and it defaults `nameAttr`. Reference inputs and `<attr>File` secret inputs
   are declared separately (they are resolved/rerouted at generation, not passed
   through).
 - Required attributes are declared without a default; optional ones are
@@ -217,7 +219,7 @@ readers are exercised in-tree:
   `resourceTypes` is forced. Identity: the schema's `source` and `version` match
   the packaged provider. Overlay → schema: every `type`, `nameAttr`, ref `attr`,
   correction entry and `extraAttrs` key names something the schema declares;
-  `prefix`es and `type`s are unique. Schema → overlay: every resource the
+  collection names are unique. Schema → overlay: every resource the
   provider offers is either modelled or listed in `unsupported` with a non-empty
   reason. A provider bump therefore names every new resource in the error.
 - `<svc>-schema-coverage` forces those assertions on their own, so drift fails a
@@ -248,7 +250,7 @@ readers are exercised in-tree:
   `<attr>File` option taking a **host file path** (a string path resolved on the
   target, _never_ a Nix store path). When set, generation emits `${var.<id>}` +
   a `sensitive` variable and collects an `id → host path` pair (id
-  `secret_<prefix>_<key>_<attr>`); the literal `<attr>` and `<attr>File` are
+  `secret_<type>_<key>_<attr>`); the literal `<attr>` and `<attr>File` are
   mutually exclusive. The credential map flows `<svc>TfConfig` → `module.nix` →
   `mkReconcileService`, which `LoadCredential=`s each file and exports it as
   `TF_VAR_<id>`. This is the same mechanism that protects the admin token.
