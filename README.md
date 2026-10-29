@@ -123,13 +123,13 @@ modules/
 services/              # one directory per service<->provider pairing
   forgejo/             # Forgejo <-> svalabs/forgejo
     module.nix         #   NixOS module: services.forgejo.runtime + systemd wiring
-    lib.nix            #   provider specifics: wrapped executor + .tf.json generation
+    lib.nix            #   provider specifics: wrapped executor + the resource-surface overlay
     pkg.nix            #   vendor the provider (not in nixpkgs)
     checks.nix         #   NixOS VM test
     README.md          #   usage docs
   keycloak/            # Keycloak <-> keycloak/keycloak (in nixpkgs)
     module.nix         #   services.keycloak.runtime + reconciler + bootstrap unit
-    lib.nix            #   ~95 typed resourceTypes + the value-tree renderer
+    lib.nix            #   provider specifics: wrapped executor + the resource-surface overlay
     checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
     README.md          #   usage docs
 examples/              # runnable demos; one configuration.nix + README per example

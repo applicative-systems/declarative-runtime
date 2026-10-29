@@ -159,14 +159,17 @@ keycloak pairings encode.
 - The surface is **derived from `provider-schema.json`**, not hand-written:
   `tfSchema.mkResourceTypes { schema; provider; source; runtimePrefix; resources; unsupported ? {}; omitEverywhere ? []; }`
   returns `{ resourceTypes; checks; coverage; }` in exactly the shape
-  `modules/lib/default.nix` already consumes. Split of responsibility:
+  `modules/lib/default.nix` already consumes. `resources` is keyed by resource
+  type, and `{ }` models a type as the schema has it. Split of responsibility:
 
-  | Derived from the schema                                | Hand-written in the overlay                           |
-  | ------------------------------------------------------ | ----------------------------------------------------- |
-  | every settable attribute, its Nix type and optionality | the collection name, `type`, `nameAttr`, `scope`      |
-  | nested blocks as submodules, `blockAttrs` wrapping     | `refs` — the reference graph, which no schema carries |
-  | `secrets` (schema `sensitive`) and `requiredSecrets`   | `description` — the NixOS-facing prose                |
-  | attribute descriptions (provider's own, else a stub)   | corrections: see the next bullet                      |
+  | Derived from the schema                                             | Hand-written in the overlay                                         |
+  | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+  | every settable attribute, its Nix type and optionality              | `refs` — the reference graph, which no schema carries               |
+  | the collection name: `keycloak_realm` -> `realms`                   | `nameAttr`, only where the key fills an attribute other than `name` |
+  | nested blocks as submodules, `blockAttrs` wrapping                  | `scope`, where the provider's token has scopes                      |
+  | `secrets` (schema `sensitive`) and `requiredSecrets`                | `description`, only to replace the provider's own                   |
+  | attribute and collection descriptions (provider's own, else a stub) | corrections: see the next bullet                                    |
+  | each reference's option name, list-ness and optionality             |                                                                     |
 
 - Corrections a collection may declare, all of them optional and all validated
   against the schema: `omit` (dotted paths to drop), `extraSecrets` /
@@ -217,7 +220,7 @@ readers are exercised in-tree:
 
 - Eval-time assertions live in the generator's `checks` and fire the moment
   `resourceTypes` is forced. Identity: the schema's `source` and `version` match
-  the packaged provider. Overlay → schema: every `type`, `nameAttr`, ref `attr`,
+  the packaged provider. Overlay → schema: every resource type, `nameAttr`, `refs` key,
   correction entry and `extraAttrs` key names something the schema declares;
   collection names are unique. Schema → overlay: every resource the
   provider offers is either modelled or listed in `unsupported` with a non-empty
@@ -232,12 +235,16 @@ readers are exercised in-tree:
   it before and after a change and diff, since rendered `.tf.json` alone cannot
   show an option nobody sets.
 - Parent links are named by the **key of another managed resource** and resolved
-  to `${type.label.field}` interpolations — this both wires the numeric `*_id`
-  attributes a user cannot know _and_ orders `tofu apply`. A `refs` entry is
-  `{ attr; targets; field; managedOnly; required; description; }`: `managedOnly`
-  references (numeric ids) must resolve to a managed sibling (generation throws
-  otherwise); name references accept a managed key _or_ a literal; `required`
-  declares the reference input as a required option.
+  to `${type.key.field}` interpolations — this both wires the numeric `*_id`
+  attributes a user cannot know _and_ orders `tofu apply`. `refs` is keyed by
+  the schema attribute a reference fills, and an entry is
+  `{ targets; managedOnly; required ? <schema>; description; }`, each target a
+  `{ type; field; }`. The option the user sets is named after the attribute
+  (`realm_id` -> `realm`, `group_ids` -> `groups`), and its list-ness and
+  optionality come from the schema; `required` may only be set to differ from
+  it. `managedOnly` references (numeric ids) must resolve to a managed sibling
+  (generation throws otherwise); name references accept a managed key _or_ a
+  literal.
 - `<svc>TfConfig cfg` returns `{ config; credentials; }`. `config` carries **no
   secret**: a `provider` block pointed at the local instance, plus the admin
   token and every `<attr>File` secret as `sensitive` input `variable`s fed from

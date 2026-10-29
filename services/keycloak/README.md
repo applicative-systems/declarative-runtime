@@ -452,7 +452,7 @@ currently modelled, so that set is empty.
 
 An upstream attribute that becomes **required** turns into a required
 option, which fails evaluation for configurations that never set it. That
-is usually the right signal, but `forceOptional` in the collection's
+is usually the right signal, but `forceOptional` in the resource's
 overlay is the release valve when it is not.
 
 ## State directory note

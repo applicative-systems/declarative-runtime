@@ -76,7 +76,7 @@ in
 {
   /*
     Build a pairing's `resourceTypes` (and its drift assertions) from a vendored
-    provider schema plus a per-collection overlay.
+    provider schema plus a per-resource-type overlay.
 
       schema         parsed `provider-schema.json` (normalized: `format_version`,
                      `source`, `version`, `resource_schemas`)
@@ -97,9 +97,9 @@ in
 
     Every field is optional and exists only to state what a schema cannot;
     `{ }` models a resource as the schema has it. The collection key is the
-    Terraform label. There is deliberately no way to declare
-    an option with no schema counterpart -- `refs` is the sole exception, and
-    that is what makes the drift check total.
+    Terraform label. There is deliberately no way to declare an option with no
+    schema counterpart -- `refs` is the sole exception, and that is what makes
+    the drift check total.
 
       refs           schema attribute -> reference spec (see below)
       description    what the resource is, for the collection's NixOS option.
