@@ -168,7 +168,7 @@ keycloak pairings encode.
   | the collection name: `keycloak_realm` -> `realms`                    | `nameAttr`, only where the key fills an attribute other than `name` |
   | nested blocks as submodules, `blockAttrs` wrapping                   | `scope`, where the provider's token has scopes                      |
   | `secrets` (schema `sensitive`) and `requiredSecrets`                 | `description`, only to replace the provider's own                   |
-  | attribute and collection descriptions (provider's own, else a stub)  | corrections: see the next bullet                                    |
+  | descriptions: the provider's own (else a stub), plus a docs link     | corrections: see the next bullet                                    |
   | each reference's option name, list-ness, optionality and description |                                                                     |
 
 - Corrections a collection may declare, all of them optional and all validated

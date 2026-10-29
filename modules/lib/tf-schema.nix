@@ -104,8 +104,10 @@ in
       refs           schema attribute -> reference spec (see below)
       description    what the resource is, for the collection's NixOS option.
                      Defaults to the provider's own description, else to a
-                     stub; the sentence on what a key means is always
-                     generated, so it does not go here.
+                     stub. Set it only to state a fact that neither the
+                     resource type nor the provider docs give. The sentence
+                     on what a key means and the link to the provider docs
+                     are always generated, so they do not go here.
 
       nameAttr       attribute the collection key fills in. Defaults to `name`
                      when the resource has a settable string `name`, else null;
@@ -219,6 +221,7 @@ in
               else
                 "Each key sets the instance's `${nameAttr}`, unless the instance sets `${nameAttr}` itself."
             )
+            "Provider documentation: <https://search.opentofu.org/provider/${source}/v${schema.version}/docs/resources/${lib.removePrefix "${providerName}_" type}>."
           ];
 
           # attributes the reference inputs occupy: the user names a sibling
