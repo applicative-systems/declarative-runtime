@@ -5,11 +5,19 @@
 # the grants between them) against Garage's v2 admin API once `garage.service`
 # is up.
 #
-# The admin token is the one Garage itself reads at startup
-# (`settings.admin.admin_token_file`), so there is no token to bootstrap: Garage
-# has no admin token until its config has one, and a token minted at runtime
-# (`garage admin-token create`) is stored in the cluster, which needs a layout
-# first.
+# Garage stores no bucket or key until its cluster layout gives a node a role,
+# and an admin token minted at runtime is stored in the cluster too. So the
+# module bootstraps in this order, before the reconciler:
+#
+# 1. `declarative-garage-layout` (when `layout` is set) gives this node its role
+#    and applies the layout.
+# 2. `declarative-garage-token` (when `tokenFile` is null) replaces the
+#    reconciler's admin token with a new one, scoped to the functions the
+#    provider calls. Garage keeps the token in the cluster, and the unit keeps
+#    it in its runtime directory only, so it is never on disk.
+#
+# Both units use `garage json-api`, which calls the admin API through Garage's
+# RPC as root, so they need no admin token of their own.
 #
 # `nix-tf-schema` is the schema-conversion library the resource surface is derived
 # from; the flake injects it via `_module.args`, since a NixOS module cannot
@@ -41,6 +49,37 @@ let
     if adminBind == null then null else "http://localhost:${lib.last (lib.splitString ":" adminBind)}";
 
   tf = tflib.garageTfConfig cfg;
+
+  layoutUnit = "declarative-garage-layout";
+  tokenUnit = "declarative-garage-token";
+  bootstrapToken = cfg.tokenFile == null;
+  tokenFile = if bootstrapToken then "/run/${tokenUnit}/token" else cfg.tokenFile;
+
+  # Run a command until it succeeds, for two minutes at most (the budget of the
+  # reconciler's health wait). A oneshot has no start timeout of its own.
+  retry = ''
+    retry() {
+      for _ in $(seq 60); do
+        if "$@"; then return 0; fi
+        sleep 2
+      done
+      echo "$*: no success after two minutes" >&2
+      return 1
+    }
+  '';
+
+  bootstrapUnit = {
+    after = [ "garage.service" ];
+    requires = [ "garage.service" ];
+    path = [
+      garage.package
+      pkgs.jq
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+  };
 in
 {
   options.services.garage.runtime = {
@@ -68,7 +107,48 @@ in
         sops-nix or agenix), NOT a store path: it is handed to the reconciler
         via systemd `LoadCredential=` and never copied into the Nix store.
 
-        Defaults to the file Garage itself reads its admin token from.
+        Defaults to the file Garage itself reads its admin token from. When
+        `null`, the `declarative-garage-token` unit mints a token each time it
+        starts, scoped to the admin API functions the provider calls, and
+        deletes the token it minted before.
+      '';
+    };
+
+    layout = mkOption {
+      type = types.nullOr (
+        types.submodule {
+          options = {
+            zone = mkOption {
+              type = types.str;
+              example = "dc1";
+              description = "Zone of this node.";
+            };
+            capacity = mkOption {
+              type = types.ints.positive;
+              example = literalExpression "100 * 1000 * 1000 * 1000";
+              description = "Storage capacity of this node, in bytes.";
+            };
+            tags = mkOption {
+              type = types.listOf types.str;
+              default = [ ];
+              description = "Tags of this node.";
+            };
+          };
+        }
+      );
+      default = null;
+      example = {
+        zone = "dc1";
+        capacity = 1000 * 1000 * 1000;
+      };
+      description = ''
+        Role of this node in the cluster layout. When set, the
+        `declarative-garage-layout` unit gives this node this role and applies
+        the layout, before the reconciler runs. It does nothing when the node
+        already has this role, and it changes no other node.
+
+        When `null`, the operator makes the layout. Garage stores no bucket or
+        key, and mints no admin token, until the layout gives a node a role.
       '';
     };
   }
@@ -89,21 +169,82 @@ in
         assertion = cfg.baseUrl != null;
         message = "services.garage.runtime requires the admin API: set services.garage.settings.admin.api_bind_addr, or services.garage.runtime.baseUrl.";
       }
-      {
-        assertion = cfg.tokenFile != null;
-        message = "services.garage.runtime requires an admin token: set services.garage.settings.admin.admin_token_file, or services.garage.runtime.tokenFile.";
-      }
     ];
+
+    systemd.services.${layoutUnit} = mkIf (cfg.layout != null) (
+      bootstrapUnit
+      // {
+        description = "Give this node its role in the Garage cluster layout";
+        script = ''
+          ${retry}
+          retry garage json-api GetClusterLayout > /dev/null
+          node=$(garage node id -q)
+          role=$(jq -n --arg id "''${node%%@*}" \
+            --argjson role ${lib.escapeShellArg (builtins.toJSON cfg.layout)} \
+            '$role + { id: $id }')
+          layout=$(garage json-api GetClusterLayout)
+          # A current role also carries computed fields, so compare only the
+          # fields this unit sets.
+          if jq -e --argjson role "$role" \
+            '.roles | any(with_entries(select(.key | IN($role | keys[]))) == $role)' \
+            <<< "$layout" > /dev/null; then
+            echo "this node has its role in layout version $(jq .version <<< "$layout")"
+            exit 0
+          fi
+          garage json-api UpdateClusterLayout \
+            "$(jq -n --argjson role "$role" '{ roles: [ $role ] }')" > /dev/null
+          garage json-api ApplyClusterLayout \
+            "$(jq '{ version: (.version + 1) }' <<< "$layout")" | jq -r '.message[]'
+        '';
+      }
+    );
+
+    systemd.services.${tokenUnit} = mkIf bootstrapToken (
+      bootstrapUnit
+      // {
+        description = "Mint the admin token of the Garage reconciler";
+        after = bootstrapUnit.after ++ lib.optional (cfg.layout != null) "${layoutUnit}.service";
+        serviceConfig = bootstrapUnit.serviceConfig // {
+          RuntimeDirectory = tokenUnit;
+          RuntimeDirectoryMode = "0700";
+          UMask = "0077";
+        };
+        script = ''
+          ${retry}
+          healthy() {
+            [ "$(garage json-api GetClusterHealth | jq -r .status)" = healthy ]
+          }
+          # Garage stores the token in the cluster, which needs a layout.
+          retry healthy
+          garage json-api ListAdminTokens \
+            | jq -c '.[] | select(.name == "${tokenUnit}" and .id != null) | { id }' \
+            | while read -r id; do garage json-api DeleteAdminToken "$id" > /dev/null; done
+          garage json-api CreateAdminToken ${
+            lib.escapeShellArg (
+              builtins.toJSON {
+                name = tokenUnit;
+                neverExpires = true;
+                scope = tflib.adminScope;
+              }
+            )
+          } | jq -r .secretToken > "$RUNTIME_DIRECTORY/token"
+        '';
+      }
+    );
 
     systemd.services.declarative-garage = tflib.mkReconcileService {
       name = "declarative-garage";
       tfConfig = tf.config;
       inherit (tf) credentials;
-      afterUnits = [ "garage.service" ];
+      afterUnits = [
+        "garage.service"
+      ]
+      ++ lib.optional (cfg.layout != null) "${layoutUnit}.service"
+      ++ lib.optional bootstrapToken "${tokenUnit}.service";
       # 200 only once the cluster has a layout, which no bucket or key can be
       # made without.
       healthUrl = "${cfg.baseUrl}/health";
-      inherit (cfg) tokenFile;
+      inherit tokenFile;
       # The reconciler only uses the admin API, so it runs as a dynamic user of
       # its own. Its state cannot go below `/var/lib/garage`: that is the
       # state directory of Garage's dynamic user, and systemd cannot make a

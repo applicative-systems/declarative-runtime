@@ -19,6 +19,24 @@ let
   providerSource = "jkossis/garage";
   runtimePrefix = "services.garage.runtime";
   tokenVar = "garage_admin_token";
+  # The admin API functions the provider calls, which is the scope of the admin
+  # token the module mints. A provider bump that calls another function fails
+  # the apply with 403 Forbidden, so the VM test shows it.
+  adminScope = [
+    "AddBucketAlias"
+    "AllowBucketKey"
+    "CreateBucket"
+    "CreateKey"
+    "DeleteBucket"
+    "DeleteKey"
+    "DenyBucketKey"
+    "GetBucketInfo"
+    "GetKeyInfo"
+    "ImportKey"
+    "ListBuckets"
+    "RemoveBucketAlias"
+    "UpdateBucket"
+  ];
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
 
   # The jkossis/garage resource surface, keyed by resource name: the resource
@@ -80,6 +98,7 @@ let
 in
 {
   inherit
+    adminScope
     provider
     providerSource
     resourceTypes

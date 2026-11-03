@@ -44,10 +44,11 @@ step with the rest of your system.
 - **Garage 2.0 or later** (`services.garage.package = pkgs.garage_2`). The
   provider speaks the v2 admin API, which Garage 1.x does not serve; the module
   asserts the version.
-- **The admin API** (`services.garage.settings.admin.api_bind_addr`) with an
-  admin token (`services.garage.settings.admin.admin_token_file`). The module
-  targets that API and reads that same token, so there is no token to mint.
-- **A cluster layout**, which you make once by hand. See
+- **The admin API** (`services.garage.settings.admin.api_bind_addr`). The
+  reconciler uses Garage's own admin token
+  (`services.garage.settings.admin.admin_token_file`) when there is one, and
+  else a token that the module mints. See [Admin token](#admin-token).
+- **A cluster layout.** The module makes it when you set `layout`. See
   [Cluster layout](#cluster-layout).
 - **A single node.** The pairing is built and tested for a Garage cluster of
   one node. See [Single-node scope](#single-node-scope).
@@ -55,9 +56,22 @@ step with the rest of your system.
 ### Cluster layout
 
 Garage stores no bucket or key, and reports itself unhealthy, until its layout
-assigns a role to a node. A layout is a one-time operator decision (zones,
-capacities, which nodes), so the module does not make one. Make it once, after
-the first start of `garage.service`:
+gives a role to a node. Set the role of this node:
+
+```nix
+services.garage.runtime.layout = {
+  zone = "dc1";
+  capacity = 100 * 1000 * 1000 * 1000; # 100 GB, in bytes
+};
+```
+
+The `declarative-garage-layout` unit then gives this node that role and applies
+the layout, before the reconciler runs. When the node already has that role,
+the unit does nothing. When you change the role, the unit applies a new layout
+version. The unit changes no other node.
+
+With `layout = null` (the default), you make the layout yourself, after the
+first start of `garage.service`:
 
 ```sh
 # The node id is the part before the `@`.
@@ -78,10 +92,18 @@ shows as failed. Make the layout, then run the reconciler again:
 systemctl restart declarative-garage
 ```
 
-The VM test in `checks.nix` does the same steps in a oneshot
-(`garage-layout`) that runs before the reconciler. It is for a fresh cluster
-only: `--version 1` must be the next layout version, so do not copy the
-oneshot to a host that boots more than one time.
+### Admin token
+
+When `tokenFile` is `null` (the default when Garage has no
+`admin_token_file`), the `declarative-garage-token` unit mints the admin token
+of the reconciler each time it starts, and deletes the token it minted before.
+The token has only the scope of the admin API functions that the provider
+calls. Garage keeps the token in the cluster, and the unit keeps it in
+`/run/declarative-garage-token` only, so it is not on disk. Garage can mint a
+token only when the cluster has a layout.
+
+The layout and token units use `garage json-api`, which calls the admin API
+through Garage's RPC as root. So they need no admin token of their own.
 
 ### Single-node scope
 
@@ -154,11 +176,12 @@ services.garage.runtime.bucket.www = {
 
 ## Module options (`services.garage.runtime`)
 
-| Option      | Type        | Default                                                   | Purpose                                                                             |
-| ----------- | ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `enable`    | bool        | `false`                                                   | Turn on the reconciler.                                                             |
-| `baseUrl`   | null or str | `http://localhost:<port of settings.admin.api_bind_addr>` | Garage admin API base URL the provider targets.                                     |
-| `tokenFile` | null or str | `settings.admin.admin_token_file`                         | Host path to an admin API token (read via systemd `LoadCredential=`, never stored). |
+| Option      | Type              | Default                                                   | Purpose                                                                                                             |
+| ----------- | ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `enable`    | bool              | `false`                                                   | Turn on the reconciler.                                                                                             |
+| `baseUrl`   | null or str       | `http://localhost:<port of settings.admin.api_bind_addr>` | Garage admin API base URL the provider targets.                                                                     |
+| `tokenFile` | null or str       | `settings.admin.admin_token_file`                         | Host path to an admin API token (read via systemd `LoadCredential=`, never stored). `null`: the module mints one.   |
+| `layout`    | null or submodule | `null`                                                    | Role of this node in the cluster layout: `zone`, `capacity` (bytes), `tags`. `null`: the operator makes the layout. |
 
 Plus one collection option per provider resource (next section).
 
