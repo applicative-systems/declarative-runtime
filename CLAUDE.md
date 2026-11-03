@@ -67,11 +67,12 @@ For each enabled pairing:
 
 Provider reality verified against nixpkgs + the public registry:
 
-| Service      | Provider                          | Source                                                  | Status                                                                                                                                                                                                                                                          |
-| ------------ | --------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Forgejo**  | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
-| **Grafana**  | `grafana` (4.36.0)                | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
-| **Keycloak** | `keycloak` (5.8.0)                | `pkgs.terraform-providers.keycloak`                     | **Implemented.** All 101 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
+| Service        | Provider                                  | Source                                                  | Status                                                                                                                                                                                                                                                          |
+| -------------- | ----------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Forgejo**    | `forgejo` (svalabs/forgejo 1.5.0)         | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
+| **Grafana**    | `grafana` (4.36.0)                        | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
+| **Keycloak**   | `keycloak` (5.8.0)                        | `pkgs.terraform-providers.keycloak`                     | **Implemented.** All 101 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
+| **PostgreSQL** | `postgresql` (cyrilgdn/postgresql 1.27.0) | `pkgs.terraform-providers.cyrilgdn_postgresql`          | **Implemented.** All 15 provider resources modelled. The provider logs in over TCP as a superuser role that the module makes (`declarative_postgresql`), with a password that a oneshot generates.                                                              |
 
 ## Repository layout
 
@@ -100,6 +101,7 @@ services/                   # one directory per service<->provider pairing
     checks.nix              # the pairing's checks attrset (nixosTest); merged into flake checks
     README.md               # per-pairing usage docs
   keycloak/                 # the Keycloak <-> keycloak/keycloak pairing; same layout, no pkg.nix (provider is in nixpkgs)
+  postgresql/               # the PostgreSQL <-> cyrilgdn/postgresql pairing; same layout, no pkg.nix (provider is in nixpkgs)
 ```
 
 ## Provider implementation contract
