@@ -246,6 +246,7 @@
         ) examples)
         // schemaChecks pkgs
         // schemaCoverage pkgs
+        // renderedFixtures pkgs
         // optionsDocs pkgs
         // {
           formatting = inputs.self.formatter.${system}.check inputs.self;

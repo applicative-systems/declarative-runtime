@@ -30,14 +30,22 @@ in
     pkgs.writeText "${name}-rendered-fixtures.json" (
       builtins.toJSON (
         lib.mapAttrs (
-          _: fixture:
-          tfConfig
-            (lib.evalModules {
-              modules = [
-                { inherit options; }
-                fixture
-              ];
-            }).config
+          fixtureName: fixture:
+          let
+            rendered =
+              tfConfig
+                (lib.evalModules {
+                  modules = [
+                    { inherit options; }
+                    fixture
+                  ];
+                }).config;
+            # OpenTofu rejects an empty top-level block, such as `"variable": {}`.
+            emptyBlocks = lib.attrNames (lib.filterAttrs (_: v: v == { } || v == [ ]) rendered.config);
+          in
+          lib.throwIf (
+            emptyBlocks != [ ]
+          ) "${name} fixture `${fixtureName}`: empty top-level blocks: ${toString emptyBlocks}" rendered
         ) fixtures
       )
     );
