@@ -469,11 +469,6 @@ let
       saml_client = {
         nameAttr = "client_id";
         refs.realm_id = realmRef;
-        # signing_private_key isn't marked Sensitive upstream but is a
-        # private key; expose <attr>File so it stays out of the store.
-        extraSecrets = [
-          "signing_private_key"
-        ];
       };
       saml_client_default_scopes = {
         refs = {
@@ -966,22 +961,20 @@ let
       };
       realm_keystore_java_keystore = {
         refs.realm_id = realmRef;
-        extraSecrets = [
-          "key_password"
-          "keystore_password"
-        ];
       };
       realm_keystore_rsa = {
         refs.realm_id = realmRef;
-        # private_key and certificate are PEM material; expose <attr>File
-        # for both even though only private_key is technically secret.
+        # the schema marks private_key sensitive; certificate is PEM
+        # material too, so expose <attr>File for it as well.
         description = "Keystore backed by an externally-provided RSA private key / certificate pair.";
         extraSecrets = [
           "certificate"
-          "private_key"
         ];
       };
       realm_keystore_rsa_generated = {
+        refs.realm_id = realmRef;
+      };
+      realm_keystore_rsa_enc_generated = {
         refs.realm_id = realmRef;
       };
       hardcoded_attribute_mapper = {
@@ -1048,6 +1041,29 @@ let
       organization = {
         refs.realm = realmAliasRef;
         description = "Keycloak organizations. They require the organizations feature.";
+      };
+      organization_memberships = {
+        refs = {
+          realm_id = realmRef;
+          organization_id = {
+            targets = [
+              {
+                type = "organization";
+                field = "id";
+              }
+            ];
+            managedOnly = true;
+          };
+          members = {
+            targets = [
+              {
+                type = "user";
+                field = "username";
+              }
+            ];
+            managedOnly = false;
+          };
+        };
       };
       identity_provider_token_exchange_scope_permission = {
         refs.realm_id = realmRef;

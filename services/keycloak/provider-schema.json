@@ -293,6 +293,12 @@
             "required": true,
             "type": "string"
           },
+          "copy_from": {
+            "description": "The alias of an existing authentication flow (built-in or custom) to copy. All executions and subflows of the source flow are duplicated into this flow, which - unlike a built-in flow - can then be freely modified.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
           "description": {
             "description_kind": "plain",
             "optional": true,
@@ -305,6 +311,7 @@
             "type": "string"
           },
           "provider_id": {
+            "computed": true,
             "description_kind": "plain",
             "optional": true,
             "type": "string"
@@ -468,7 +475,9 @@
           },
           "parent_id": {
             "computed": true,
-            "description": "The parent_id of the generated component. will use realm_id if not specified.",
+            "deprecated": true,
+            "deprecation_message": "Keycloak resolves the parent of realm components automatically, so this attribute no longer needs to be set. It will be removed in a future release.",
+            "description": "The parent_id of the generated component. Keycloak resolves this to the realm's internal id automatically.",
             "description_kind": "plain",
             "optional": true,
             "type": "string"
@@ -554,6 +563,14 @@
     "keycloak_generic_client_authorization_policy": {
       "block": {
         "attributes": {
+          "config": {
+            "description_kind": "plain",
+            "optional": true,
+            "type": [
+              "map",
+              "string"
+            ]
+          },
           "decision_strategy": {
             "description_kind": "plain",
             "required": true,
@@ -2152,6 +2169,20 @@
             "description_kind": "plain",
             "optional": true,
             "sensitive": true,
+            "type": "string"
+          },
+          "bind_credential_wo": {
+            "description": "Password of LDAP admin as a write-only argument.",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string",
+            "write_only": true
+          },
+          "bind_credential_wo_version": {
+            "description": "Version of the bind credential write-only argument.",
+            "description_kind": "plain",
+            "optional": true,
             "type": "string"
           },
           "bind_dn": {
@@ -6072,6 +6103,41 @@
       },
       "version": 0
     },
+    "keycloak_organization_memberships": {
+      "block": {
+        "attributes": {
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "members": {
+            "description": "The set of usernames to assign to the organization.",
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "set",
+              "string"
+            ]
+          },
+          "organization_id": {
+            "description": "The ID of the organization to manage members for.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "realm_id": {
+            "description": "The realm this organization exists in.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
     "keycloak_realm": {
       "block": {
         "attributes": {
@@ -6494,6 +6560,11 @@
                         "type": "number"
                       },
                       "max_login_failures": {
+                        "description_kind": "plain",
+                        "optional": true,
+                        "type": "number"
+                      },
+                      "max_secondary_auth_failures": {
                         "description_kind": "plain",
                         "optional": true,
                         "type": "number"
@@ -7320,6 +7391,7 @@
             "description": "Password for the private key",
             "description_kind": "plain",
             "required": true,
+            "sensitive": true,
             "type": "string"
           },
           "key_use": {
@@ -7338,6 +7410,7 @@
             "description": "Password for the keys",
             "description_kind": "plain",
             "required": true,
+            "sensitive": true,
             "type": "string"
           },
           "name": {
@@ -7385,7 +7458,21 @@
           "certificate": {
             "description": "X509 Certificate encoded in PEM format",
             "description_kind": "plain",
-            "required": true,
+            "optional": true,
+            "type": "string"
+          },
+          "certificate_wo": {
+            "description": "X509 Certificate encoded in PEM format as write-only argument",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string",
+            "write_only": true
+          },
+          "certificate_wo_version": {
+            "description": "Version of the certificate write-only argument",
+            "description_kind": "plain",
+            "optional": true,
             "type": "string"
           },
           "enabled": {
@@ -7423,7 +7510,22 @@
           "private_key": {
             "description": "Private RSA Key encoded in PEM format",
             "description_kind": "plain",
-            "required": true,
+            "optional": true,
+            "sensitive": true,
+            "type": "string"
+          },
+          "private_key_wo": {
+            "description": "Private RSA Key encoded in PEM format as write-only argument",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string",
+            "write_only": true
+          },
+          "private_key_wo_version": {
+            "description": "Version of the private_key write-only argument",
+            "description_kind": "plain",
+            "optional": true,
             "type": "string"
           },
           "provider_id": {
@@ -7431,6 +7533,61 @@
             "description_kind": "plain",
             "optional": true,
             "type": "string"
+          },
+          "realm_id": {
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "keycloak_realm_keystore_rsa_enc_generated": {
+      "block": {
+        "attributes": {
+          "active": {
+            "description": "Set if the keys can be used for encryption",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "algorithm": {
+            "description": "Intended algorithm for the key",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Set if the keys are enabled",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "key_size": {
+            "description": "Size for the generated keys",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "name": {
+            "description": "Display name of provider when linked in admin console.",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority for the provider",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
           },
           "realm_id": {
             "description_kind": "plain",
@@ -8133,12 +8290,17 @@
           },
           "signing_private_key": {
             "computed": true,
+            "deprecated": true,
+            "deprecation_message": "Keycloak starting 26.8 does not need the SAML client's private key. Remove signing_private_key from your configuration and configure only signing_certificate. ",
             "description_kind": "plain",
             "optional": true,
+            "sensitive": true,
             "type": "string"
           },
           "signing_private_key_sha1": {
             "computed": true,
+            "deprecated": true,
+            "deprecation_message": "Deprecated together with signing_private_key since Keycloak 26.8. Remove references to this attribute and manage the private key outside of Keycloak ",
             "description_kind": "plain",
             "type": "string"
           },
@@ -8888,8 +9050,22 @@
                 },
                 "value": {
                   "description_kind": "plain",
-                  "required": true,
+                  "optional": true,
                   "sensitive": true,
+                  "type": "string"
+                },
+                "value_wo": {
+                  "description": "The initial password as write-only argument",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "sensitive": true,
+                  "type": "string",
+                  "write_only": true
+                },
+                "value_wo_version": {
+                  "description": "Version of the initial password write-only argument",
+                  "description_kind": "plain",
+                  "optional": true,
                   "type": "string"
                 }
               },
@@ -9431,5 +9607,5 @@
     }
   },
   "source": "keycloak/keycloak",
-  "version": "5.9.0"
+  "version": "5.10.0"
 }
