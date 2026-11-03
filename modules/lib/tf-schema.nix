@@ -93,8 +93,9 @@ in
 
     A resource name is the schema's resource type without the provider's
     name, as the provider docs give it: `realm` for `keycloak_realm`. Each
-    resource becomes the collection `services.<svc>.runtime.<names>`, its name
-    in the plural (`realm` -> `realms`, `repository` -> `repositories`).
+    resource becomes the collection `services.<svc>.runtime.<name>`
+    (`services.keycloak.runtime.realm`), so the overlay, the options and the
+    provider docs all use one name.
 
     Every field is optional and exists only to state what a schema cannot;
     `{ }` models a resource as the schema has it. The collection key is the
@@ -157,20 +158,10 @@ in
       # `svalabs/forgejo` -> `forgejo`: every resource type starts with it.
       providerName = lib.last (lib.splitString "/" source);
 
-      # the English plural of the snake_case resource name, which is what a
-      # NixOS user expects to read as an attrset of instances.
-      pluralize =
-        s:
-        if lib.hasSuffix "s" s then
-          s
-        else if builtins.match ".*[^aeiou]y" s != null then
-          "${lib.removeSuffix "y" s}ies"
-        else if builtins.match ".*(sh|ch|x)" s != null then
-          "${s}es"
-        else
-          "${s}s";
-
-      collectionName = type: pluralize (lib.removePrefix "${providerName}_" type);
+      # the collection takes the resource name as it is. A plural cannot be
+      # derived: many resource names are plural already (`group_roles`), and a
+      # suffix cannot tell those from a singular (`entity_alias`).
+      collectionName = type: lib.removePrefix "${providerName}_" type;
 
       # the overlay names a resource without the provider's name, as the
       # provider docs do; the schema and the generated JSON name it in full.

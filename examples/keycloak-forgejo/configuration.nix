@@ -101,15 +101,15 @@
       enable = true;
       bootstrapAdminPasswordFile = "/etc/secrets/keycloak-admin-password";
 
-      realms.dunder_mifflin = {
+      realm.dunder_mifflin = {
         display_name = "Dunder Mifflin Paper Company";
         login_theme = "dunder_mifflin";
       };
 
       # declare picture (and the four standard attrs) and flip unmanaged
       # to ENABLED so keycloak v24+'s declarative profile stores
-      # users.jhalpert.attributes.picture instead of silently dropping it.
-      realm_user_profiles.dunder_mifflin =
+      # user.jhalpert.attributes.picture instead of silently dropping it.
+      realm_user_profile.dunder_mifflin =
         let
           stdPerms = {
             view = [
@@ -142,7 +142,7 @@
           ];
         };
 
-      users.jhalpert = {
+      user.jhalpert = {
         realm = "dunder_mifflin";
         username = "jhalpert";
         email = "jim@dundermifflin.com";
@@ -159,7 +159,7 @@
         };
       };
 
-      openid_clients.dunder_mifflin_infinity = {
+      openid_client.dunder_mifflin_infinity = {
         realm = "dunder_mifflin";
         client_id = "dunder-mifflin-infinity";
         name = "Dunder Mifflin Infinity";
@@ -194,12 +194,12 @@
     runtime = {
       enable = true;
 
-      organizations.dunder_mifflin = {
+      organization.dunder_mifflin = {
         visibility = "public";
         description = "Dunder Mifflin Paper Company, Inc.";
       };
 
-      repositories.scranton_branch = {
+      repository.scranton_branch = {
         owner = "dunder_mifflin";
         description = "The best branch in the company";
         private = false;
@@ -210,26 +210,26 @@
       # (`jhalpert`); pre-creating jhalpert here lets us name him as a
       # collaborator. ACCOUNT_LINKING=auto matches by email on first SSO,
       # so the pre-created + SSO accounts are the same forgejo user.
-      repositories.intranet = {
+      repository.intranet = {
         owner = "dunder_mifflin";
         description = "Internal Dunder Mifflin intranet -- not for the warehouse";
         private = true;
       };
 
-      users.jhalpert = {
+      user.jhalpert = {
         email = "jim@dundermifflin.com";
         full_name = "Jim Halpert";
         passwordFile = "/etc/secrets/jhalpert-forgejo-password";
         must_change_password = false;
       };
 
-      users.dschrute = {
+      user.dschrute = {
         email = "dschrute@dundermifflin.com";
         passwordFile = "/etc/secrets/dschrute-password";
         must_change_password = false;
       };
 
-      collaborators.jhalpert_intranet = {
+      collaborator.jhalpert_intranet = {
         repository = "intranet";
         user = "jhalpert";
         permission = "write";
