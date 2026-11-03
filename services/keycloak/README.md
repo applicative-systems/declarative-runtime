@@ -404,14 +404,15 @@ Other federation:
 
 ### Realm keys
 
-| Option                            | `keycloak_*` resource            | Key defaults | Reference inputs |
-| --------------------------------- | -------------------------------- | ------------ | ---------------- |
-| `realm_keystore_aes_generateds`   | `realm_keystore_aes_generated`   | `name`       | `realm`          |
-| `realm_keystore_ecdsa_generateds` | `realm_keystore_ecdsa_generated` | `name`       | `realm`          |
-| `realm_keystore_hmac_generateds`  | `realm_keystore_hmac_generated`  | `name`       | `realm`          |
-| `realm_keystore_java_keystores`   | `realm_keystore_java_keystore`   | `name`       | `realm`          |
-| `realm_keystore_rsas`             | `realm_keystore_rsa`             | `name`       | `realm`          |
-| `realm_keystore_rsa_generateds`   | `realm_keystore_rsa_generated`   | `name`       | `realm`          |
+| Option                              | `keycloak_*` resource              | Key defaults | Reference inputs |
+| ----------------------------------- | ---------------------------------- | ------------ | ---------------- |
+| `realm_keystore_aes_generateds`     | `realm_keystore_aes_generated`     | `name`       | `realm`          |
+| `realm_keystore_ecdsa_generateds`   | `realm_keystore_ecdsa_generated`   | `name`       | `realm`          |
+| `realm_keystore_hmac_generateds`    | `realm_keystore_hmac_generated`    | `name`       | `realm`          |
+| `realm_keystore_java_keystores`     | `realm_keystore_java_keystore`     | `name`       | `realm`          |
+| `realm_keystore_rsas`               | `realm_keystore_rsa`               | `name`       | `realm`          |
+| `realm_keystore_rsa_generateds`     | `realm_keystore_rsa_generated`     | `name`       | `realm`          |
+| `realm_keystore_rsa_enc_generateds` | `realm_keystore_rsa_enc_generated` | `name`       | `realm`          |
 
 ### Realm-level config + permissions
 
@@ -423,6 +424,7 @@ Other federation:
 | `realm_default_client_scopes`                        | `realm_default_client_scopes`                       | —            | `realm`, `default_scopes` → openid/saml client_scopes (multi-target)  |
 | `realm_optional_client_scopes`                       | `realm_optional_client_scopes`                      | —            | `realm`, `optional_scopes` → openid/saml client_scopes (multi-target) |
 | `organizations`                                      | `organization`                                      | `name`       | `realm` (by realm name)                                               |
+| `organization_memberships`                           | `organization_memberships`                          | —            | `realm`, `organization` → organizations, `members` → users            |
 | `identity_provider_token_exchange_scope_permissions` | `identity_provider_token_exchange_scope_permission` | —            | `realm`                                                               |
 | `realm_user_profiles`                                | `realm_user_profile`                                | —            | `realm`                                                               |
 | `realm_client_policy_profiles`                       | `realm_client_policy_profile`                       | `name`       | `realm`                                                               |
