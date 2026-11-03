@@ -71,9 +71,8 @@ let
 
   # The svalabs/forgejo resource surface, keyed by resource name: the resource
   # type without `forgejo_`, as the provider docs give it. Each resource
-  # becomes the collection `services.forgejo.runtime.<plural>`
-  # (`repository` -> `repositories`). Per resource, only the facts the
-  # schema does not carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
+  # becomes the collection `services.forgejo.runtime.<name>`. Per resource, only
+  # the facts the schema does not carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
   #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   scope        Forgejo token scope(s) required to manage the resource
   #   refs         parent links resolved to references against managed siblings

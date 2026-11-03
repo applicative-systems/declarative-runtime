@@ -227,7 +227,7 @@ in
               "cat /var/lib/keycloak/declarative-terraform/main.tf.json"
           )
           assert "topsecret" not in tfjson, \
-              "openid_clients.acme_app.client_secret leaked into .tf.json"
+              "openid_client.acme_app.client_secret leaked into .tf.json"
 
       with subtest("protocol mapper attached to client scope"):
           # protocolMappers ride along on the client-scope representation.

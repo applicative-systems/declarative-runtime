@@ -8,22 +8,22 @@
 {
   # Core test: one realm, plus the realm its specialisation adds.
   core = {
-    realms.acme = {
+    realm.acme = {
       display_name = "ACME Corp.";
       display_name_html = "<b>ACME</b> Corp.";
     };
   };
   coreAddRealm = {
-    realms.delta = {
+    realm.delta = {
       display_name = "Delta Realm";
     };
   };
 
   # Roles, groups, users and their bindings via managed-key list refs.
   rbac = {
-    realms.acme.display_name = "ACME";
+    realm.acme.display_name = "ACME";
 
-    roles.acme_engineer = {
+    role.acme_engineer = {
       realm = "acme";
       name = "engineer";
       description = "ACME engineering role";
@@ -37,12 +37,12 @@
       ];
     };
 
-    groups.acme_eng = {
+    group.acme_eng = {
       realm = "acme";
       name = "engineering";
       attributes."team" = "infra";
     };
-    groups.acme_eng_backend = {
+    group.acme_eng_backend = {
       realm = "acme";
       name = "backend";
       parent = "acme_eng";
@@ -54,7 +54,7 @@
       exhaustive = true;
     };
 
-    users.acme_alice = {
+    user.acme_alice = {
       realm = "acme";
       username = "alice";
       email = "alice@acme.example";
@@ -79,9 +79,9 @@
 
   # OpenID clients + scopes + protocol mapper + default-scope binding.
   clients = {
-    realms.acme.display_name = "ACME";
+    realm.acme.display_name = "ACME";
 
-    openid_client_scopes.acme_profile = {
+    openid_client_scope.acme_profile = {
       realm = "acme";
       name = "acme-profile";
       description = "ACME profile scope";
@@ -90,7 +90,7 @@
       gui_order = 10;
     };
 
-    openid_clients.acme_app = {
+    openid_client.acme_app = {
       realm = "acme";
       client_id = "acme-app";
       name = "ACME App";
@@ -115,7 +115,7 @@
     };
 
     # protocol mapper attached to the managed scope by key.
-    openid_user_attribute_protocol_mappers.team_claim = {
+    openid_user_attribute_protocol_mapper.team_claim = {
       realm = "acme";
       client_scope = "acme_profile";
       name = "team";
@@ -132,7 +132,7 @@
   # security_defenses (nested-in-nested), otp_policy, realm_user_profile
   # (nested-in-list), a keystore, required_action, localization.
   realmExtras = {
-    realms.acme = {
+    realm.acme = {
       display_name = "ACME Corp.";
       display_name_html = "<b>ACME</b> Corp.";
       # cross-section of the extended realm attrs.
@@ -182,7 +182,7 @@
       };
     };
 
-    realm_keystore_rsa_generateds.acme_extra_rsa = {
+    realm_keystore_rsa_generated.acme_extra_rsa = {
       realm = "acme";
       name = "acme-extra-rsa";
       algorithm = "RS256";
@@ -190,14 +190,14 @@
       priority = 50;
     };
 
-    required_actions.acme_configure_totp = {
+    required_action.acme_configure_totp = {
       realm = "acme";
       alias = "CONFIGURE_TOTP";
       enabled = false;
       default_action = false;
     };
 
-    realm_localizations.acme_en = {
+    realm_localization.acme_en = {
       realm = "acme";
       locale = "en";
       texts.loginAccountTitle = "ACME";
@@ -206,7 +206,7 @@
     # realm_user_profile exercises a nested MaxItems:1 block inside a
     # list element (attribute[].permissions). keycloak refuses to drop
     # the built-in attrs, so declare them alongside the custom one.
-    realm_user_profiles.acme = {
+    realm_user_profile.acme = {
       realm = "acme";
       unmanaged_attribute_policy = "ENABLED";
       attribute = [
@@ -296,17 +296,17 @@
 
   # Identity providers + IdP mappers + an authentication flow.
   idp = {
-    realms.acme.display_name = "ACME";
+    realm.acme.display_name = "ACME";
 
     # google IdP exercises realm-alias resolution + secret-file indirection.
-    oidc_google_identity_providers.acme_google = {
+    oidc_google_identity_provider.acme_google = {
       realm = "acme";
       client_id = "fake-client-id";
       client_secretFile = "/etc/acme-google-secret";
     };
 
     # IdP mapper exercises the multi-target idp-alias ref.
-    attribute_importer_identity_provider_mappers.google_email = {
+    attribute_importer_identity_provider_mapper.google_email = {
       realm = "acme";
       identity_provider = "acme_google";
       name = "google-email";
@@ -314,7 +314,7 @@
       claim_name = "email";
     };
 
-    authentication_flows.acme_passkey = {
+    authentication_flow.acme_passkey = {
       realm = "acme";
       alias = "acme-passkey";
       description = "Passkey login flow";
@@ -324,12 +324,12 @@
   # OIDC password-grant end-to-end: a declared user authenticating against a
   # declared client.
   e2e = {
-    realms.acme = {
+    realm.acme = {
       display_name = "ACME";
       login_with_email_allowed = true;
     };
 
-    users.alice = {
+    user.alice = {
       realm = "acme";
       username = "alice";
       email = "alice@acme.test";
@@ -347,7 +347,7 @@
     # grant doesn't use redirects, so no valid_redirect_uris and
     # standard/implicit flow off -- the provider rejects redirect
     # URIs without a flow that uses them).
-    openid_clients.test_app = {
+    openid_client.test_app = {
       realm = "acme";
       client_id = "test-app";
       name = "Test App";
