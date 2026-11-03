@@ -396,14 +396,15 @@ Other federation:
 
 ### Realm keys
 
-| Option                           | Key defaults | Reference inputs |
-| -------------------------------- | ------------ | ---------------- |
-| `realm_keystore_aes_generated`   | `name`       | `realm_id`       |
-| `realm_keystore_ecdsa_generated` | `name`       | `realm_id`       |
-| `realm_keystore_hmac_generated`  | `name`       | `realm_id`       |
-| `realm_keystore_java_keystore`   | `name`       | `realm_id`       |
-| `realm_keystore_rsa`             | `name`       | `realm_id`       |
-| `realm_keystore_rsa_generated`   | `name`       | `realm_id`       |
+| Option                             | Key defaults | Reference inputs |
+| ---------------------------------- | ------------ | ---------------- |
+| `realm_keystore_aes_generated`     | `name`       | `realm_id`       |
+| `realm_keystore_ecdsa_generated`   | `name`       | `realm_id`       |
+| `realm_keystore_hmac_generated`    | `name`       | `realm_id`       |
+| `realm_keystore_java_keystore`     | `name`       | `realm_id`       |
+| `realm_keystore_rsa`               | `name`       | `realm_id`       |
+| `realm_keystore_rsa_generated`     | `name`       | `realm_id`       |
+| `realm_keystore_rsa_enc_generated` | `name`       | `realm_id`       |
 
 ### Realm-level config + permissions
 
@@ -415,6 +416,7 @@ Other federation:
 | `realm_default_client_scopes`                       | —            | `realm_id`, `default_scopes` → openid/saml client_scopes (multi-target)  |
 | `realm_optional_client_scopes`                      | —            | `realm_id`, `optional_scopes` → openid/saml client_scopes (multi-target) |
 | `organization`                                      | `name`       | `realm` (by realm name)                                                  |
+| `organization_memberships`                          | —            | `realm_id`, `organization_id` → organization, `members` → user           |
 | `identity_provider_token_exchange_scope_permission` | —            | `realm_id`                                                               |
 | `realm_user_profile`                                | —            | `realm_id`                                                               |
 | `realm_client_policy_profile`                       | `name`       | `realm_id`                                                               |
