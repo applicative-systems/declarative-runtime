@@ -47,11 +47,49 @@ step with the rest of your system.
 - **The admin API** (`services.garage.settings.admin.api_bind_addr`) with an
   admin token (`services.garage.settings.admin.admin_token_file`). The module
   targets that API and reads that same token, so there is no token to mint.
-- **A cluster layout.** Garage stores no bucket or key, and reports itself
-  unhealthy, until its layout assigns a role to a node. Laying out a cluster is
-  a one-time operator decision (zones, capacities, which nodes), so the module
-  does not make one: the reconciler waits for `/health` and then applies. The
-  VM test in `checks.nix` shows a oneshot that lays out a single node.
+- **A cluster layout**, which you make once by hand. See
+  [Cluster layout](#cluster-layout).
+- **A single node.** The pairing is built and tested for a Garage cluster of
+  one node. See [Single-node scope](#single-node-scope).
+
+### Cluster layout
+
+Garage stores no bucket or key, and reports itself unhealthy, until its layout
+assigns a role to a node. A layout is a one-time operator decision (zones,
+capacities, which nodes), so the module does not make one. Make it once, after
+the first start of `garage.service`:
+
+```sh
+# The node id is the part before the `@`.
+garage node id
+garage layout assign -z dc1 -c 1G <node id>
+garage layout show   # examine the staged change
+garage layout apply --version 1
+```
+
+Set the zone (`-z`) and the capacity (`-c`) for your host. Garage keeps the
+layout in its metadata, so you do this one time only.
+
+The reconciler waits up to two minutes for `/health` and then applies. If the
+cluster has no layout at that time, the apply fails and `declarative-garage`
+shows as failed. Make the layout, then run the reconciler again:
+
+```sh
+systemctl restart declarative-garage
+```
+
+The VM test in `checks.nix` does the same steps in a oneshot
+(`garage-layout`) that runs before the reconciler. It is for a fresh cluster
+only: `--version 1` must be the next layout version, so do not copy the
+oneshot to a host that boots more than one time.
+
+### Single-node scope
+
+Use this pairing on a single-node Garage cluster. The VM test does not cover
+more than one node. Also, the reconciler keeps its Terraform state locally on
+each host. If you enable `services.garage.runtime` on more than one node of a
+cluster, each node tries to own the same buckets and keys through the shared
+admin API.
 
 ## Configuration examples
 
