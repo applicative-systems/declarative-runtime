@@ -31,7 +31,7 @@ A `scranton.qcow2` lands in CWD; delete it to start over. Exit with
 
 - Realm `dunder_mifflin` with a custom `dunder_mifflin` login theme
   (Scranton blue on corporate beige -- see `themes/dunder_mifflin/`).
-- Declarative user-profile schema (`realm_user_profiles`) so the
+- Declarative user-profile schema (`realm_user_profile`) so the
   `picture` attribute survives Keycloak v24+'s default
   `unmanaged_attribute_policy = DISABLED`.
 - User `jhalpert` (Jim Halpert) with `initial_password.valueFile`
