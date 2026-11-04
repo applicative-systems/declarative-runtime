@@ -127,7 +127,7 @@
           };
         in
         {
-          realm = "dunder_mifflin";
+          realm_id = "dunder_mifflin";
           unmanaged_attribute_policy = "ENABLED";
           attribute = [
             (stdAttr "username")
@@ -143,7 +143,7 @@
         };
 
       user.jhalpert = {
-        realm = "dunder_mifflin";
+        realm_id = "dunder_mifflin";
         username = "jhalpert";
         email = "jim@dundermifflin.com";
         first_name = "Jim";
@@ -160,7 +160,7 @@
       };
 
       openid_client.dunder_mifflin_infinity = {
-        realm = "dunder_mifflin";
+        realm_id = "dunder_mifflin";
         client_id = "dunder-mifflin-infinity";
         name = "Dunder Mifflin Infinity";
         access_type = "CONFIDENTIAL";
@@ -230,7 +230,7 @@
       };
 
       collaborator.jhalpert_intranet = {
-        repository = "intranet";
+        repository_id = "intranet";
         user = "jhalpert";
         permission = "write";
       };

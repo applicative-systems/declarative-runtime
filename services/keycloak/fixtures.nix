@@ -24,12 +24,12 @@
     realm.acme.display_name = "ACME";
 
     role.acme_engineer = {
-      realm = "acme";
+      realm_id = "acme";
       name = "engineer";
       description = "ACME engineering role";
     };
     default_roles.acme = {
-      realm = "acme";
+      realm_id = "acme";
       default_roles = [
         "offline_access"
         "uma_authorization"
@@ -38,24 +38,24 @@
     };
 
     group.acme_eng = {
-      realm = "acme";
+      realm_id = "acme";
       name = "engineering";
       attributes."team" = "infra";
     };
     group.acme_eng_backend = {
-      realm = "acme";
+      realm_id = "acme";
       name = "backend";
-      parent = "acme_eng";
+      parent_id = "acme_eng";
     };
     group_roles.acme_eng_admins = {
-      realm = "acme";
-      group = "acme_eng";
-      roles = [ "acme_engineer" ]; # managed key
+      realm_id = "acme";
+      group_id = "acme_eng";
+      role_ids = [ "acme_engineer" ]; # managed key
       exhaustive = true;
     };
 
     user.acme_alice = {
-      realm = "acme";
+      realm_id = "acme";
       username = "alice";
       email = "alice@acme.example";
       first_name = "Alice";
@@ -64,15 +64,15 @@
       required_actions = [ "UPDATE_PASSWORD" ];
     };
     user_roles.acme_alice = {
-      realm = "acme";
-      user = "acme_alice";
-      roles = [ "acme_engineer" ];
+      realm_id = "acme";
+      user_id = "acme_alice";
+      role_ids = [ "acme_engineer" ];
       exhaustive = false;
     };
     user_groups.acme_alice = {
-      realm = "acme";
-      user = "acme_alice";
-      groups = [ "acme_eng" ]; # managed key
+      realm_id = "acme";
+      user_id = "acme_alice";
+      group_ids = [ "acme_eng" ]; # managed key
       exhaustive = false;
     };
   };
@@ -82,7 +82,7 @@
     realm.acme.display_name = "ACME";
 
     openid_client_scope.acme_profile = {
-      realm = "acme";
+      realm_id = "acme";
       name = "acme-profile";
       description = "ACME profile scope";
       consent_screen_text = "Access your ACME profile";
@@ -91,7 +91,7 @@
     };
 
     openid_client.acme_app = {
-      realm = "acme";
+      realm_id = "acme";
       client_id = "acme-app";
       name = "ACME App";
       access_type = "CONFIDENTIAL";
@@ -105,8 +105,8 @@
       full_scope_allowed = true;
     };
     openid_client_default_scopes.acme_app = {
-      realm = "acme";
-      client = "acme_app";
+      realm_id = "acme";
+      client_id = "acme_app";
       default_scopes = [
         "profile"
         "email"
@@ -116,8 +116,8 @@
 
     # protocol mapper attached to the managed scope by key.
     openid_user_attribute_protocol_mapper.team_claim = {
-      realm = "acme";
-      client_scope = "acme_profile";
+      realm_id = "acme";
+      client_scope_id = "acme_profile";
       name = "team";
       user_attribute = "team";
       claim_name = "team";
@@ -183,7 +183,7 @@
     };
 
     realm_keystore_rsa_generated.acme_extra_rsa = {
-      realm = "acme";
+      realm_id = "acme";
       name = "acme-extra-rsa";
       algorithm = "RS256";
       key_size = 2048;
@@ -191,14 +191,14 @@
     };
 
     required_action.acme_configure_totp = {
-      realm = "acme";
+      realm_id = "acme";
       alias = "CONFIGURE_TOTP";
       enabled = false;
       default_action = false;
     };
 
     realm_localization.acme_en = {
-      realm = "acme";
+      realm_id = "acme";
       locale = "en";
       texts.loginAccountTitle = "ACME";
     };
@@ -207,7 +207,7 @@
     # list element (attribute[].permissions). keycloak refuses to drop
     # the built-in attrs, so declare them alongside the custom one.
     realm_user_profile.acme = {
-      realm = "acme";
+      realm_id = "acme";
       unmanaged_attribute_policy = "ENABLED";
       attribute = [
         {
@@ -308,14 +308,14 @@
     # IdP mapper exercises the multi-target idp-alias ref.
     attribute_importer_identity_provider_mapper.google_email = {
       realm = "acme";
-      identity_provider = "acme_google";
+      identity_provider_alias = "acme_google";
       name = "google-email";
       user_attribute = "email";
       claim_name = "email";
     };
 
     authentication_flow.acme_passkey = {
-      realm = "acme";
+      realm_id = "acme";
       alias = "acme-passkey";
       description = "Passkey login flow";
     };
@@ -330,7 +330,7 @@
     };
 
     user.alice = {
-      realm = "acme";
+      realm_id = "acme";
       username = "alice";
       email = "alice@acme.test";
       first_name = "Alice";
@@ -348,7 +348,7 @@
     # standard/implicit flow off -- the provider rejects redirect
     # URIs without a flow that uses them).
     openid_client.test_app = {
-      realm = "acme";
+      realm_id = "acme";
       client_id = "test-app";
       name = "Test App";
       access_type = "PUBLIC";
