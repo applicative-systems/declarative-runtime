@@ -60,10 +60,10 @@
       data = "eu-west";
     };
 
-    # repository references the managed repo by key -> emitted as a
+    # repository_id references the managed repo by key -> emitted as a
     # ${forgejo_repository.widgets.id} numeric reference.
     repository_action_variable.build_flag = {
-      repository = "widgets";
+      repository_id = "widgets";
       data = "release";
     };
 

@@ -56,22 +56,6 @@ let
 
   quoteList = xs: concatStringsSep ", " (map (x: "`${x}`") xs);
 
-  # the option name a reference input takes, from the attribute it fills: the
-  # user names a managed key, not an id, so the id suffix goes.
-  #   realm_id -> realm, parent_flow_alias -> parent_flow, group_ids -> groups
-  refOptionName =
-    attr:
-    let
-      strip = suffix: lib.removeSuffix suffix attr;
-    in
-    if lib.hasSuffix "_ids" attr then
-      "${strip "_ids"}s"
-    else if lib.hasSuffix "_id" attr then
-      strip "_id"
-    else if lib.hasSuffix "_alias" attr then
-      strip "_alias"
-    else
-      attr;
 in
 {
   /*
@@ -129,9 +113,9 @@ in
     `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`,
     keyed by the schema attribute it fills. Each target is
     `{ type; field; }`: a modelled resource name, and the attribute of it that
-    the reference resolves to. The option the user sets is named
-    after that attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and
-    whether it takes a list comes from the attribute's type. `required` defaults
+    the reference resolves to. The option the user sets has the name of
+    that attribute, so the provider docs apply to it as they are, and whether
+    it takes a list comes from the attribute's type. `required` defaults
     to the attribute's own flag and may only be set to differ from it -- for
     a reference that stands in for an `ExactlyOneOf` pair, say. `description`
     replaces the attribute's own description, and only that: the sentences on
@@ -395,14 +379,6 @@ in
             (namesPaths "`requiredAttrs`" o.requiredAttrs (attrNames tree))
             (namesPaths "`extraAttrs`" (attrNames o.extraAttrs) (attrNames tree))
             (namesPaths "`refs`" refConsumed (attrNames tree))
-            (check (duplicates refOptionNames == [ ])
-              "${ctx}: refs ${quoteList refConsumed} derive the same option name ${quoteList (duplicates refOptionNames)}"
-            )
-            (check (filter (n: elem n topLevel) refOptionNames == [ ])
-              "${ctx}: ref option ${
-                quoteList (filter (n: elem n topLevel) refOptionNames)
-              } would shadow a settable attribute of the same name"
-            )
             (check (filter (p: elem p sensitivePaths) o.extraSecrets == [ ])
               "${ctx}: `extraSecrets` lists ${
                 quoteList (filter (p: elem p sensitivePaths) o.extraSecrets)
@@ -442,14 +418,11 @@ in
               }, which ${ctx} does not declare as refs"
           ) o.oneOfRefs;
 
-          # the overlay keys refs by schema attribute; the renderer wants them
-          # keyed by the option the user sets, with list-ness and optionality
-          # read off the schema.
-          refs = lib.mapAttrs' (
+          # each ref, with its list-ness and optionality read off the schema.
+          refs = lib.mapAttrs (
             attr: r:
             let
               node = tree.${attr} or null;
-              option = refOptionName attr;
               list =
                 node != null
                 && node.kind == "attr"
@@ -471,13 +444,12 @@ in
                       ", or a literal `${attr}` ${if list then "element" else "value"}"
                   }."
                 ]
-                ++ lib.optional (option != attr) "It fills the provider attribute `${attr}`."
-                ++ map (
-                  group: "Set exactly one of ${concatStringsSep " and " (map (a: "`${refOptionName a}`") group)}."
-                ) (filter (elem attr) o.oneOfRefs)
+                ++ map (group: "Set exactly one of ${concatStringsSep " and " (map (a: "`${a}`") group)}.") (
+                  filter (elem attr) o.oneOfRefs
+                )
               );
             in
-            lib.nameValuePair option {
+            {
               inherit attr list;
               inherit (r) managedOnly;
               description = concatStringsSep "\n\n" (
@@ -495,15 +467,13 @@ in
             }
           ) o.refs;
 
-          refOptionNames = map refOptionName refConsumed;
-
           spec = {
             inherit (o)
               type
               scope
               ;
             inherit nameAttr description refs;
-            oneOfRefs = map (map refOptionName) o.oneOfRefs;
+            inherit (o) oneOfRefs;
             inherit
               secrets
               requiredSecrets
