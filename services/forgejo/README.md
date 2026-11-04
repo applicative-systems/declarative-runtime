@@ -67,19 +67,19 @@ are applied after it.
     runtime = {
       enable = true;
 
-      organizations.acme = {
+      organization.acme = {
         description = "ACME Corporation";
         visibility = "public";
       };
 
       # `owner` names the managed organization by key -> applied after it.
-      repositories.widgets = {
+      repository.widgets = {
         owner = "acme";
         description = "Widget factory";
         private = false;
       };
 
-      teams.engineers = {
+      team.engineers = {
         organization = "acme";
         description = "Engineering";
         units_map."repo.code" = "read"; # required by the provider
@@ -92,7 +92,7 @@ are applied after it.
 ### Actions variables and secrets
 
 Configure CI inputs at organization and repository scope. `organization`
-resolves to the managed org's name, while `repository` names a managed repo by
+resolves to the managed org's name, while `repository_id` names a managed repo by
 key and resolves to its numeric `id`.
 
 ```nix
@@ -103,25 +103,25 @@ key and resolves to its numeric `id`.
     runtime = {
       enable = true;
 
-      organizations.acme.description = "ACME Corporation";
-      repositories.widgets.owner = "acme";
+      organization.acme.description = "ACME Corporation";
+      repository.widgets.owner = "acme";
 
       # String-name reference to the managed organization.
-      organization_action_variables.ci_region = {
+      organization_action_variable.ci_region = {
         organization = "acme";
         data = "eu-west";
       };
 
-      # `repository` -> ${forgejo_repository.widgets.id} (a numeric reference).
-      repository_action_variables.build_flag = {
-        repository = "widgets";
+      # `repository_id` -> ${forgejo_repository.widgets.id} (a numeric reference).
+      repository_action_variable.build_flag = {
+        repository_id = "widgets";
         data = "release";
       };
 
       # `data` (literal) lands in the world-readable Nix store; use `dataFile`
       # (a host path) for a real secret -- see the security note.
-      repository_action_secrets.registry_token = {
-        repository = "widgets";
+      repository_action_secret.registry_token = {
+        repository_id = "widgets";
         data = "REPLACE_ME";
       };
     };
@@ -143,11 +143,11 @@ lists (`events`) are typed and serialized as-is.
     runtime = {
       enable = true;
 
-      organizations.acme.description = "ACME Corporation";
-      repositories.widgets.owner = "acme";
+      organization.acme.description = "ACME Corporation";
+      repository.widgets.owner = "acme";
 
-      repository_webhooks.ci = {
-        repository = "widgets"; # -> ${forgejo_repository.widgets.id}
+      repository_webhook.ci = {
+        repository_id = "widgets"; # -> ${forgejo_repository.widgets.id}
         type = "forgejo";
         events = [
           "push"
@@ -160,8 +160,8 @@ lists (`events`) are typed and serialized as-is.
         };
       };
 
-      branch_protections.main = {
-        repository = "widgets";
+      branch_protection.main = {
+        repository_id = "widgets";
         branch_name = "main";
         enable_push = false;
         required_approvals = 1;
@@ -193,23 +193,23 @@ nix build .#checks.x86_64-linux.forgejo-options-doc   # every option, typed
 nix build .#checks.x86_64-linux.forgejo-schema-coverage # what is covered
 ```
 
-| Option                          | `forgejo_*` resource           | Key defaults | Reference inputs                   |
-| ------------------------------- | ------------------------------ | ------------ | ---------------------------------- |
-| `organizations`                 | `organization`                 | `name`       | —                                  |
-| `users`                         | `user`                         | `login`      | — (requires admin)                 |
-| `repositories`                  | `repository`                   | `name`       | `owner` → org/user                 |
-| `teams`                         | `team`                         | `name`       | `organization` → org               |
-| `team_members`                  | `team_member`                  | —            | `team` → team, `user` → user       |
-| `collaborators`                 | `collaborator`                 | —            | `repository` → repo, `user` → user |
-| `repository_webhooks`           | `repository_webhook`           | —            | `repository` → repo                |
-| `branch_protections`            | `branch_protection`            | —            | `repository` → repo                |
-| `deploy_keys`                   | `deploy_key`                   | —            | `repository` → repo                |
-| `repository_action_secrets`     | `repository_action_secret`     | `name`       | `repository` → repo                |
-| `repository_action_variables`   | `repository_action_variable`   | `name`       | `repository` → repo                |
-| `organization_action_secrets`   | `organization_action_secret`   | `name`       | `organization` → org               |
-| `organization_action_variables` | `organization_action_variable` | `name`       | `organization` → org               |
-| `ssh_keys`                      | `ssh_key`                      | —            | `user` → user (requires admin)     |
-| `gpg_keys`                      | `gpg_key`                      | —            | —                                  |
+| Option                         | Key defaults | Reference inputs                      |
+| ------------------------------ | ------------ | ------------------------------------- |
+| `organization`                 | `name`       | —                                     |
+| `user`                         | `login`      | — (requires admin)                    |
+| `repository`                   | `name`       | `owner` → org/user                    |
+| `team`                         | `name`       | `organization` → org                  |
+| `team_member`                  | —            | `team_id` → team, `user` → user       |
+| `collaborator`                 | —            | `repository_id` → repo, `user` → user |
+| `repository_webhook`           | —            | `repository_id` → repo                |
+| `branch_protection`            | —            | `repository_id` → repo                |
+| `deploy_key`                   | —            | `repository_id` → repo                |
+| `repository_action_secret`     | `name`       | `repository_id` → repo                |
+| `repository_action_variable`   | `name`       | `repository_id` → repo                |
+| `organization_action_secret`   | `name`       | `organization` → org                  |
+| `organization_action_variable` | `name`       | `organization` → org                  |
+| `ssh_key`                      | —            | `user` → user (requires admin)        |
+| `gpg_key`                      | —            | —                                     |
 
 The provider takes an owning organization either by name or by numeric
 `organization_id` and requires exactly one of the two. Only the name form is
@@ -239,9 +239,9 @@ valve when it is not.
 
 ## Security note
 
-Secret-valued _resource_ attributes — `password` (`users`), `data`
-(`*_action_secret`), `auth_token` (`repositories`), `authorization_header`
-(`repository_webhooks`) — each accept an `<attr>File` form (`passwordFile`,
+Secret-valued _resource_ attributes — `password` (`user`), `data`
+(`*_action_secret`), `auth_token` (`repository`), `authorization_header`
+(`repository_webhook`) — each accept an `<attr>File` form (`passwordFile`,
 `dataFile`, `auth_tokenFile`, `authorization_headerFile`) that takes a **host
 file path** instead of the literal value. The file is read at apply time via
 systemd `LoadCredential=` into a sensitive Terraform variable and **never enters
@@ -250,7 +250,7 @@ same mechanism that protects the provider admin token). Prefer it for any real
 secret:
 
 ```nix
-services.forgejo.runtime.organization_action_secrets.deploy_key = {
+services.forgejo.runtime.organization_action_secret.deploy_key = {
   organization = "acme";
   dataFile = "/run/secrets/forgejo-deploy-key"; # host path, not a store path
 };

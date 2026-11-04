@@ -39,7 +39,7 @@ already covered by `services.authelia.*` — so it was dropped as a pairing.)
 | Secrets          | **systemd `LoadCredential=`** is the blessed path. Generated config references the secret as a `sensitive` Terraform variable; never literal secrets. sops-nix/agenix, if used, only supply the source that feeds `LoadCredential=`.                                                                                                                        |
 | Reconciliation   | **Run-once**: a `Type=oneshot` unit ordered `After=` the primary unit + readiness probe, runs `init` + `apply -auto-approve`. Re-applies on config change via `restartTriggers`. **No** drift timer. A failed apply fails _that unit_ visibly (`systemctl status`) and does **not** tear down the service.                                                  |
 | State            | **Local, per-host only.** Terraform state lives under the **base service's primary state directory** (e.g. `services.forgejo.stateDir` → `/var/lib/forgejo`), co-located with the service it configures. No remote backends.                                                                                                                                |
-| Module namespace | Under the base service as **`services.<svc>.runtime.*`** (e.g. `services.forgejo.runtime.repositories`), so the pairing reads as a transparent extension of the upstream `services.<svc>` module.                                                                                                                                                           |
+| Module namespace | Under the base service as **`services.<svc>.runtime.*`** (e.g. `services.forgejo.runtime.repository`), so the pairing reads as a transparent extension of the upstream `services.<svc>` module.                                                                                                                                                             |
 | Resource surface | **Derived from a vendored provider schema**, via the generic converters in [`nix-tf-schema`](https://git.fediversity.eu/fediversity/nix-tf-schema) (a source-only flake input). A pairing hand-writes only what the schema cannot carry: the reference graph, the NixOS-facing prose, and per-collection corrections. Provider drift is an eval-time error. |
 | Formatter        | **treefmt** driving **nixfmt**. Formatter is the single source of layout truth — run it, never hand-format.                                                                                                                                                                                                                                                 |
 | CI               | **GitHub Actions**: `nix flake check` on push + PR, Nix provided by Determinate Systems `nix-installer-action`. Workflow is Forgejo-Actions-compatible (same syntax) if hosting moves there.                                                                                                                                                                |
@@ -167,7 +167,7 @@ keycloak pairings encode.
   | Derived from the schema                                              | Hand-written in the overlay                                         |
   | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
   | every settable attribute, its Nix type and optionality               | `refs` — the reference graph, which no schema carries               |
-  | the collection name: `keycloak_realm` -> `realms`                    | `nameAttr`, only where the key fills an attribute other than `name` |
+  | the collection name: `keycloak_realm` -> `realm`                     | `nameAttr`, only where the key fills an attribute other than `name` |
   | nested blocks as submodules, `blockAttrs` wrapping                   | `scope`, where the provider's token has scopes                      |
   | `secrets` (schema `sensitive`) and `requiredSecrets`                 | `description`, only to add a fact the generated one lacks           |
   | descriptions: the provider's own (else a stub), plus a docs link     | corrections: see the next bullet                                    |
@@ -241,9 +241,9 @@ readers are exercised in-tree:
   attributes a user cannot know _and_ orders `tofu apply`. `refs` is keyed by
   the schema attribute a reference fills, and an entry is
   `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`, each
-  target a `{ type; field; }`. The option the user sets is named after the
-  attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and its list-ness,
-  optionality and description come from the schema; `required` may only be set
+  target a `{ type; field; }`. The option the user sets has the attribute's
+  name (`realm_id`, `group_ids`), so the provider docs apply to it as they are,
+  and its list-ness, optionality and description come from the schema; `required` may only be set
   to differ from it, and `description` only replaces the attribute's own text --
   the sentences on which keys the option takes are generated. `managedOnly` references (numeric ids) must resolve to a managed sibling
   (generation throws otherwise); name references accept a managed key _or_ a

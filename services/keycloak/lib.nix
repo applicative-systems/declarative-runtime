@@ -197,9 +197,8 @@ let
   };
   # The keycloak/keycloak resource surface, keyed by resource name: the resource
   # type without `keycloak_`, as the provider docs give it. Each resource
-  # becomes the collection `services.keycloak.runtime.<plural>`
-  # (`realm` -> `realms`). Per resource, only the facts the schema does not
-  # carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
+  # becomes the collection `services.keycloak.runtime.<name>`. Per resource, only
+  # the facts the schema does not carry (see modules/lib/tf-schema.nix for the full overlay vocabulary):
   #   nameAttr     attribute the collection key fills in, where it is not `name`
   #   refs         parent links resolved to references against managed siblings
   #   description  replaces the generated description, only to add a fact
@@ -1026,7 +1025,7 @@ let
             managedOnly = false;
           };
         };
-        description = "Realm-wide default client-scope binding (set of scope names). Distinct from realms.<r>.default_default_client_scopes, which is a free-form realm attribute.";
+        description = "Realm-wide default client-scope binding (set of scope names). Distinct from realm.<r>.default_default_client_scopes, which is a free-form realm attribute.";
       };
       realm_optional_client_scopes = {
         refs = {
