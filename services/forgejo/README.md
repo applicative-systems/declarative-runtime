@@ -92,7 +92,7 @@ are applied after it.
 ### Actions variables and secrets
 
 Configure CI inputs at organization and repository scope. `organization`
-resolves to the managed org's name, while `repository` names a managed repo by
+resolves to the managed org's name, while `repository_id` names a managed repo by
 key and resolves to its numeric `id`.
 
 ```nix
@@ -112,16 +112,16 @@ key and resolves to its numeric `id`.
         data = "eu-west";
       };
 
-      # `repository` -> ${forgejo_repository.widgets.id} (a numeric reference).
+      # `repository_id` -> ${forgejo_repository.widgets.id} (a numeric reference).
       repository_action_variable.build_flag = {
-        repository = "widgets";
+        repository_id = "widgets";
         data = "release";
       };
 
       # `data` (literal) lands in the world-readable Nix store; use `dataFile`
       # (a host path) for a real secret -- see the security note.
       repository_action_secret.registry_token = {
-        repository = "widgets";
+        repository_id = "widgets";
         data = "REPLACE_ME";
       };
     };
@@ -147,7 +147,7 @@ lists (`events`) are typed and serialized as-is.
       repository.widgets.owner = "acme";
 
       repository_webhook.ci = {
-        repository = "widgets"; # -> ${forgejo_repository.widgets.id}
+        repository_id = "widgets"; # -> ${forgejo_repository.widgets.id}
         type = "forgejo";
         events = [
           "push"
@@ -161,7 +161,7 @@ lists (`events`) are typed and serialized as-is.
       };
 
       branch_protection.main = {
-        repository = "widgets";
+        repository_id = "widgets";
         branch_name = "main";
         enable_push = false;
         required_approvals = 1;
@@ -193,23 +193,23 @@ nix build .#checks.x86_64-linux.forgejo-options-doc   # every option, typed
 nix build .#checks.x86_64-linux.forgejo-schema-coverage # what is covered
 ```
 
-| Option                         | Key defaults | Reference inputs                   |
-| ------------------------------ | ------------ | ---------------------------------- |
-| `organization`                 | `name`       | —                                  |
-| `user`                         | `login`      | — (requires admin)                 |
-| `repository`                   | `name`       | `owner` → org/user                 |
-| `team`                         | `name`       | `organization` → org               |
-| `team_member`                  | —            | `team` → team, `user` → user       |
-| `collaborator`                 | —            | `repository` → repo, `user` → user |
-| `repository_webhook`           | —            | `repository` → repo                |
-| `branch_protection`            | —            | `repository` → repo                |
-| `deploy_key`                   | —            | `repository` → repo                |
-| `repository_action_secret`     | `name`       | `repository` → repo                |
-| `repository_action_variable`   | `name`       | `repository` → repo                |
-| `organization_action_secret`   | `name`       | `organization` → org               |
-| `organization_action_variable` | `name`       | `organization` → org               |
-| `ssh_key`                      | —            | `user` → user (requires admin)     |
-| `gpg_key`                      | —            | —                                  |
+| Option                         | Key defaults | Reference inputs                      |
+| ------------------------------ | ------------ | ------------------------------------- |
+| `organization`                 | `name`       | —                                     |
+| `user`                         | `login`      | — (requires admin)                    |
+| `repository`                   | `name`       | `owner` → org/user                    |
+| `team`                         | `name`       | `organization` → org                  |
+| `team_member`                  | —            | `team_id` → team, `user` → user       |
+| `collaborator`                 | —            | `repository_id` → repo, `user` → user |
+| `repository_webhook`           | —            | `repository_id` → repo                |
+| `branch_protection`            | —            | `repository_id` → repo                |
+| `deploy_key`                   | —            | `repository_id` → repo                |
+| `repository_action_secret`     | `name`       | `repository_id` → repo                |
+| `repository_action_variable`   | `name`       | `repository_id` → repo                |
+| `organization_action_secret`   | `name`       | `organization` → org                  |
+| `organization_action_variable` | `name`       | `organization` → org                  |
+| `ssh_key`                      | —            | `user` → user (requires admin)        |
+| `gpg_key`                      | —            | —                                     |
 
 The provider takes an owning organization either by name or by numeric
 `organization_id` and requires exactly one of the two. Only the name form is

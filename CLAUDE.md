@@ -241,9 +241,9 @@ readers are exercised in-tree:
   attributes a user cannot know _and_ orders `tofu apply`. `refs` is keyed by
   the schema attribute a reference fills, and an entry is
   `{ targets; managedOnly; required ? <schema>; description ? <schema>; }`, each
-  target a `{ type; field; }`. The option the user sets is named after the
-  attribute (`realm_id` -> `realm`, `group_ids` -> `groups`), and its list-ness,
-  optionality and description come from the schema; `required` may only be set
+  target a `{ type; field; }`. The option the user sets has the attribute's
+  name (`realm_id`, `group_ids`), so the provider docs apply to it as they are,
+  and its list-ness, optionality and description come from the schema; `required` may only be set
   to differ from it, and `description` only replaces the attribute's own text --
   the sentences on which keys the option takes are generated. `managedOnly` references (numeric ids) must resolve to a managed sibling
   (generation throws otherwise); name references accept a managed key _or_ a

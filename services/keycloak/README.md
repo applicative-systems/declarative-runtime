@@ -157,23 +157,23 @@ nested-secret indirection at once.
         };
       };
 
-      role.engineer = { realm = "staff"; description = "Engineering"; };
-      group.eng     = { realm = "staff"; name = "engineering"; };
+      role.engineer = { realm_id = "staff"; description = "Engineering"; };
+      group.eng     = { realm_id = "staff"; name = "engineering"; };
 
       # managed list-refs: scope/role names resolve to managed siblings
       # (built-in names like "offline_access" pass through as literals).
       default_roles.staff = {
-        realm = "staff";
+        realm_id = "staff";
         default_roles = [ "engineer" "offline_access" "uma_authorization" ];
       };
       group_roles.eng = {
-        realm = "staff";
-        group = "eng";
-        roles = [ "engineer" ];   # managed key, resolved to id
+        realm_id = "staff";
+        group_id = "eng";
+        role_ids = [ "engineer" ];   # managed key, resolved to id
       };
 
       user.alice = {
-        realm = "staff";
+        realm_id = "staff";
         username = "alice";
         email = "alice@example.com";
         # nested initial-password File:
@@ -184,7 +184,7 @@ nested-secret indirection at once.
       };
 
       openid_client.app = {
-        realm = "staff";
+        realm_id = "staff";
         client_id = "app";
         access_type = "CONFIDENTIAL";
         client_secretFile = "/run/secrets/staff-app-client-secret";
@@ -201,7 +201,7 @@ nested-secret indirection at once.
 
       attribute_importer_identity_provider_mapper.staff_google_email = {
         realm = "staff";
-        identity_provider = "staff_google";   # managed IdP key
+        identity_provider_alias = "staff_google";   # managed IdP key
         name = "google-email";
         user_attribute = "email";
         claim_name = "email";
@@ -254,37 +254,37 @@ blocks `smtp_server`, `internationalization`, `security_defenses`,
 
 ### Roles, groups, users
 
-| Option              | Key defaults | Reference inputs                           |
-| ------------------- | ------------ | ------------------------------------------ |
-| `role`              | `name`       | `realm`, `composite_roles` → role          |
-| `default_roles`     | —            | `realm`, `default_roles` → role            |
-| `group`             | `name`       | `realm`, `parent` → group                  |
-| `default_groups`    | —            | `realm`, `groups` → group                  |
-| `group_memberships` | —            | `realm`, `group` → group, `members` → user |
-| `group_roles`       | —            | `realm`, `group` → group, `roles` → role   |
-| `user`              | `username`   | `realm`                                    |
-| `user_roles`        | —            | `realm`, `user` → user, `roles` → role     |
-| `user_groups`       | —            | `realm`, `user` → user, `groups` → group   |
+| Option              | Key defaults | Reference inputs                                  |
+| ------------------- | ------------ | ------------------------------------------------- |
+| `role`              | `name`       | `realm_id`, `composite_roles` → role              |
+| `default_roles`     | —            | `realm_id`, `default_roles` → role                |
+| `group`             | `name`       | `realm_id`, `parent_id` → group                   |
+| `default_groups`    | —            | `realm_id`, `group_ids` → group                   |
+| `group_memberships` | —            | `realm_id`, `group_id` → group, `members` → user  |
+| `group_roles`       | —            | `realm_id`, `group_id` → group, `role_ids` → role |
+| `user`              | `username`   | `realm_id`                                        |
+| `user_roles`        | —            | `realm_id`, `user_id` → user, `role_ids` → role   |
+| `user_groups`       | —            | `realm_id`, `user_id` → user, `group_ids` → group |
 
 ### Clients, scopes, service accounts
 
-| Option                                     | Key defaults | Reference inputs                                                           |
-| ------------------------------------------ | ------------ | -------------------------------------------------------------------------- |
-| `openid_client`                            | `client_id`  | `realm`                                                                    |
-| `openid_client_scope`                      | `name`       | `realm`                                                                    |
-| `openid_client_default_scopes`             | —            | `realm`, `client` → openid_client, `default_scopes` → openid_client_scope  |
-| `openid_client_optional_scopes`            | —            | `realm`, `client` → openid_client, `optional_scopes` → openid_client_scope |
-| `openid_client_service_account_role`       | —            | `realm`, `client` → openid_client (target)                                 |
-| `openid_client_service_account_realm_role` | —            | `realm`                                                                    |
-| `openid_client_permissions`                | —            | `realm`, `client` → openid_client                                          |
-| `saml_client`                              | `client_id`  | `realm`                                                                    |
-| `saml_client_scope`                        | `name`       | `realm`                                                                    |
-| `saml_client_default_scopes`               | —            | `realm`, `client` → saml_client, `default_scopes` → saml_client_scope      |
+| Option                                     | Key defaults | Reference inputs                                                                 |
+| ------------------------------------------ | ------------ | -------------------------------------------------------------------------------- |
+| `openid_client`                            | `client_id`  | `realm_id`                                                                       |
+| `openid_client_scope`                      | `name`       | `realm_id`                                                                       |
+| `openid_client_default_scopes`             | —            | `realm_id`, `client_id` → openid_client, `default_scopes` → openid_client_scope  |
+| `openid_client_optional_scopes`            | —            | `realm_id`, `client_id` → openid_client, `optional_scopes` → openid_client_scope |
+| `openid_client_service_account_role`       | —            | `realm_id`, `client_id` → openid_client (target)                                 |
+| `openid_client_service_account_realm_role` | —            | `realm_id`                                                                       |
+| `openid_client_permissions`                | —            | `realm_id`, `client_id` → openid_client                                          |
+| `saml_client`                              | `client_id`  | `realm_id`                                                                       |
+| `saml_client_scope`                        | `name`       | `realm_id`                                                                       |
+| `saml_client_default_scopes`               | —            | `realm_id`, `client_id` → saml_client, `default_scopes` → saml_client_scope      |
 
 ### Protocol mappers (OpenID, SAML, generic)
 
-OpenID mappers (`realm` + optional `client` → openid_client +
-optional `client_scope` → openid_client_scope):
+OpenID mappers (`realm_id` + optional `client_id` → openid_client +
+optional `client_scope_id` → openid_client_scope):
 
 - `openid_user_attribute_protocol_mapper`
 - `openid_user_property_protocol_mapper`
@@ -299,14 +299,14 @@ optional `client_scope` → openid_client_scope):
 - `openid_user_client_role_protocol_mapper`
 - `openid_user_session_note_protocol_mapper`
 
-SAML mappers (`realm` + optional `client` → saml_client + optional
-`client_scope` → saml_client_scope):
+SAML mappers (`realm_id` + optional `client_id` → saml_client + optional
+`client_scope_id` → saml_client_scope):
 
 - `saml_user_attribute_protocol_mapper`
 - `saml_user_property_protocol_mapper`
 
-Generic mappers (`realm` + optional `client` → openid/saml clients +
-optional `client_scope` → openid/saml client scopes, multi-target):
+Generic mappers (`realm_id` + optional `client_id` → openid/saml clients +
+optional `client_scope_id` → openid/saml client scopes, multi-target):
 
 - `generic_protocol_mapper`
 - `generic_client_protocol_mapper`
@@ -326,7 +326,7 @@ optional `client_scope` → openid/saml client scopes, multi-target):
 | `oidc_openshift_v4_identity_provider` | `alias`      | `realm` (by realm name) |
 | `spiffe_identity_provider`            | `alias`      | `realm` (by realm name) |
 
-Identity-provider mappers (`realm` + `identity_provider` → any IdP
+Identity-provider mappers (`realm` + `identity_provider_alias` → any IdP
 collection, multi-target with literal fallback):
 
 - `hardcoded_attribute_identity_provider_mapper`
@@ -339,13 +339,13 @@ collection, multi-target with literal fallback):
 
 ### Authentication
 
-| Option                            | Key defaults | Reference inputs                                                                     |
-| --------------------------------- | ------------ | ------------------------------------------------------------------------------------ |
-| `authentication_flow`             | `alias`      | `realm`                                                                              |
-| `authentication_subflow`          | `alias`      | `realm`, `parent_flow` → authentication_flow / authentication_subflow (multi-target) |
-| `authentication_execution`        | —            | `realm`, `parent_flow` → authentication_flow / authentication_subflow (multi-target) |
-| `authentication_execution_config` | `alias`      | `realm`, `execution` → authentication_execution                                      |
-| `authentication_bindings`         | —            | `realm`                                                                              |
+| Option                            | Key defaults | Reference inputs                                                                              |
+| --------------------------------- | ------------ | --------------------------------------------------------------------------------------------- |
+| `authentication_flow`             | `alias`      | `realm_id`                                                                                    |
+| `authentication_subflow`          | `alias`      | `realm_id`, `parent_flow_alias` → authentication_flow / authentication_subflow (multi-target) |
+| `authentication_execution`        | —            | `realm_id`, `parent_flow_alias` → authentication_flow / authentication_subflow (multi-target) |
+| `authentication_execution_config` | `alias`      | `realm_id`, `execution_id` → authentication_execution                                         |
+| `authentication_bindings`         | —            | `realm_id`                                                                                    |
 
 ### Authorization (per-client fine-grained)
 
@@ -363,14 +363,14 @@ collection, multi-target with literal fallback):
 | `openid_client_time_policy`                       | `name`       |
 | `openid_client_user_policy`                       | `name`       |
 
-All authz resources share `realm` + `resource_server` → openid_client
+All authz resources share `realm_id` + `resource_server_id` → openid_client
 (the latter resolves to the client's computed `resource_server_id`,
 populated once `services.keycloak.runtime.openid_client.<key>.authorization`
 is set).
 
 ### Federation
 
-LDAP (`realm` + `ldap_user_federation` → ldap_user_federation for the
+LDAP (`realm_id` + `ldap_user_federation_id` → ldap_user_federation for the
 mappers):
 
 | Option                                      | Key defaults |
@@ -389,39 +389,39 @@ mappers):
 
 Other federation:
 
-| Option                       | Key defaults | Reference inputs                                       |
-| ---------------------------- | ------------ | ------------------------------------------------------ |
-| `custom_user_federation`     | `name`       | `realm`                                                |
-| `hardcoded_attribute_mapper` | `name`       | `realm`, `ldap_user_federation` → ldap_user_federation |
+| Option                       | Key defaults | Reference inputs                                             |
+| ---------------------------- | ------------ | ------------------------------------------------------------ |
+| `custom_user_federation`     | `name`       | `realm_id`                                                   |
+| `hardcoded_attribute_mapper` | `name`       | `realm_id`, `ldap_user_federation_id` → ldap_user_federation |
 
 ### Realm keys
 
 | Option                           | Key defaults | Reference inputs |
 | -------------------------------- | ------------ | ---------------- |
-| `realm_keystore_aes_generated`   | `name`       | `realm`          |
-| `realm_keystore_ecdsa_generated` | `name`       | `realm`          |
-| `realm_keystore_hmac_generated`  | `name`       | `realm`          |
-| `realm_keystore_java_keystore`   | `name`       | `realm`          |
-| `realm_keystore_rsa`             | `name`       | `realm`          |
-| `realm_keystore_rsa_generated`   | `name`       | `realm`          |
+| `realm_keystore_aes_generated`   | `name`       | `realm_id`       |
+| `realm_keystore_ecdsa_generated` | `name`       | `realm_id`       |
+| `realm_keystore_hmac_generated`  | `name`       | `realm_id`       |
+| `realm_keystore_java_keystore`   | `name`       | `realm_id`       |
+| `realm_keystore_rsa`             | `name`       | `realm_id`       |
+| `realm_keystore_rsa_generated`   | `name`       | `realm_id`       |
 
 ### Realm-level config + permissions
 
-| Option                                              | Key defaults | Reference inputs                                                      |
-| --------------------------------------------------- | ------------ | --------------------------------------------------------------------- |
-| `required_action`                                   | `alias`      | `realm`                                                               |
-| `realm_events`                                      | —            | `realm`                                                               |
-| `realm_localization`                                | `locale`     | `realm`                                                               |
-| `realm_default_client_scopes`                       | —            | `realm`, `default_scopes` → openid/saml client_scopes (multi-target)  |
-| `realm_optional_client_scopes`                      | —            | `realm`, `optional_scopes` → openid/saml client_scopes (multi-target) |
-| `organization`                                      | `name`       | `realm` (by realm name)                                               |
-| `identity_provider_token_exchange_scope_permission` | —            | `realm`                                                               |
-| `realm_user_profile`                                | —            | `realm`                                                               |
-| `realm_client_policy_profile`                       | `name`       | `realm`                                                               |
-| `realm_client_policy_profile_policy`                | `name`       | `realm`, `profiles` → realm_client_policy_profile                     |
-| `group_permissions`                                 | —            | `realm`, `group` → group                                              |
-| `users_permissions`                                 | —            | `realm`                                                               |
-| `workflow`                                          | `name`       | `realm` (by realm name)                                               |
+| Option                                              | Key defaults | Reference inputs                                                         |
+| --------------------------------------------------- | ------------ | ------------------------------------------------------------------------ |
+| `required_action`                                   | `alias`      | `realm_id`                                                               |
+| `realm_events`                                      | —            | `realm_id`                                                               |
+| `realm_localization`                                | `locale`     | `realm_id`                                                               |
+| `realm_default_client_scopes`                       | —            | `realm_id`, `default_scopes` → openid/saml client_scopes (multi-target)  |
+| `realm_optional_client_scopes`                      | —            | `realm_id`, `optional_scopes` → openid/saml client_scopes (multi-target) |
+| `organization`                                      | `name`       | `realm` (by realm name)                                                  |
+| `identity_provider_token_exchange_scope_permission` | —            | `realm_id`                                                               |
+| `realm_user_profile`                                | —            | `realm_id`                                                               |
+| `realm_client_policy_profile`                       | `name`       | `realm_id`                                                               |
+| `realm_client_policy_profile_policy`                | `name`       | `realm_id`, `profiles` → realm_client_policy_profile                     |
+| `group_permissions`                                 | —            | `realm_id`, `group_id` → group                                           |
+| `users_permissions`                                 | —            | `realm_id`                                                               |
+| `workflow`                                          | `name`       | `realm` (by realm name)                                                  |
 
 ## Provider updates
 
