@@ -136,7 +136,7 @@ services/              # one directory per service<->provider pairing
     lib.nix            #   provider specifics: wrapped executor + the resource-surface overlay
     checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
     README.md          #   usage docs
-  garage/              # Garage <-> jkossis/garage (in nixpkgs)
+  garage/              # Garage <-> arsolitt/garagehq (vendored)
     module.nix         #   services.garage.runtime + reconciler
     lib.nix            #   provider specifics: wrapped executor + .tf.json generation
     checks.nix         #   NixOS VM test
