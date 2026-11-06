@@ -178,7 +178,7 @@ services.garage.runtime.buckets.www = {
 ```
 
 To stop serving a bucket as a website, remove `website_access`. Do not set
-`enabled = false`: provider 1.3.0 then reports a change on each apply.
+`enabled = false`: provider 1.3.1 then reports a change on each apply.
 
 ## Module options (`services.garage.runtime`)
 
@@ -244,11 +244,6 @@ right signal, but `forceOptional` in the collection's overlay is the release
 valve when it is not.
 
 ## Security note
-
-Provider 1.3.0 does not remove a permission when a `bucket_keys` entry changes
-from `true` to `false`: the apply reports a change, Garage keeps the permission,
-and the next apply reports the same change. To remove a permission from a key,
-remove the entry, apply, and add the entry again with the new values.
 
 The secret-valued _resource_ attribute `secret_access_key` (`keys`) accepts a
 `secret_access_keyFile` form that takes a **host file path** instead of the

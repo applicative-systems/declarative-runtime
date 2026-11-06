@@ -15,10 +15,10 @@
 pkgs.terraform-providers.mkProvider {
   owner = "Arsolitt";
   repo = "terraform-provider-garagehq";
-  rev = "v1.3.0";
+  rev = "v1.3.1";
   spdx = "MIT";
-  hash = "sha256-8esFGSJQK6neXhaUriwLAvSSjdyU/CrMw+EV/7cK9uA=";
-  vendorHash = "sha256-Xa7V3SdkQhMpFV4N5EqrQzrRPt3ADuhwOWtn2wNDYnI=";
+  hash = "sha256-lifONrWL/QdVTpZnl7oXPiwxveCuayGBUkyvrwHQbvM=";
+  vendorHash = "sha256-lmudKUXeHHDVSLKozobHMuwjkSdXZyPhfLfIg+tXs+4=";
   mkProviderGoModule = pkgs.buildGoLatestModule;
   homepage = "https://registry.terraform.io/providers/arsolitt/garagehq";
 }

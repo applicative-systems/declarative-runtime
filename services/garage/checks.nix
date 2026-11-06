@@ -11,10 +11,11 @@
 #     proves reference resolution and apply ordering. An imported key with a
 #     `secret_access_keyFile` also proves per-secret credential indirection -
 #     the value is loaded from a host file and kept out of the generated
-#     `.tf.json`. The `operator-token` specialisation changes the capacity of
-#     the node and gives Garage an admin token of its own, which the
-#     reconciler then uses in place of a minted one. Requires KVM (a NixOS VM
-#     test).
+#     `.tf.json`. The `narrowed` specialisation removes permissions, one of
+#     them the last that a key has on a bucket. The `operator-token`
+#     specialisation adds them again, changes the capacity of the node and
+#     gives Garage an admin token of its own, which the reconciler then uses
+#     in place of a minted one. Requires KVM (a NixOS VM test).
 { pkgs, self }:
 let
   fixtures = import ./fixtures.nix;
@@ -88,6 +89,15 @@ in
             };
           }
           // fixtures.main;
+        };
+
+        # One permission keeps a part of its grant, and one loses all of it.
+        specialisation.narrowed.configuration.services.garage.runtime.bucket_keys = {
+          app_photos = {
+            write = lib.mkForce false;
+            owner = lib.mkForce false;
+          };
+          imported_backups.write = lib.mkForce false;
         };
 
         # The operator gives Garage an admin token, so the reconciler uses it
@@ -218,9 +228,28 @@ in
       machine.succeed("systemctl restart declarative-garage.service")
       assert_noop("apply with the new token")
 
+      # A switch moves /run/current-system to a system with no specialisations.
+      base = machine.succeed("readlink -f /run/current-system").strip()
+
+      # Narrowing a permission removes the grant from Garage. A key with no
+      # permission left has no entry on the bucket, and the resource stays.
+      machine.succeed(f"{base}/specialisation/narrowed/bin/switch-to-configuration test")
+      machine.wait_for_unit("declarative-garage.service")
+      assert "0 added, 2 changed, 0 destroyed" in last_apply(), f"narrowing: {last_apply()}"
+      photos = admin("GetBucketInfo", {"globalAlias": "photos"})
+      grants = {k["accessKeyId"]: k["permissions"] for k in photos["keys"]}
+      assert grants == {
+          app["accessKeyId"]: {"read": True, "write": False, "owner": False},
+          "GK0123456789abcdef01234567": {"read": True, "write": False, "owner": False},
+      }, f"photos grants not narrowed: {grants}"
+      backups = admin("GetBucketInfo", {"globalAlias": "backups"})
+      assert backups["keys"] == [], f"backups grant not removed: {backups['keys']}"
+      machine.succeed("systemctl restart declarative-garage.service")
+      assert_noop("apply after narrowing")
+
       # The operator's token: the module mints no token, the layout has the
       # new capacity, and the reconciler applies with Garage's own token.
-      machine.succeed("/run/current-system/specialisation/operator-token/bin/switch-to-configuration test")
+      machine.succeed(f"{base}/specialisation/operator-token/bin/switch-to-configuration test")
       machine.wait_for_unit("declarative-garage.service")
       machine.fail("systemctl is-active declarative-garage-token.service")
       layout = admin("GetClusterLayout")
@@ -228,6 +257,16 @@ in
       assert (layout["version"], roles) == (2, [("dc1", 2000000000)]), \
           f"new capacity not applied: {layout}"
       machine.succeed(f"curl --fail {bearer}")
+      assert "0 added, 2 changed, 0 destroyed" in last_apply(), f"widening: {last_apply()}"
+      photos = admin("GetBucketInfo", {"globalAlias": "photos"})
+      grants = {k["accessKeyId"]: k["permissions"] for k in photos["keys"]}
+      assert grants[app["accessKeyId"]] == {"read": True, "write": True, "owner": True}, \
+          f"photos grant not added again: {grants}"
+      backups = admin("GetBucketInfo", {"globalAlias": "backups"})
+      grants = {k["accessKeyId"]: k["permissions"] for k in backups["keys"]}
+      assert grants == {
+          "GK0123456789abcdef01234567": {"read": False, "write": True, "owner": False},
+      }, f"backups grant not added again: {grants}"
       machine.succeed("systemctl restart declarative-garage.service")
       assert_noop("apply with the operator token")
       assert "${adminToken}" not in machine.succeed(f"cat {tfjson_path}"), \
