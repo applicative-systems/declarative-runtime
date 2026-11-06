@@ -159,7 +159,7 @@ keycloak pairings encode.
 ### Modeling the resource surface
 
 - The surface is **derived from `provider-schema.json`**, not hand-written:
-  `tfSchema.mkResourceTypes { schema; provider; source; runtimePrefix; resources; unsupported ? {}; omitEverywhere ? []; }`
+  `tfSchema.mkResourceTypes { schema; provider; source; runtimePrefix; resources; unsupported ? {}; omitEverywhere ? []; providerName ? <from source>; docsUrl ? <OpenTofu registry>; }`
   returns `{ resourceTypes; checks; coverage; }` in exactly the shape
   `modules/lib/default.nix` already consumes. `resources` is keyed by resource
   name -- the resource type without the provider's name, as the provider docs
