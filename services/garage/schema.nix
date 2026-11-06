@@ -1,4 +1,4 @@
-# The vendored jkossis/garage provider schema, parsed.
+# The vendored arsolitt/garagehq provider schema, parsed.
 #
 # Indirection, not decoration: Nix memoizes `import <path>` but not
 # `builtins.readFile`, and `lib.nix` is instantiated once per system per check.

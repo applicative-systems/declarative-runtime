@@ -34,9 +34,9 @@ let
     "GetBucketInfo"
     "GetKeyInfo"
     "ImportKey"
-    "ListBuckets"
     "RemoveBucketAlias"
     "UpdateBucket"
+    "UpdateKey"
   ];
 in
 {

@@ -13,9 +13,11 @@
     bucket.photos = {
       max_objects = 1000;
       max_size = 1073741824;
-      website_enabled = true;
-      website_index_document = "index.html";
-      website_error_document = "error.html";
+      website_access = {
+        enabled = true;
+        index_document = "index.html";
+        error_document = "error.html";
+      };
     };
     bucket.backups = { };
 
@@ -27,28 +29,32 @@
     # secret comes from a host file via LoadCredential, so the literal never
     # lands in the generated .tf.json.
     key.imported = {
-      id = "GK0123456789abcdef01234567";
+      access_key_id = "GK0123456789abcdef01234567";
       secret_access_keyFile = "/etc/garage-imported-secret";
     };
 
     # bucket_id and access_key_id take the keys of the managed bucket and key ->
     # emitted as `${garage_bucket.<k>.id}` and `${garage_key.<k>.id}`.
-    bucket_permission.app_photos = {
+    bucket_key.app_photos = {
       bucket_id = "photos";
       access_key_id = "app";
       read = true;
       write = true;
       owner = true;
     };
-    bucket_permission.imported_photos = {
+    bucket_key.imported_photos = {
       bucket_id = "photos";
       access_key_id = "imported";
       read = true;
+      write = false;
+      owner = false;
     };
-    bucket_permission.imported_backups = {
+    bucket_key.imported_backups = {
       bucket_id = "backups";
       access_key_id = "imported";
+      read = false;
       write = true;
+      owner = false;
     };
   };
 }

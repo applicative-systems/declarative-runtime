@@ -1,4 +1,4 @@
-# Garage <-> jkossis/garage pairing.
+# Garage <-> arsolitt/garagehq pairing.
 #
 # Enables the upstream `services.garage` module unchanged, and adds a run-once
 # reconciler that applies declarative runtime state (buckets, access keys and
