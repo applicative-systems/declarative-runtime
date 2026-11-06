@@ -3,9 +3,9 @@
 Declaratively manage a [Garage](https://garagehq.deuxfleurs.fr/) cluster's
 **runtime state** (buckets, access keys and the permissions between them) from
 NixOS, on top of the upstream `services.garage` module, through the
-[`jkossis/garage`][provider] provider.
+[`arsolitt/garagehq`][provider] provider.
 
-[provider]: https://registry.terraform.io/providers/jkossis/garage/latest/docs
+[provider]: https://registry.terraform.io/providers/arsolitt/garagehq/latest/docs
 
 ## Installation
 
@@ -138,11 +138,12 @@ services.garage.runtime = {
     max_size = 10737418240; # 10 GiB
   };
   keys.media-app = { };
-  bucket_permissions.media-app = {
+  bucket_keys.media-app = {
     bucket = "media";
     access_key = "media-app";
     read = true;
     write = true;
+    owner = false;
   };
 };
 ```
@@ -152,14 +153,14 @@ with `garage key info --show-secret media-app`.
 
 ### Keys with a known secret
 
-With both `id` and `secret_access_key` set, the provider imports the key with
+With both `access_key_id` and `secret_access_key` set, the provider imports the key with
 those credentials rather than generating one, so a client can be configured
 with credentials ahead of time. An id is `GK` followed by 24 hex digits; a
 secret is 64 hex digits.
 
 ```nix
 services.garage.runtime.keys.backup = {
-  id = "GK0123456789abcdef01234567";
+  access_key_id = "GK0123456789abcdef01234567";
   secret_access_keyFile = "/run/secrets/garage-backup-secret";
 };
 ```
@@ -168,11 +169,16 @@ services.garage.runtime.keys.backup = {
 
 ```nix
 services.garage.runtime.buckets.www = {
-  website_enabled = true;
-  website_index_document = "index.html";
-  website_error_document = "404.html";
+  website_access = {
+    enabled = true;
+    index_document = "index.html";
+    error_document = "404.html";
+  };
 };
 ```
+
+To stop serving a bucket as a website, remove `website_access`. Do not set
+`enabled = false`: provider 1.3.0 then reports a change on each apply.
 
 ## Module options (`services.garage.runtime`)
 
@@ -187,8 +193,8 @@ Plus one collection option per provider resource (next section).
 
 ## Resources
 
-Every [`jkossis/garage`][provider] resource is exposed as a collection keyed by
-an arbitrary handle. What each collection accepts comes from the vendored
+The [`arsolitt/garagehq`][provider] bucket, key and permission resources are
+exposed as collections keyed by an arbitrary handle. What each collection accepts comes from the vendored
 provider schema, not from this table: the authoritative option list is
 
 ```sh
@@ -196,11 +202,15 @@ nix build .#checks.x86_64-linux.garage-options-doc     # every option, typed
 nix build .#checks.x86_64-linux.garage-schema-coverage # what is covered
 ```
 
-| Option               | `garage_*` resource | Key defaults   | Reference inputs                        |
-| -------------------- | ------------------- | -------------- | --------------------------------------- |
-| `buckets`            | `bucket`            | `global_alias` | -                                       |
-| `keys`               | `key`               | `name`         | -                                       |
-| `bucket_permissions` | `bucket_permission` | -              | `bucket` -> bucket, `access_key` -> key |
+| Option        | `garage_*` resource | Key defaults   | Reference inputs                        |
+| ------------- | ------------------- | -------------- | --------------------------------------- |
+| `buckets`     | `bucket`            | `global_alias` | -                                       |
+| `keys`        | `key`               | `name`         | -                                       |
+| `bucket_keys` | `bucket_key`        | -              | `bucket` -> bucket, `access_key` -> key |
+
+`garage_admin_token` and `garage_cluster_layout` are not modelled:
+`declarative-garage-token` makes the token of the reconciler, and
+`declarative-garage-layout` must assign the layout before the reconciler runs.
 
 A reference names a managed entry by its key, or takes a literal bucket or
 access key id for one that is managed elsewhere.
@@ -216,8 +226,7 @@ of each key, generated or imported.
 
 The option surface is generated from `provider-schema.json`, a normalized
 dump of the pinned provider's schema, committed next to `module.nix`. The
-provider itself comes from nixpkgs, so it moves when the flake's `nixpkgs`
-input does; after such a bump:
+provider itself is vendored in `pkg.nix`; after a bump there:
 
 ```sh
 nix run .#update-provider-schemas
@@ -235,6 +244,11 @@ right signal, but `forceOptional` in the collection's overlay is the release
 valve when it is not.
 
 ## Security note
+
+Provider 1.3.0 does not remove a permission when a `bucket_keys` entry changes
+from `true` to `false`: the apply reports a change, Garage keeps the permission,
+and the next apply reports the same change. To remove a permission from a key,
+remove the entry, apply, and add the entry again with the new values.
 
 The secret-valued _resource_ attribute `secret_access_key` (`keys`) accepts a
 `secret_access_keyFile` form that takes a **host file path** instead of the
