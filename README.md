@@ -5,7 +5,7 @@ Make NixOS services **more declaratively configurable** than upstream Nixpkgs
 modules allow, by pairing each service with its Terraform provider and
 reconciling the service's _runtime state_ once it is up.
 
-> **Status:** two pairings implemented.
+> **Status:** three pairings implemented.
 >
 > - **[Forgejo](services/forgejo/README.md)** — 15 resource types
 >   (organizations, users, repositories, teams, action secrets/variables,
@@ -16,6 +16,8 @@ reconciling the service's _runtime state_ once it is up.
 >   authorization + policies, LDAP federation + mappers, realm keystores,
 >   realm-level config). Includes a service-account bootstrap and nested
 >   `<attr>File` indirection for every secret attribute at any depth.
+> - **[Garage](services/garage/README.md)** - 3 resource types (buckets,
+>   access keys, bucket permissions).
 
 ## The gap this closes
 
@@ -81,7 +83,7 @@ unit_ visibly (`systemctl status`) without tearing down the service.
 ## Usage
 
 Add this flake as an input and import the pairing's NixOS module
-(`nixosModules.forgejo`, `nixosModules.keycloak`, or
+(`nixosModules.forgejo`, `nixosModules.keycloak`, `nixosModules.garage`, or
 `nixosModules.default` for all pairings). Full installation, configuration
 examples, the option reference, the resource table, and the secrets guide
 live in the per-pairing README:
@@ -90,6 +92,8 @@ live in the per-pairing README:
 - [Keycloak pairing](services/keycloak/README.md) — includes the
   service-account bootstrap flow and the operator-supplied client
   override.
+- [Garage pairing](services/garage/README.md) - includes what the cluster
+  needs before the reconciler can apply.
 
 ### Runnable examples
 
@@ -131,6 +135,11 @@ services/              # one directory per service<->provider pairing
     module.nix         #   services.keycloak.runtime + reconciler + bootstrap unit
     lib.nix            #   provider specifics: wrapped executor + the resource-surface overlay
     checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
+    README.md          #   usage docs
+  garage/              # Garage <-> arsolitt/garagehq (vendored)
+    module.nix         #   services.garage.runtime + reconciler
+    lib.nix            #   provider specifics: wrapped executor + .tf.json generation
+    checks.nix         #   NixOS VM test
     README.md          #   usage docs
 examples/              # runnable demos; one configuration.nix + README per example
   keycloak-forgejo/    #   both pairings together with theme, SSO, avatar

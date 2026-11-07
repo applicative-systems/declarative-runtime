@@ -1,0 +1,287 @@
+{
+  "format_version": "1.0",
+  "resource_schemas": {
+    "garage_admin_token": {
+      "block": {
+        "attributes": {
+          "created": {
+            "computed": true,
+            "description": "Creation date",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "expiration": {
+            "computed": true,
+            "description": "Expiration time (RFC3339 format). Omit to keep the current value; set `never_expires` to remove an expiration",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "expired": {
+            "computed": true,
+            "description": "Whether this admin token is expired",
+            "description_kind": "plain",
+            "type": "bool"
+          },
+          "id": {
+            "computed": true,
+            "description": "Identifier of the admin token",
+            "description_kind": "plain",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the admin API token",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "never_expires": {
+            "description": "Set the admin token to never expire. Conflicts with a configured `expiration`",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "bool"
+          },
+          "scope": {
+            "description": "Scope of the admin API token (list of endpoint names or '*' for all)",
+            "description_kind": "plain",
+            "required": true,
+            "type": [
+              "list",
+              "string"
+            ]
+          },
+          "secret_token": {
+            "computed": true,
+            "description": "The secret bearer token (only available on create)",
+            "description_kind": "plain",
+            "sensitive": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "garage_bucket": {
+      "block": {
+        "attributes": {
+          "bytes": {
+            "computed": true,
+            "description": "Total number of bytes used by objects in this bucket",
+            "description_kind": "plain",
+            "type": "number"
+          },
+          "expiration_days": {
+            "description": "Number of days after which objects in this bucket will be automatically deleted. Set to 0 to disable expiration.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "global_alias": {
+            "description": "Global alias for the bucket (this appears as the name in garage bucket list). A change adds the new alias, then removes the old alias. Garage does not remove the last alias of a bucket, so to remove the global alias, the bucket must have another global alias or a local alias.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description": "The bucket ID (computed if not provided)",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "max_objects": {
+            "description": "Maximum number of objects in this bucket. Unset or 0 means no quota.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "max_size": {
+            "description": "Maximum total size in bytes of the objects in this bucket. Unset or 0 means no quota.",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "number"
+          },
+          "objects": {
+            "computed": true,
+            "description": "Number of objects in this bucket",
+            "description_kind": "plain",
+            "type": "number"
+          }
+        },
+        "block_types": {
+          "website_access": {
+            "block": {
+              "attributes": {
+                "enabled": {
+                  "description": "Whether website access is enabled for this bucket.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "bool"
+                },
+                "error_document": {
+                  "description": "Name of the error document served on errors (e.g. error.html).",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "index_document": {
+                  "description": "Name of the index document served at the root of the website (e.g. index.html).",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                }
+              },
+              "description": "Website hosting configuration for the bucket. When enabled, the bucket is served over the Garage S3 web endpoint.",
+              "description_kind": "plain"
+            },
+            "max_items": 1,
+            "nesting_mode": "list"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "garage_bucket_key": {
+      "block": {
+        "attributes": {
+          "access_key_id": {
+            "description": "The access key ID",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "bucket_id": {
+            "description": "The bucket ID",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "owner": {
+            "description": "Grant owner permission",
+            "description_kind": "plain",
+            "required": true,
+            "type": "bool"
+          },
+          "read": {
+            "description": "Grant read permission",
+            "description_kind": "plain",
+            "required": true,
+            "type": "bool"
+          },
+          "write": {
+            "description": "Grant write permission",
+            "description_kind": "plain",
+            "required": true,
+            "type": "bool"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "garage_cluster_layout": {
+      "block": {
+        "attributes": {
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "version": {
+            "computed": true,
+            "description": "Current layout version",
+            "description_kind": "plain",
+            "type": "number"
+          }
+        },
+        "block_types": {
+          "roles": {
+            "block": {
+              "attributes": {
+                "capacity": {
+                  "description": "Storage capacity with unit suffix (e.g., 1G, 500M, 2TiB). Omit for gateway nodes.",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": "string"
+                },
+                "id": {
+                  "description": "Node ID",
+                  "description_kind": "plain",
+                  "required": true,
+                  "type": "string"
+                },
+                "tags": {
+                  "description": "Tags assigned to the node",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "type": [
+                    "list",
+                    "string"
+                  ]
+                },
+                "zone": {
+                  "description": "Zone assigned to the node",
+                  "description_kind": "plain",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "description": "List of node roles in the cluster layout",
+              "description_kind": "plain"
+            },
+            "min_items": 1,
+            "nesting_mode": "list"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    },
+    "garage_key": {
+      "block": {
+        "attributes": {
+          "access_key_id": {
+            "computed": true,
+            "description": "The access key ID. Set it together with `secret_access_key` to import a key with known credentials; otherwise Garage generates it",
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "id": {
+            "computed": true,
+            "description_kind": "plain",
+            "optional": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the access key",
+            "description_kind": "plain",
+            "required": true,
+            "type": "string"
+          },
+          "secret_access_key": {
+            "computed": true,
+            "description": "The secret access key. Set it together with `access_key_id` to import a key with known credentials; otherwise Garage generates it (the provider records it at create and import time, not on later reads)",
+            "description_kind": "plain",
+            "optional": true,
+            "sensitive": true,
+            "type": "string"
+          }
+        },
+        "description_kind": "plain"
+      },
+      "version": 0
+    }
+  },
+  "source": "arsolitt/garagehq",
+  "version": "1.3.1"
+}
