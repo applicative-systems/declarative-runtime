@@ -10,7 +10,8 @@
 #     certificate from a host file proves per-secret credential indirection.
 #     A second certificate is in the trust store before the first apply, and
 #     the fingerprint in a file makes the apply adopt it (`adoptIdFile`).
-#     Requires KVM (a NixOS VM test).
+#     State held under the legacy label prefixes proves the generated `moved`
+#     blocks, also for adopted resources. Requires KVM (a NixOS VM test).
 { pkgs, self }:
 let
   fixtures = import ./fixtures.nix;
@@ -61,6 +62,11 @@ in
 
         environment.etc."incus-metrics.crt".source = "${metricsCert}/cert.pem";
         environment.etc."incus-adopted.crt".source = "${adoptedCert}/cert.pem";
+
+        # `tofu` with the provider, to move the state to the legacy labels.
+        environment.systemPackages = [
+          (pkgs.opentofu.withPlugins (_: [ pkgs.terraform-providers.lxc_incus ]))
+        ];
 
         # An object that something other than the reconciler made, with a
         # fingerprint that is known at runtime only.
@@ -175,6 +181,24 @@ in
       assert "1 changed" in last_apply(), f"drift not reverted: {last_apply()}"
       stray = query("/1.0/networks/incusbr0")["config"]
       assert "user.stray" not in stray, f"undeclared key kept: {stray}"
+
+      # A host that applied an older config holds its resources under the
+      # legacy labels `<prefix>_<key>`. Move the state to those labels: the
+      # next apply must follow the generated `moved` blocks back, and must not
+      # destroy and re-create a resource. The `import` blocks of the adopted
+      # resources must not get in the way.
+      legacy = json.loads('${builtins.toJSON (import ./legacy-label-prefixes.nix)}')
+      tf = "tofu -chdir=/var/lib/declarative-incus/declarative-terraform"
+      addrs = sorted(machine.succeed(f"{tf} state list").split())
+      assert any(a.split(".")[0] == "incus_network" for a in addrs), f"no network in the state: {addrs}"
+      for addr in addrs:
+          rtype, label = addr.split(".")
+          machine.succeed(f"{tf} state mv {addr} {rtype}.{legacy[rtype]}_{label}")
+      machine.succeed("systemctl restart declarative-incus.service")
+      assert "0 added, 0 changed, 0 destroyed" in last_apply(), \
+          f"legacy-label migration was not a no-op: {last_apply()}"
+      migrated = sorted(machine.succeed(f"{tf} state list").split())
+      assert migrated == addrs, f"state not moved back to the current labels: {migrated}"
 
       # A restart of incus also runs the preseed and the reconciler again. The
       # preseed sets only keys the reconciler sets to the same values, so the
