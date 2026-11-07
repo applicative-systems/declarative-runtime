@@ -189,6 +189,7 @@ let
       runtimePrefix
       ;
     providerName = "incus";
+    legacyLabelPrefixes = import ./legacy-label-prefixes.nix;
     providerBlock = cfg: {
       # A directory with no `config.yml`, so that the provider uses its
       # default configuration: the `local` remote on the local unix socket.
