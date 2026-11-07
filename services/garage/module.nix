@@ -9,8 +9,10 @@
 # and an admin token minted at runtime is stored in the cluster too. So the
 # module bootstraps in this order, before the reconciler:
 #
-# 1. `declarative-garage-layout` (when `layout` is set) gives this node its role
-#    and applies the layout.
+# 1. `declarative-garage-layout` (when `layout` is set) gives this node and its
+#    `peers` their roles and applies the layout. One node applies the layout:
+#    two nodes that apply the same version with different roles break the
+#    cluster.
 # 2. `declarative-garage-token` (when `tokenFile` is null) replaces the
 #    reconciler's admin token with a new one, scoped to the functions the
 #    provider calls. Garage keeps the token in the cluster, and the unit keeps
@@ -68,6 +70,25 @@ let
     }
   '';
 
+  # A role in the cluster layout, for this node and for its peers.
+  roleOptions = {
+    zone = mkOption {
+      type = types.str;
+      example = "dc1";
+      description = "Zone of the node.";
+    };
+    capacity = mkOption {
+      type = types.ints.positive;
+      example = literalExpression "100 * 1000 * 1000 * 1000";
+      description = "Storage capacity of the node, in bytes.";
+    };
+    tags = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = "Tags of the node.";
+    };
+  };
+
   bootstrapUnit = {
     after = [ "garage.service" ];
     requires = [ "garage.service" ];
@@ -117,21 +138,25 @@ in
     layout = mkOption {
       type = types.nullOr (
         types.submodule {
-          options = {
-            zone = mkOption {
-              type = types.str;
-              example = "dc1";
-              description = "Zone of this node.";
-            };
-            capacity = mkOption {
-              type = types.ints.positive;
-              example = literalExpression "100 * 1000 * 1000 * 1000";
-              description = "Storage capacity of this node, in bytes.";
-            };
-            tags = mkOption {
-              type = types.listOf types.str;
+          options = roleOptions // {
+            peers = mkOption {
+              type = types.listOf (
+                types.submodule {
+                  options = roleOptions // {
+                    id = mkOption {
+                      type = types.strMatching "[0-9a-f]{64}";
+                      description = "Node id, which is the part of `garage node id` before the `@`.";
+                    };
+                  };
+                }
+              );
               default = [ ];
-              description = "Tags of this node.";
+              description = ''
+                Roles of the other nodes of the cluster. This node assigns
+                them, so the other nodes need no `services.garage.runtime`.
+                This node must reach them, for example through
+                `services.garage.settings.bootstrap_peers`.
+              '';
             };
           };
         }
@@ -143,9 +168,12 @@ in
       };
       description = ''
         Role of this node in the cluster layout. When set, the
-        `declarative-garage-layout` unit gives this node this role and applies
-        the layout, before the reconciler runs. It does nothing when the node
-        already has this role, and it changes no other node.
+        `declarative-garage-layout` unit gives this node this role and each of
+        `peers` its role, and applies the layout, before the reconciler runs.
+        It does nothing when all of these nodes already have these roles, and
+        it does not remove a node from the layout.
+
+        Set this on one node of a cluster only.
 
         When `null`, the operator makes the layout. Garage stores no bucket or
         key, and mints no admin token, until the layout gives a node a role.
@@ -174,25 +202,29 @@ in
     systemd.services.${layoutUnit} = mkIf (cfg.layout != null) (
       bootstrapUnit
       // {
-        description = "Give this node its role in the Garage cluster layout";
+        description = "Give the nodes their roles in the Garage cluster layout";
         script = ''
           ${retry}
           retry garage json-api GetClusterLayout > /dev/null
           node=$(garage node id -q)
-          role=$(jq -n --arg id "''${node%%@*}" \
-            --argjson role ${lib.escapeShellArg (builtins.toJSON cfg.layout)} \
-            '$role + { id: $id }')
+          roles=$(jq -n --arg id "''${node%%@*}" \
+            --argjson layout ${lib.escapeShellArg (builtins.toJSON cfg.layout)} \
+            '[ ($layout | del(.peers)) + { id: $id } ] + $layout.peers')
           layout=$(garage json-api GetClusterLayout)
           # A current role also carries computed fields, so compare only the
           # fields this unit sets.
-          if jq -e --argjson role "$role" \
-            '.roles | any(with_entries(select(.key | IN($role | keys[]))) == $role)' \
-            <<< "$layout" > /dev/null; then
-            echo "this node has its role in layout version $(jq .version <<< "$layout")"
+          changes=$(jq --argjson roles "$roles" '
+            .roles as $current
+            | [ $roles[]
+                | . as $role
+                | select($current | any(with_entries(select(.key | IN($role | keys[]))) == $role) | not) ]
+          ' <<< "$layout")
+          if [ "$(jq length <<< "$changes")" = 0 ]; then
+            echo "the nodes have their roles in layout version $(jq .version <<< "$layout")"
             exit 0
           fi
           garage json-api UpdateClusterLayout \
-            "$(jq -n --argjson role "$role" '{ roles: [ $role ] }')" > /dev/null
+            "$(jq -n --argjson roles "$changes" '{ roles: $roles }')" > /dev/null
           garage json-api ApplyClusterLayout \
             "$(jq '{ version: (.version + 1) }' <<< "$layout")" | jq -r '.message[]'
         '';

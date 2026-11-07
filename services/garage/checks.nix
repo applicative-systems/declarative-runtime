@@ -1,5 +1,5 @@
-# Garage pairing check, returned as a single-entry attrset merged into the
-# flake's per-system `checks`.
+# Garage pairing checks, returned as an attrset merged into the flake's
+# per-system `checks`.
 #
 #   garage - Full integration test: boots a VM with services.garage +
 #     services.garage.runtime and lets the pairing converge at boot, with no
@@ -16,6 +16,13 @@
 #     specialisation adds them again, changes the capacity of the node and
 #     gives Garage an admin token of its own, which the reconciler then uses
 #     in place of a minted one. Requires KVM (a NixOS VM test).
+#
+#   garage-cluster - Three nodes with replication factor 3. Only `node1` has
+#     services.garage.runtime. It knows the ids of the other nodes, gives them
+#     their roles, and then the pairing converges at boot as on one node. The
+#     other nodes must see the same layout and the same buckets, and an object
+#     written through one node must be readable through another. Requires KVM
+#     (a NixOS VM test).
 { pkgs, self }:
 let
   fixtures = import ./fixtures.nix;
@@ -39,6 +46,67 @@ let
     "UpdateBucket"
     "UpdateKey"
   ];
+
+  # Fixed key pairs of the `garage-cluster` nodes, in the format of Garage's
+  # `node_key` file: a 32-byte seed, then the 32-byte public key, which is the
+  # node id. A real cluster reads the id from `garage node id`; a VM test has
+  # to know the id at eval time.
+  nodeKeys = {
+    node2 = "25146dc6affe8b2349d0f6ccc0baec71bbd04dcc1ad543abbffe6364025006f924f05d564d2560369388de463973fd0b5e08599a21ef7b5835e91701ffc1b6c8";
+    node3 = "a03cbc2c5299612a51faa7504fd2f1c713625ed2fc16a91df5821cd68e7de6e2027ebec10ee67adeacc0bff6e293d8a451a7139fb29f3cd47dd3aca6993b8190";
+  };
+  nodeId = name: builtins.substring 64 64 nodeKeys.${name};
+
+  # The configuration all nodes of `garage-cluster` share.
+  clusterNode =
+    { config, pkgs, ... }:
+    {
+      # curl and jq drive the post-convergence API assertions.
+      environment.systemPackages = [
+        pkgs.curl
+        pkgs.jq
+      ];
+
+      networking.firewall.allowedTCPPorts = [
+        3900
+        3901
+      ];
+
+      services.garage = {
+        enable = true;
+        package = pkgs.garage_2;
+        settings = {
+          replication_factor = 3;
+          rpc_bind_addr = "[::]:3901";
+          rpc_public_addr = "${config.networking.primaryIPAddress}:3901";
+          rpc_secret = "5c1915fa04d0b6739675c61bf5907eb0fe3d9c69850c83820f51b4d25d13868c";
+          s3_api = {
+            s3_region = "garage";
+            api_bind_addr = "[::]:3900";
+          };
+          admin.api_bind_addr = "[::]:3903";
+        };
+      };
+
+      virtualisation = {
+        memorySize = 2048;
+        diskSize = 4096;
+      };
+    };
+
+  # A node that starts with a fixed key, so that its id is known.
+  clusterPeer =
+    name:
+    { pkgs, ... }:
+    {
+      imports = [ clusterNode ];
+      systemd.services.garage.serviceConfig.ExecStartPre = pkgs.writeShellScript "garage-node-key" ''
+        mkdir -p /var/lib/garage/meta
+        echo ${nodeKeys.${name}} | ${pkgs.xxd}/bin/xxd -r -p > /var/lib/garage/meta/node_key
+        echo ${nodeId name} | ${pkgs.xxd}/bin/xxd -r -p > /var/lib/garage/meta/node_key.pub
+        chmod 600 /var/lib/garage/meta/node_key
+      '';
+    };
 in
 {
   garage = pkgs.testers.runNixOSTest {
@@ -271,6 +339,157 @@ in
       assert_noop("apply with the operator token")
       assert "${adminToken}" not in machine.succeed(f"cat {tfjson_path}"), \
           "admin token leaked into generated .tf.json"
+    '';
+  };
+
+  garage-cluster = pkgs.testers.runNixOSTest {
+    name = "declarative-garage-cluster";
+
+    nodes.node1 =
+      {
+        lib,
+        nodes,
+        ...
+      }:
+      {
+        imports = [
+          self.nixosModules.default
+          clusterNode
+        ];
+
+        # mock agenix secret: an imported key's secret.
+        environment.etc."garage-imported-secret".text = importedSecret;
+
+        services.garage = {
+          # This node connects to the other nodes. They need no list of their
+          # own, as Garage gives each node the addresses of its peers.
+          settings.bootstrap_peers =
+            map (name: "${nodeId name}@${nodes.${name}.networking.primaryIPAddress}:3901")
+              [
+                "node2"
+                "node3"
+              ];
+
+          runtime = {
+            enable = true;
+            layout = {
+              zone = "dc1";
+              capacity = 1000 * 1000 * 1000;
+              peers = [
+                {
+                  id = nodeId "node2";
+                  zone = "dc2";
+                  capacity = 1000 * 1000 * 1000;
+                }
+                {
+                  id = nodeId "node3";
+                  zone = "dc3";
+                  capacity = 1000 * 1000 * 1000;
+                }
+              ];
+            };
+          }
+          // fixtures.main;
+        };
+
+        # A new capacity for a peer makes a new layout version.
+        specialisation.grown.configuration.services.garage.runtime.layout.peers = lib.mkForce [
+          {
+            id = nodeId "node2";
+            zone = "dc2";
+            capacity = 1000 * 1000 * 1000;
+          }
+          {
+            id = nodeId "node3";
+            zone = "dc3";
+            capacity = 2 * 1000 * 1000 * 1000;
+          }
+        ];
+      };
+
+    nodes.node2 = clusterPeer "node2";
+    nodes.node3 = clusterPeer "node3";
+
+    testScript = ''
+      import json
+
+      def admin(node, endpoint, request=None):
+          return json.loads(node.succeed(
+              f"garage json-api {endpoint} '{json.dumps(request)}'"
+          ))
+
+      def capacities(node):
+          layout = admin(node, "GetClusterLayout")
+          roles = sorted((r["zone"], r["capacity"]) for r in layout["roles"])
+          return layout["version"], roles
+
+      def assert_noop(what):
+          lines = node1.succeed(
+              "journalctl -u declarative-garage.service --no-pager --output=cat "
+              "| grep 'Apply complete'"
+          ).strip().splitlines()
+          assert "0 added, 0 changed, 0 destroyed" in lines[-1], f"{what} was not a no-op: {lines[-1]}"
+
+      # Sign an S3 request to the given node with the given key.
+      def s3(node, target, key, args):
+          secret = key["secretAccessKey"]
+          return node.succeed(
+              f"curl --fail --silent --show-error --aws-sigv4 aws:amz:garage:s3 "
+              f"--user {key['accessKeyId']}:{secret} "
+              f"-H 'x-amz-content-sha256: UNSIGNED-PAYLOAD' "
+              f"{args} http://{target}:3900/photos/hello"
+          )
+
+      start_all()
+
+      # The nodes form the cluster and converge at boot, with no manual step.
+      node1.wait_for_unit("declarative-garage.service")
+
+      # Only node1 has the pairing.
+      for node in (node2, node3):
+          node.wait_for_unit("garage.service")
+          node.fail("systemctl cat declarative-garage.service")
+
+      gigabyte = 1000000000
+      for node in (node1, node2, node3):
+          node.wait_until_succeeds(
+              "[ \"$(garage json-api GetClusterHealth | jq -r .status)\" = healthy ]", timeout=60
+          )
+          found = capacities(node)
+          expected = (1, [("dc1", gigabyte), ("dc2", gigabyte), ("dc3", gigabyte)])
+          assert found == expected, f"{node.name} has layout {found}"
+
+      # The reconciler's state on node1 is the cluster's state on all nodes.
+      for node in (node2, node3):
+          photos = admin(node, "GetBucketInfo", {"globalAlias": "photos"})
+          assert len(photos["keys"]) == 2, f"{node.name} has grants {photos['keys']}"
+
+      # An object written through one node is readable through the others.
+      app = admin(node1, "GetKeyInfo", {"search": "app", "showSecretKey": True})
+      node1.succeed("echo hackme > /tmp/hello")
+      s3(node1, "node1", app, "--upload-file /tmp/hello")
+      for target in ("node2", "node3"):
+          body = s3(node1, target, app, "")
+          assert body.strip() == "hackme", f"object through {target}: {body}"
+
+      node1.succeed("systemctl restart declarative-garage.service")
+      assert_noop("reapply")
+
+      # The nodes have their roles, so the layout stays as it is.
+      node1.succeed("systemctl restart declarative-garage-layout.service")
+      assert capacities(node1)[0] == 1, "layout changed with no new role"
+
+      # node1 changes the role of another node.
+      base = node1.succeed("readlink -f /run/current-system").strip()
+      node1.succeed(f"{base}/specialisation/grown/bin/switch-to-configuration test")
+      node1.wait_for_unit("declarative-garage.service")
+      expected = (2, [("dc1", gigabyte), ("dc2", gigabyte), ("dc3", 2 * gigabyte)])
+      node3.wait_until_succeeds(
+          f"garage json-api GetClusterLayout | jq -e '.version == {expected[0]}'", timeout=60
+      )
+      for node in (node1, node2, node3):
+          found = capacities(node)
+          assert found == expected, f"{node.name} has layout {found}"
     '';
   };
 }
