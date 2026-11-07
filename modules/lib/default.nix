@@ -111,8 +111,8 @@ rec {
 
   # one option collection per resource: attrsOf a typed submodule. options
   # are the resource's typed attrs + ref inputs + `<attr>File` siblings
-  # for each top-level secret. no freeformType -- unknown attrs are eval
-  # errors.
+  # for each top-level secret, plus `adopt` where the collection sets
+  # `importId`. no freeformType -- unknown attrs are eval errors.
   resourceOptions =
     resourceTypes:
     lib.mapAttrs (
@@ -150,7 +150,27 @@ rec {
                     }
                   )
                 ) (spec.secrets or [ ])
-              );
+              )
+              // lib.optionalAttrs ((spec.importId or null) != null) {
+                adopt = lib.mkOption {
+                  type = ty.bool;
+                  default = false;
+                  description = ''
+                    Take an object that exists already into the state on the
+                    first apply, in place of creating it. This renders an
+                    OpenTofu `import` block. The block has no effect when the
+                    object is in the state already, and the apply fails when
+                    the object does not exist.
+
+                    Use this for an object that something else (a preseed,
+                    the service's own setup) creates before the reconciler
+                    runs, and that the provider cannot create a second time.
+                    From the first apply on, the reconciler owns the
+                    attributes it sets; a change to one of them by the other
+                    creator is reverted on the next apply.
+                  '';
+                };
+              };
           }
         );
         default = { };
@@ -170,7 +190,9 @@ rec {
   #   providerVersion   pinned to the packaged provider's version
   #   providerBlock     cfg -> attrs (provider's tf block contents)
   #   runtimePrefix     "services.<svc>.runtime" — for error messages
-  #   tokenVar          name of the primary sensitive tf variable
+  #   tokenVar          name of the primary sensitive tf variable, or null
+  #                     when the provider needs no credential (it talks to
+  #                     a local socket, say)
   #   extraSensitiveVars  extra sensitive-tf-var names (default [])
   #   legacyLabelPrefixes  type -> label prefix of an older label scheme
   #                     (`<prefix>_<key>`); each declared resource of such a
@@ -185,7 +207,7 @@ rec {
       providerVersion,
       providerBlock,
       runtimePrefix,
-      tokenVar,
+      tokenVar ? null,
       extraSensitiveVars ? [ ],
       legacyLabelPrefixes ? { },
     }:
@@ -314,7 +336,7 @@ rec {
         let
           # drop ref keys (re-injected as refAttrs below). *File siblings
           # are kept -- substituteSecrets handles them after cleanNulls.
-          virtuals = builtins.attrNames spec.refs;
+          virtuals = builtins.attrNames spec.refs ++ [ "adopt" ];
           base = removeAttrs item ([ "_module" ] ++ virtuals);
           nameInject = lib.optionalAttrs (spec.nameAttr != null && (item.${spec.nameAttr} or null) == null) {
             ${spec.nameAttr} = key;
@@ -392,6 +414,14 @@ rec {
           cleaned = cleanNulls (base // nameInject // refAttrs);
           substituted = substituteSecrets c spec key cleaned;
           wrapped = wrapBlocks "" substituted.value;
+          label = key;
+          # the import id comes from the options as set, with refs not
+          # resolved and secrets not substituted: OpenTofu must know an id
+          # at plan time, so it cannot point to another resource.
+          imports = lib.optional (item.adopt or false) {
+            to = "${spec.type}.${label}";
+            id = spec.importId (cleanNulls (removeAttrs item [ "adopt" ] // nameInject));
+          };
         in
         # deepSeq forces the checks to run.
         # (they're not nixos assertions because we generate the .tf.json
@@ -404,7 +434,7 @@ rec {
           }"
         else
           builtins.deepSeq [ reqSecretChecks reqAttrChecks oneOfChecks ] {
-            label = key;
+            inherit label imports;
             value = wrapped;
             inherit (substituted) secrets;
           };
@@ -457,26 +487,35 @@ rec {
         lib.concatLists (lib.mapAttrsToList (_: items: map (r: r.secrets) items) renderedPerCollection)
       );
       secretIds = map (e: e.id) allSecrets;
+      allImports = lib.concatLists (
+        lib.concatLists (lib.mapAttrsToList (_: items: map (r: r.imports) items) renderedPerCollection)
+      );
 
       sensitiveVar = {
         type = "string";
         sensitive = true;
       };
 
+      variables =
+        lib.optionalAttrs (tokenVar != null) {
+          ${tokenVar} = sensitiveVar;
+        }
+        // lib.listToAttrs (map (v: lib.nameValuePair v sensitiveVar) extraSensitiveVars)
+        // lib.listToAttrs (map (e: lib.nameValuePair e.id sensitiveVar) allSecrets);
+
+      # OpenTofu rejects an empty block in `.tf.json` ("Missing block label"),
+      # so leave out each block that has no entries.
       config = {
         terraform.required_providers.${providerName} = {
           source = providerSource;
           version = providerVersion;
         };
-        variable = {
-          ${tokenVar} = sensitiveVar;
-        }
-        // lib.listToAttrs (map (v: lib.nameValuePair v sensitiveVar) extraSensitiveVars)
-        // lib.listToAttrs (map (e: lib.nameValuePair e.id sensitiveVar) allSecrets);
         provider.${providerName} = providerBlock cfg;
       }
+      // lib.optionalAttrs (variables != { }) { variable = variables; }
       // lib.optionalAttrs (resourceBlocks != { }) { resource = resourceBlocks; }
-      // lib.optionalAttrs (moved != [ ]) { inherit moved; };
+      // lib.optionalAttrs (moved != [ ]) { inherit moved; }
+      // lib.optionalAttrs (allImports != [ ]) { import = allImports; };
 
       credentials =
         if lib.length secretIds != lib.length (lib.unique secretIds) then
@@ -500,11 +539,14 @@ rec {
   #   name        unit + generated-config name (e.g. "declarative-forgejo")
   #   tfConfig    the .tf.json config to apply
   #   afterUnits  units to order/require after (the service's main unit)
-  #   healthUrl   url polled until the service answers, before applying
-  #   tokenFile   path to the admin token on the host, read via LoadCredential
+  #   healthUrl   url polled until the service answers, before applying, or
+  #               null when the service is ready once `afterUnits` are active
+  #   tokenFile   path to the admin token on the host, read via
+  #               LoadCredential, or null when tokenVar is null
   #   executor    OpenTofu wrapped with the pairing's provider (offline)
   #   tokenVar    name of the sensitive tf variable carrying the token; also
-  #               the LoadCredential id -- exported as TF_VAR_<tokenVar>
+  #               the LoadCredential id -- exported as TF_VAR_<tokenVar>.
+  #               null when the provider needs no credential
   #   credentials extra TF_VAR_<id> -> host path pairs for per-resource
   #               secrets, handled the same way as tokenFile
   #   user/group  the service's user/group; the reconciler runs as them
@@ -521,10 +563,10 @@ rec {
       name,
       tfConfig,
       afterUnits,
-      healthUrl,
-      tokenFile,
+      healthUrl ? null,
+      tokenFile ? null,
       executor,
-      tokenVar,
+      tokenVar ? null,
       user,
       group,
       stateDir,
@@ -535,17 +577,30 @@ rec {
       confFile = tfJsonFile name tfConfig;
       # admin token + per-resource secrets, all read via LoadCredential
       # so they never land in the world-readable store.
-      allCredentials = {
-        ${tokenVar} = tokenFile;
-      }
-      // credentials;
+      allCredentials =
+        lib.optionalAttrs (tokenVar != null) {
+          ${tokenVar} = tokenFile;
+        }
+        // credentials;
       # tfstate lives in this subdir of stateDir.
       workDir = "${stateDir}/declarative-terraform";
       # under DynamicUser= systemd creates the dir via StateDirectory=
       # (relative to /var/lib). derive both from stateDir so the script
       # path and the unit declaration cannot drift.
       stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
+      healthWait = lib.optionalString (healthUrl != null) ''
+        # wait for the service to actually answer before applying.
+        for _ in $(seq 1 60); do
+          if curl -fsS -o /dev/null "${healthUrl}"; then
+            break
+          fi
+          sleep 2
+        done
+      '';
     in
+    assert lib.assertMsg (
+      (tokenVar == null) == (tokenFile == null)
+    ) "mkReconcileService: set both tokenVar and tokenFile, or neither.";
     assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
       "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
     {
@@ -593,14 +648,7 @@ rec {
         # refresh the generated config (tfstate persists across runs).
         install -m 0600 ${confFile} ./main.tf.json
 
-        # wait for the service to actually answer before applying.
-        for _ in $(seq 1 60); do
-          if curl -fsS -o /dev/null "${healthUrl}"; then
-            break
-          fi
-          sleep 2
-        done
-
+        ${healthWait}
         # pass each credential to tofu as TF_VAR_<id>.
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do
           export "TF_VAR_$id=$(cat "$CREDENTIALS_DIRECTORY/$id")"
