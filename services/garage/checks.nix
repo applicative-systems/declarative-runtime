@@ -475,6 +475,20 @@ in
       node1.succeed("systemctl restart declarative-garage.service")
       assert_noop("reapply")
 
+      # A cluster with quorum accepts writes with one node down, so the
+      # bootstrap must work then too.
+      node3.succeed("systemctl stop garage.service")
+      node1.wait_until_succeeds(
+          "[ \"$(garage json-api GetClusterHealth | jq -r .status)\" = degraded ]", timeout=60
+      )
+      node1.succeed("systemctl restart declarative-garage-token.service")
+      node1.succeed("systemctl restart declarative-garage.service")
+      assert_noop("reapply with a node down")
+      node3.succeed("systemctl start garage.service")
+      node1.wait_until_succeeds(
+          "[ \"$(garage json-api GetClusterHealth | jq -r .status)\" = healthy ]", timeout=60
+      )
+
       # The nodes have their roles, so the layout stays as it is.
       node1.succeed("systemctl restart declarative-garage-layout.service")
       assert capacities(node1)[0] == 1, "layout changed with no new role"

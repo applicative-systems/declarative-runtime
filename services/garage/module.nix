@@ -243,11 +243,12 @@ in
         };
         script = ''
           ${retry}
-          healthy() {
-            [ "$(garage json-api GetClusterHealth | jq -r .status)" = healthy ]
+          has_quorum() {
+            garage json-api GetClusterHealth | jq -e '.status != "unavailable"' > /dev/null
           }
-          # Garage stores the token in the cluster, which needs a layout.
-          retry healthy
+          # Garage stores the token in the cluster, which needs a layout and a
+          # quorum of nodes. A cluster with a node down still has a quorum.
+          retry has_quorum
           garage json-api ListAdminTokens \
             | jq -c '.[] | select(.name == "${tokenUnit}" and .id != null) | { id }' \
             | while read -r id; do garage json-api DeleteAdminToken "$id" > /dev/null; done
