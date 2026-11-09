@@ -46,6 +46,10 @@
           inherit pkgs;
           inherit (inputs) nix-tf-schema;
         };
+        incus = import ./services/incus/lib.nix {
+          inherit pkgs;
+          inherit (inputs) nix-tf-schema;
+        };
       };
 
       # A NixOS module cannot reach a flake input by path, so the schema library
@@ -110,6 +114,15 @@
             tfConfig = libs.keycloak.keycloakTfConfig;
             fixtures = import ./services/keycloak/fixtures.nix;
           };
+
+          incus-rendered-fixtures = renderFixtures {
+            name = "incus";
+            options = libs.incus.resourceOptions // {
+              configDir = urlOption "/var/lib/declarative-incus/client";
+            };
+            tfConfig = libs.incus.incusTfConfig;
+            fixtures = import ./services/incus/fixtures.nix;
+          };
         };
 
       # `<svc>-schema-coverage`: the pairing's coverage table. Building it forces
@@ -145,7 +158,13 @@
               inherit
                 (
                   (lib.evalModules {
-                    modules = [ { options.services.${svc}.runtime = l.resourceOptions; } ];
+                    modules = [
+                      {
+                        options = lib.setAttrByPath (lib.splitString "." (
+                          l.runtimePrefix or "services.${svc}.runtime"
+                        )) l.resourceOptions;
+                      }
+                    ];
                   })
                 )
                 options
@@ -194,6 +213,7 @@
       nixosModules.default = withSchemaLib ./modules;
       nixosModules.forgejo = withSchemaLib ./services/forgejo/module.nix;
       nixosModules.keycloak = withSchemaLib ./services/keycloak/module.nix;
+      nixosModules.incus = withSchemaLib ./services/incus/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
@@ -237,6 +257,10 @@
           inherit (inputs) self;
         }
         // (import ./services/keycloak/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (import ./services/incus/checks.nix {
           inherit pkgs;
           inherit (inputs) self;
         })
