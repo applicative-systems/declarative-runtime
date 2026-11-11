@@ -46,6 +46,10 @@
           inherit pkgs;
           inherit (inputs) nix-tf-schema;
         };
+        openbao = import ./services/openbao/lib.nix {
+          inherit pkgs;
+          inherit (inputs) nix-tf-schema;
+        };
       };
 
       # A NixOS module cannot reach a flake input by path, so the schema library
@@ -109,6 +113,16 @@
             };
             tfConfig = libs.keycloak.keycloakTfConfig;
             fixtures = import ./services/keycloak/fixtures.nix;
+          };
+
+          openbao-rendered-fixtures = renderFixtures {
+            name = "openbao";
+            options = libs.openbao.resourceOptions // {
+              address = urlOption "http://127.0.0.1:8200";
+              caCertFile = urlOption null;
+            };
+            tfConfig = libs.openbao.openbaoTfConfig;
+            fixtures = import ./services/openbao/fixtures.nix;
           };
         };
 
@@ -194,6 +208,7 @@
       nixosModules.default = withSchemaLib ./modules;
       nixosModules.forgejo = withSchemaLib ./services/forgejo/module.nix;
       nixosModules.keycloak = withSchemaLib ./services/keycloak/module.nix;
+      nixosModules.openbao = withSchemaLib ./services/openbao/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
@@ -237,6 +252,10 @@
           inherit (inputs) self;
         }
         // (import ./services/keycloak/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (import ./services/openbao/checks.nix {
           inherit pkgs;
           inherit (inputs) self;
         })
