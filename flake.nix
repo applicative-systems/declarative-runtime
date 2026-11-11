@@ -46,6 +46,10 @@
           inherit pkgs;
           inherit (inputs) nix-tf-schema;
         };
+        garage = import ./services/garage/lib.nix {
+          inherit pkgs;
+          inherit (inputs) nix-tf-schema;
+        };
       };
 
       # A NixOS module cannot reach a flake input by path, so the schema library
@@ -109,6 +113,15 @@
             };
             tfConfig = libs.keycloak.keycloakTfConfig;
             fixtures = import ./services/keycloak/fixtures.nix;
+          };
+
+          garage-rendered-fixtures = renderFixtures {
+            name = "garage";
+            options = libs.garage.resourceOptions // {
+              baseUrl = urlOption "http://localhost:3903";
+            };
+            tfConfig = libs.garage.garageTfConfig;
+            fixtures = import ./services/garage/fixtures.nix;
           };
         };
 
@@ -194,6 +207,7 @@
       nixosModules.default = withSchemaLib ./modules;
       nixosModules.forgejo = withSchemaLib ./services/forgejo/module.nix;
       nixosModules.keycloak = withSchemaLib ./services/keycloak/module.nix;
+      nixosModules.garage = withSchemaLib ./services/garage/module.nix;
 
       nixosConfigurations = lib.mapAttrs' (
         name: cfg: lib.nameValuePair "example-${name}" (exampleSystem "x86_64-linux" cfg)
@@ -237,6 +251,10 @@
           inherit (inputs) self;
         }
         // (import ./services/keycloak/checks.nix {
+          inherit pkgs;
+          inherit (inputs) self;
+        })
+        // (import ./services/garage/checks.nix {
           inherit pkgs;
           inherit (inputs) self;
         })

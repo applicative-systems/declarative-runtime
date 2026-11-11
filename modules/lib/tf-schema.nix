@@ -74,6 +74,11 @@ in
                      them. For dialect artifacts that repeat across the whole
                      provider -- the sdk/v2 synthetic `id`, say -- not as a
                      shortcut for per-collection `omit`.
+      providerName   prefix of the resource types. Set it only when they do
+                     not start with the last part of `source`:
+                     `arsolitt/garagehq` has `garage_bucket`.
+      docsUrl        base of the generated links to the resource docs. Set it
+                     for a provider that is not in the OpenTofu registry.
 
     A resource name is the schema's resource type without the provider's
     name, as the provider docs give it: `realm` for `keycloak_realm`. Each
@@ -135,12 +140,12 @@ in
       resources,
       unsupported ? { },
       omitEverywhere ? [ ],
+      # `svalabs/forgejo` -> `forgejo`: every resource type starts with it.
+      providerName ? lib.last (lib.splitString "/" source),
+      docsUrl ? "https://search.opentofu.org/provider/${source}/v${schema.version}",
     }:
     let
       check = cond: msg: if cond then null else throw "${runtimePrefix}: ${msg}";
-
-      # `svalabs/forgejo` -> `forgejo`: every resource type starts with it.
-      providerName = lib.last (lib.splitString "/" source);
 
       # the collection takes the resource name as it is. A plural cannot be
       # derived: many resource names are plural already (`group_roles`), and a
@@ -211,7 +216,7 @@ in
               else
                 "Each key sets the instance's `${nameAttr}`, unless the instance sets `${nameAttr}` itself."
             )
-            "Provider documentation: <https://search.opentofu.org/provider/${source}/v${schema.version}/docs/resources/${lib.removePrefix "${providerName}_" type}>."
+            "Provider documentation: <${docsUrl}/docs/resources/${lib.removePrefix "${providerName}_" type}>."
           ];
 
           # attributes the reference inputs occupy: the user names a sibling
