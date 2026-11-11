@@ -516,6 +516,13 @@ rec {
   #               same hashed UID as the main unit, and systemd creates
   #               the work dir via StateDirectory= (derived from stateDir).
   #               requires stateDir to live under /var/lib.
+  #   sharedStateDirMode  set when the base service declares stateDir as its
+  #               own StateDirectory= under DynamicUser=true, to that
+  #               directory's StateDirectoryMode=. systemd cannot make a
+  #               second unit's StateDirectory= inside it (the private
+  #               directory and its symlink collide), so the reconciler
+  #               declares the same one, with the same mode so that
+  #               neither unit changes it, and makes the work dir itself.
   mkReconcileService =
     {
       name,
@@ -530,6 +537,7 @@ rec {
       stateDir,
       credentials ? { },
       dynamicUser ? false,
+      sharedStateDirMode ? null,
     }:
     let
       confFile = tfJsonFile name tfConfig;
@@ -544,10 +552,14 @@ rec {
       # under DynamicUser= systemd creates the dir via StateDirectory=
       # (relative to /var/lib). derive both from stateDir so the script
       # path and the unit declaration cannot drift.
-      stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
+      stateDirectoryRelative = lib.removePrefix "/var/lib/" (
+        if sharedStateDirMode != null then stateDir else workDir
+      );
     in
-    assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
-      "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
+    # the checks below guard the values they are about rather than the whole
+    # unit: NixOS reads every unit's `after` and `wants` for its assertions, so
+    # a check here that read the base service's unit would be an infinite
+    # recursion.
     {
       description = "Declarative reconciliation for ${name} (OpenTofu)";
       after = afterUnits;
@@ -568,7 +580,10 @@ rec {
         Type = "oneshot";
         RemainAfterExit = true;
         # run as the service's own user so tfstate sits next to its data.
-        User = user;
+        User =
+          assert lib.assertMsg (sharedStateDirMode == null || dynamicUser)
+            "mkReconcileService: sharedStateDirMode is only for a base service with DynamicUser=true; set dynamicUser = true.";
+          user;
         Group = group;
         # secrets stay out of the store; loaded into $CREDENTIALS_DIRECTORY at runtime.
         LoadCredential = lib.mapAttrsToList (id: path: "${id}:${path}") allCredentials;
@@ -578,8 +593,11 @@ rec {
         # persistent state dir. systemd hashes the User= name to a
         # stable UID that's shared across units and owns the state dir.
         DynamicUser = true;
-        StateDirectory = stateDirectoryRelative;
-        StateDirectoryMode = "0700";
+        StateDirectory =
+          assert lib.assertMsg (lib.hasPrefix "/var/lib/" stateDir)
+            "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
+          stateDirectoryRelative;
+        StateDirectoryMode = if sharedStateDirMode != null then sharedStateDirMode else "0700";
       };
       script = ''
         set -euo pipefail
