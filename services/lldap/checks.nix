@@ -133,16 +133,18 @@ in
       # and must not appear in the generated config; logging in with it
       # proves the value still reached lldap intact.
       login("alice", "${alicePassword}")
-      tfjson = machine.succeed("cat /var/lib/declarative-lldap/declarative-terraform/main.tf.json")
+      tfjson = machine.succeed("cat /var/lib/lldap/declarative-terraform/main.tf.json")
       assert "${alicePassword}" not in tfjson, "user password leaked into generated .tf.json"
       assert "${adminPassword}" not in tfjson, "admin password leaked into generated .tf.json"
 
-      # The state is in the reconciler's own state directory, and only its
-      # dynamic user can read it. On the host, the files show as the dynamic
-      # user, or as `nobody` when systemd maps the directory into the unit
-      # with an ID-mapped mount.
-      tfstate = "/var/lib/declarative-lldap/declarative-terraform/terraform.tfstate"
+      # The state is next to lldap's data, and only lldap's dynamic user,
+      # which the reconciler runs as, can read it. On the host, the files
+      # show as that user, or as `nobody` when systemd maps the directory
+      # into the unit with an ID-mapped mount.
+      tfstate = "/var/lib/lldap/declarative-terraform/terraform.tfstate"
       uid = machine.succeed("systemctl show -P UID declarative-lldap.service").strip()
+      lldap_uid = machine.succeed("systemctl show -P UID lldap.service").strip()
+      assert uid == lldap_uid, f"reconciler uid {uid} is not lldap's uid {lldap_uid}"
       owner, mode = machine.succeed(f"stat -c '%u %a' {tfstate}").split()
       assert owner in (uid, "65534"), f"tfstate not owned by the reconciler: uid {owner}, reconciler uid {uid}"
       assert mode == "600", f"tfstate readable by others: mode {mode}"

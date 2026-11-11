@@ -172,9 +172,9 @@ group id or attribute name for one that is managed elsewhere.
 
 ## State
 
-The reconciler runs as a systemd dynamic user of its own
-(`declarative-lldap`) and keeps its Terraform state in
-`/var/lib/declarative-lldap/declarative-terraform`. The state holds the
+The reconciler runs as lldap's own systemd dynamic user and keeps its
+Terraform state in `/var/lib/lldap/declarative-terraform`, next to lldap's
+data, so a backup of lldap's state directory holds both. The state holds the
 password of each user that sets one.
 
 ## Provider updates
