@@ -194,10 +194,10 @@ A subscription to a publication on this same server must use
 
 ## State
 
-The reconciler runs as `postgres` and keeps its Terraform state in
-`/var/lib/declarative-postgresql/declarative-terraform`. The state holds each
-`password` that a role sets, each secret option of a user mapping and each
-subscription's `conninfo`, but no `password_wo`.
+The reconciler runs as `postgres` and keeps its Terraform state inside
+PostgreSQL's state directory in `/var/lib/postgresql/declarative-terraform`.
+The state holds each `password` that a role sets, each secret option of a user
+mapping and each subscription's `conninfo`, but no `password_wo`.
 
 ## Provider updates
 

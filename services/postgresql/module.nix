@@ -33,8 +33,9 @@ let
 
   name = "declarative-postgresql";
   passwordServiceName = "${name}-password";
-  stateDir = "/var/lib/${name}";
-  passwordFile = "${stateDir}/admin-password";
+  stateDir = "/var/lib/postgresql";
+  workDir = "${stateDir}/declarative-terraform";
+  passwordFile = "/var/lib/${name}/admin-password";
 
   tf = tflib.postgresqlTfConfig cfg;
 
@@ -91,8 +92,16 @@ in
       '';
     };
 
+    # The upstream service specifies no state dir if its dataDir is
+    # non-standard.
+    systemd.tmpfiles.settings.${name}.${workDir}.d = {
+      user = "postgres";
+      group = "postgres";
+      mode = "0700";
+    };
+
     systemd.services = {
-      ${name} = lib.recursiveUpdate (tflib.mkReconcileService {
+      ${name} = tflib.mkReconcileService {
         inherit name;
         tfConfig = tf.config;
         inherit (tf) credentials;
@@ -108,7 +117,7 @@ in
         user = "postgres";
         group = "postgres";
         inherit stateDir;
-      }) { serviceConfig.StateDirectory = name; };
+      };
 
       ${passwordServiceName} = {
         description = "Set the password of the ${name} role";

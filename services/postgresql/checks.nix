@@ -122,15 +122,15 @@ in
       # them proves the values still reached PostgreSQL intact.
       assert login("app", "${appPassword}", "app") == "app"
       assert login("replicator", "${replicatorPassword}", "postgres") == "replicator"
-      tfjson = machine.succeed("cat /var/lib/declarative-postgresql/declarative-terraform/main.tf.json")
+      tfjson = machine.succeed("cat /var/lib/postgresql/declarative-terraform/main.tf.json")
       admin_password = machine.succeed("cat /var/lib/declarative-postgresql/admin-password").strip()
       for secret in ["${appPassword}", "${replicatorPassword}", admin_password]:
           assert secret not in tfjson, "secret value leaked into generated .tf.json"
 
-      # The state is in the reconciler's own state directory, and the
-      # `postgres` user that the reconciler runs as owns it.
-      owner = machine.succeed("stat -c %U /var/lib/declarative-postgresql/declarative-terraform/terraform.tfstate").strip()
+      owner = machine.succeed("stat -c %U /var/lib/postgresql/declarative-terraform/terraform.tfstate").strip()
       assert owner == "postgres", f"tfstate not owned by the reconciler: {owner}"
+      mode = machine.succeed("stat -c %a /var/lib/postgresql/declarative-terraform").strip()
+      assert mode == "700", f"state directory readable by others: {mode}"
 
       # Re-applying must be idempotent: a second run must succeed *and*
       # report 0/0/0 (the last 'Apply complete!' line in the journal).
