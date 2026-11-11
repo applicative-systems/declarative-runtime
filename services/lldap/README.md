@@ -42,9 +42,12 @@ step with the rest of your system.
 ### Requirements
 
 - **The admin password in a file**
-  (`services.lldap.settings.ldap_user_pass_file`). The provider logs in as the
-  admin user that lldap makes from its settings, with that same password, so
-  there is no credential to mint.
+  (`services.lldap.settings.ldap_user_pass_file`, or
+  `services.lldap.environment.LLDAP_LDAP_USER_PASS_FILE`). The provider logs in
+  as the admin user that lldap makes from this bootstrap credential, with that
+  same password, so there is no credential to mint. Like lldap, the pairing
+  reads `LLDAP_LDAP_USER_DN` and `LLDAP_LDAP_USER_PASS_FILE` from
+  `services.lldap.environment` before `services.lldap.settings`.
 - **`force_ldap_user_pass_reset = "always"`** is recommended. lldap otherwise
   reads the password file only when it makes the admin user, so a changed file
   (or a password changed in the web UI) gives a password that the provider
@@ -138,9 +141,9 @@ services.lldap.runtime = {
 | `enable`    | bool        | `false`                                 | Turn on the reconciler.                                                            |
 | `baseUrl`   | str         | `http://localhost:<settings.http_port>` | lldap web API base URL the provider targets.                                       |
 | `ldapUrl`   | str         | `ldap://localhost:<settings.ldap_port>` | lldap LDAP URL. The provider uses it only to set user passwords.                   |
-| `adminUser` | str         | `settings.ldap_user_dn`                 | User the provider logs in as. It must be in `lldap_admin`.                         |
+| `adminUser` | str         | lldap's `ldap_user_dn`                  | User the provider logs in as. It must be in `lldap_admin`.                         |
 | `baseDN`    | str         | `settings.ldap_base_dn`                 | Base DN of the directory.                                                          |
-| `tokenFile` | null or str | `settings.ldap_user_pass_file`          | Host path to the password of `adminUser` (read via `LoadCredential=`, not stored). |
+| `tokenFile` | null or str | lldap's `ldap_user_pass_file`           | Host path to the password of `adminUser` (read via `LoadCredential=`, not stored). |
 
 Plus one collection option per provider resource (next section).
 

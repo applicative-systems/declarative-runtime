@@ -6,8 +6,10 @@
 # is up.
 #
 # The provider logs in as the admin user that lldap itself makes from its
-# settings (`ldap_user_dn`, with the password in `ldap_user_pass_file`), so
-# there is no credential to bootstrap.
+# bootstrap credential (`ldap_user_dn`, with the password in
+# `ldap_user_pass_file`), so there is no credential to bootstrap. lldap reads
+# each of these settings from its `LLDAP_<NAME>` environment variable first, so
+# the defaults here do the same.
 #
 # `nix-tf-schema` is the schema-conversion library the resource surface is derived
 # from; the flake injects it via `_module.args`, since a NixOS module cannot
@@ -32,6 +34,9 @@ let
   lldap = config.services.lldap;
   # what the upstream module makes lldap.service run as, and where.
   lldapUnit = config.systemd.services.lldap.serviceConfig;
+  # the value lldap uses for a setting: `LLDAP_<NAME>` has priority over the config file.
+  lldapSetting =
+    name: lldap.environment."LLDAP_${lib.toUpper name}" or lldap.settings.${name} or null;
   tflib = import ./lib.nix { inherit pkgs nix-tf-schema; };
 
   tf = tflib.lldapTfConfig cfg;
@@ -59,8 +64,8 @@ in
 
     adminUser = mkOption {
       type = types.str;
-      default = lldap.settings.ldap_user_dn;
-      defaultText = literalExpression "config.services.lldap.settings.ldap_user_dn";
+      default = lldapSetting "ldap_user_dn";
+      defaultText = literalExpression "config.services.lldap.environment.LLDAP_LDAP_USER_DN or config.services.lldap.settings.ldap_user_dn";
       description = "User name the provider logs in as. The user must be in the `lldap_admin` group.";
     };
 
@@ -73,8 +78,8 @@ in
 
     tokenFile = mkOption {
       type = types.nullOr types.str;
-      default = lldap.settings.ldap_user_pass_file or null;
-      defaultText = literalExpression "config.services.lldap.settings.ldap_user_pass_file";
+      default = lldapSetting "ldap_user_pass_file";
+      defaultText = literalExpression "config.services.lldap.environment.LLDAP_LDAP_USER_PASS_FILE or config.services.lldap.settings.ldap_user_pass_file or null";
       example = "/run/secrets/lldap-admin-password";
       description = ''
         Runtime path to a file containing the password of `adminUser`.
@@ -100,7 +105,7 @@ in
       }
       {
         assertion = cfg.tokenFile != null;
-        message = "services.lldap.runtime requires the admin password in a file: set services.lldap.settings.ldap_user_pass_file, or services.lldap.runtime.tokenFile.";
+        message = "services.lldap.runtime requires the admin password in a file: set services.lldap.settings.ldap_user_pass_file, services.lldap.environment.LLDAP_LDAP_USER_PASS_FILE, or services.lldap.runtime.tokenFile.";
       }
     ];
 
