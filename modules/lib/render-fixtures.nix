@@ -35,7 +35,9 @@ in
             (lib.evalModules {
               modules = [
                 { inherit options; }
-                fixture
+                # a fixture is config, not a module: a collection can have the
+                # name of a module attribute (`key` for `garage_key`).
+                { config = fixture; }
               ];
             }).config
         ) fixtures
