@@ -72,6 +72,7 @@ Provider reality verified against nixpkgs + the public registry:
 | **Forgejo**  | `forgejo` (svalabs/forgejo 1.5.0) | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
 | **Grafana**  | `grafana` (4.36.0)                | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
 | **Keycloak** | `keycloak` (5.8.0)                | `pkgs.terraform-providers.keycloak`                     | **Implemented.** All 101 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
+| **incus**    | `incus` (lxc/incus 1.2.0)         | `pkgs.terraform-providers.lxc_incus`                    | **Implemented.** All provider resources but instances, instance snapshots and images modelled. Options under `virtualisation.incus.runtime`. Talks to the local unix socket as root: no credential, no health check. `adopt` takes over what the preseed makes. |
 
 ## Repository layout
 
@@ -100,6 +101,7 @@ services/                   # one directory per service<->provider pairing
     checks.nix              # the pairing's checks attrset (nixosTest); merged into flake checks
     README.md               # per-pairing usage docs
   keycloak/                 # the Keycloak <-> keycloak/keycloak pairing; same layout, no pkg.nix (provider is in nixpkgs)
+  incus/                    # the incus <-> lxc/incus pairing; same layout, no pkg.nix (provider is in nixpkgs)
 ```
 
 ## Provider implementation contract
@@ -150,7 +152,8 @@ keycloak pairings encode.
   variable: `mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });`.
 - `executor = pkgs.opentofu.withPlugins (_: [ provider ])`. `tokenVar` is the
   `sensitive` Terraform variable **and** `LoadCredential` id carrying the admin
-  credential (e.g. `forgejo_api_token`).
+  credential (e.g. `forgejo_api_token`). A provider with no credential (incus,
+  on its local unix socket) leaves `tokenVar` out.
 - `.tf.json` generation is `genlib.mkTfConfig` — shared, not per-provider. What
   is per-provider is the resource-surface overlay below.
 
@@ -177,8 +180,8 @@ keycloak pairings encode.
   against the schema: `omit` (dotted paths to drop), `extraSecrets` /
   `notSecrets` (attributes the schema mis-marks), `forceOptional`,
   `requiredAttrs` (extra non-empty checks), `oneOfRefs` (Go-validator
-  `ExactlyOneOf`, absent from the schema), and `extraAttrs` (last-resort typed
-  overrides). Provider-wide dialect artifacts go in `omitEverywhere` — the
+  `ExactlyOneOf`, absent from the schema), `extraAttrs` (last-resort typed
+  overrides), and `importId` (below). Provider-wide dialect artifacts go in `omitEverywhere` — the
   sdk/v2 synthetic `id`, say — not in per-collection `omit`.
 - **Every overlay key must name a real schema path.** There is deliberately no
   way to declare an option with no schema counterpart; `refs` is the only
@@ -248,6 +251,16 @@ readers are exercised in-tree:
   the sentences on which keys the option takes are generated. `managedOnly` references (numeric ids) must resolve to a managed sibling
   (generation throws otherwise); name references accept a managed key _or_ a
   literal.
+- `importId = v: <id>` lets a collection take over objects that exist before
+  the reconciler runs (made by the service or by its own seeding). It adds an
+  `adopt` option to each entry; an entry with `adopt = true` renders an
+  `import` block whose `id` is `importId` of the entry's own options (as
+  written: references unresolved, nulls removed, `name` set). An `import` of an
+  object already in the state is a no-op, so `adopt` can stay set.
+- `runtimeImportId = true` is the same for an ID that is known at runtime only
+  (exclusive with `importId`). It adds an `adoptIdFile` option to each entry.
+  The rendered `import` block reads the ID from that file at plan time, and a
+  missing file means no import, so the apply creates the object.
 - `<svc>TfConfig cfg` returns `{ config; credentials; }`. `config` carries **no
   secret**: a `provider` block pointed at the local instance, plus the admin
   token and every `<attr>File` secret as `sensitive` input `variable`s fed from
@@ -276,15 +289,17 @@ readers are exercised in-tree:
   `0700`), co-located with the service it configures and backed up alongside it,
   so the reconciler runs as the service's `User`/`Group` rather than in an
   isolated `DynamicUser` state dir.
-- The script installs the generated config `0600`, **polls `healthUrl`** until
-  the service answers, exports each credential from `$CREDENTIALS_DIRECTORY`,
+- The script installs the generated config `0600`, **polls `healthUrl`** (when
+  set) until the service answers, exports each credential from `$CREDENTIALS_DIRECTORY`,
   then runs `tofu init` + `tofu apply -auto-approve` (`-input=false -no-color`).
 
 ### `module.nix` — the NixOS module
 
 - `{ config, lib, pkgs, nix-tf-schema, ... }:`; `cfg = config.services.<svc>.runtime`;
   `tflib = import ./lib.nix { inherit pkgs nix-tf-schema; }`.
-- Options live under `services.<svc>.runtime` — so the pairing reads as a
+- Options live under `services.<svc>.runtime`, or under the `runtimePrefix` that
+  `lib.nix` exports when the upstream module is elsewhere
+  (`virtualisation.incus.runtime`) — so the pairing reads as a
   transparent extension of the upstream `services.<svc>` module: `enable`
   (`mkEnableOption`), `baseUrl` (default = the local instance), `tokenFile`
   (`nullOr str` — a **host path resolved on the target, never a store path**;
