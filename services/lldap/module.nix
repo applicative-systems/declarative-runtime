@@ -30,6 +30,8 @@ let
 
   cfg = config.services.lldap.runtime;
   lldap = config.services.lldap;
+  # what the upstream module makes lldap.service run as, and where.
+  lldapUnit = config.systemd.services.lldap.serviceConfig;
   tflib = import ./lib.nix { inherit pkgs nix-tf-schema; };
 
   tf = tflib.lldapTfConfig cfg;
@@ -110,14 +112,16 @@ in
       # The web UI answers 200 once the server is up.
       healthUrl = cfg.baseUrl;
       inherit (cfg) tokenFile;
-      # The reconciler only uses the lldap APIs, so it runs as a dynamic user
-      # of its own. Its state cannot go below `/var/lib/lldap`: that is the
-      # state directory of lldap's dynamic user, and systemd cannot make a
-      # state directory of a different unit in it.
-      user = "declarative-lldap";
-      group = "declarative-lldap";
+      # lldap runs as a dynamic user with `/var/lib/lldap` as its state
+      # directory. The reconciler runs as the same dynamic user and declares
+      # the same state directory, so its state sits next to lldap's data.
+      # It cannot declare a state directory inside lldap's: systemd fails
+      # to set that up.
+      user = lldapUnit.User;
+      group = lldapUnit.Group;
       dynamicUser = true;
-      stateDir = "/var/lib/declarative-lldap";
+      stateDir = "/var/lib/${lldapUnit.StateDirectory}";
+      sharedStateDirMode = lldapUnit.StateDirectoryMode;
     };
   };
 }
