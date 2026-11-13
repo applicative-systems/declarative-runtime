@@ -19,10 +19,6 @@ let
   # provider source address; also keys the vendored provider schema.
   providerSource = "cyrilgdn/postgresql";
   runtimePrefix = "services.postgresql.runtime";
-  # the password of the role that the provider logs in as.
-  tokenVar = "postgresql_password";
-  # the role that the provider logs in as. The module makes it.
-  adminUser = "declarative_postgresql";
   executor = pkgs.opentofu.withPlugins (_: [ provider ]);
 
   # A reference to a role, a database, a schema or a foreign server takes the
@@ -168,36 +164,40 @@ let
   };
   inherit (generated) resourceTypes;
 
-  postgresqlTfConfig = genlib.mkTfConfig {
-    inherit
-      resourceTypes
-      providerVersion
-      providerSource
-      runtimePrefix
-      tokenVar
-      ;
-    providerName = "postgresql";
-    providerBlock = cfg: {
-      # TCP and not the socket: the provider puts the host into a connection
-      # URL, which cannot hold a socket path.
-      host = "127.0.0.1";
-      inherit (cfg) port;
-      database = "postgres";
-      username = adminUser;
-      password = "\${var.${tokenVar}}";
-      sslmode = "disable";
-      # The role is a superuser, but with `superuser = true` the provider reads
-      # each role password back from `pg_authid`. A SCRAM hash then differs
-      # from the declared password, and every apply changes the role.
-      superuser = false;
+  # `superUser` is the role that peer authentication on the socket maps the
+  # `postgres` OS user to.
+  postgresqlTfConfig =
+    { superUser }:
+    genlib.mkTfConfig {
+      inherit
+        resourceTypes
+        providerVersion
+        providerSource
+        runtimePrefix
+        ;
+      providerName = "postgresql";
+      providerBlock = cfg: {
+        # Empty, so that the driver (lib/pq) takes the host from PGHOST, which
+        # the reconciler unit sets to the socket directory: the provider puts
+        # `host` into a connection URL as it is, and a socket path breaks that
+        # URL. Left out, `host` defaults to PGHOST and breaks it all the same.
+        host = "";
+        # It also names the socket.
+        inherit (cfg) port;
+        database = "postgres";
+        username = superUser;
+        sslmode = "disable";
+        # With `superuser = true` the provider reads each role password back
+        # from `pg_authid`. A SCRAM hash then differs from the declared
+        # password, and every apply changes the role.
+        superuser = false;
+      };
     };
-  };
 in
 {
   inherit
     provider
     providerSource
-    adminUser
     resourceTypes
     postgresqlTfConfig
     ;
@@ -205,5 +205,5 @@ in
   # to force independently of any particular configuration.
   inherit (generated) checks coverage;
   resourceOptions = genlib.resourceOptions resourceTypes;
-  mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor tokenVar; });
+  mkReconcileService = args: genlib.mkReconcileService (args // { inherit executor; });
 }

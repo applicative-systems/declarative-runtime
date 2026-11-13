@@ -170,7 +170,8 @@ rec {
   #   providerVersion   pinned to the packaged provider's version
   #   providerBlock     cfg -> attrs (provider's tf block contents)
   #   runtimePrefix     "services.<svc>.runtime" — for error messages
-  #   tokenVar          name of the primary sensitive tf variable
+  #   tokenVar          name of the primary sensitive tf variable; null when
+  #                     the provider needs no credential
   #   extraSensitiveVars  extra sensitive-tf-var names (default [])
   #   legacyLabelPrefixes  type -> label prefix of an older label scheme
   #                     (`<prefix>_<key>`); each declared resource of such a
@@ -185,7 +186,7 @@ rec {
       providerVersion,
       providerBlock,
       runtimePrefix,
-      tokenVar,
+      tokenVar ? null,
       extraSensitiveVars ? [ ],
       legacyLabelPrefixes ? { },
     }:
@@ -468,11 +469,10 @@ rec {
           source = providerSource;
           version = providerVersion;
         };
-        variable = {
-          ${tokenVar} = sensitiveVar;
-        }
-        // lib.listToAttrs (map (v: lib.nameValuePair v sensitiveVar) extraSensitiveVars)
-        // lib.listToAttrs (map (e: lib.nameValuePair e.id sensitiveVar) allSecrets);
+        variable =
+          lib.optionalAttrs (tokenVar != null) { ${tokenVar} = sensitiveVar; }
+          // lib.listToAttrs (map (v: lib.nameValuePair v sensitiveVar) extraSensitiveVars)
+          // lib.listToAttrs (map (e: lib.nameValuePair e.id sensitiveVar) allSecrets);
         provider.${providerName} = providerBlock cfg;
       }
       // lib.optionalAttrs (resourceBlocks != { }) { resource = resourceBlocks; }
@@ -500,8 +500,10 @@ rec {
   #   name        unit + generated-config name (e.g. "declarative-forgejo")
   #   tfConfig    the .tf.json config to apply
   #   afterUnits  units to order/require after (the service's main unit)
-  #   healthUrl   url polled until the service answers, before applying
-  #   tokenFile   path to the admin token on the host, read via LoadCredential
+  #   healthUrl   url polled until the service answers, before applying;
+  #               null when `afterUnits` are only up once the service answers
+  #   tokenFile   path to the admin token on the host, read via LoadCredential;
+  #               null, with tokenVar, when the provider needs no credential
   #   executor    OpenTofu wrapped with the pairing's provider (offline)
   #   tokenVar    name of the sensitive tf variable carrying the token; also
   #               the LoadCredential id -- exported as TF_VAR_<tokenVar>
@@ -522,9 +524,9 @@ rec {
       tfConfig,
       afterUnits,
       healthUrl,
-      tokenFile,
+      tokenFile ? null,
       executor,
-      tokenVar,
+      tokenVar ? null,
       user,
       group,
       stateDir,
@@ -535,10 +537,11 @@ rec {
       confFile = tfJsonFile name tfConfig;
       # admin token + per-resource secrets, all read via LoadCredential
       # so they never land in the world-readable store.
-      allCredentials = {
-        ${tokenVar} = tokenFile;
-      }
-      // credentials;
+      allCredentials =
+        lib.optionalAttrs (tokenVar != null) {
+          ${tokenVar} = tokenFile;
+        }
+        // credentials;
       # tfstate lives in this subdir of stateDir.
       workDir = "${stateDir}/declarative-terraform";
       # under DynamicUser= systemd creates the dir via StateDirectory=
@@ -546,6 +549,9 @@ rec {
       # path and the unit declaration cannot drift.
       stateDirectoryRelative = lib.removePrefix "/var/lib/" workDir;
     in
+    assert lib.assertMsg (
+      (tokenVar == null) == (tokenFile == null)
+    ) "mkReconcileService: set tokenVar and tokenFile together, or neither.";
     assert lib.assertMsg (!dynamicUser || lib.hasPrefix "/var/lib/" stateDir)
       "mkReconcileService: dynamicUser=true requires stateDir to live under /var/lib (got '${stateDir}'), so systemd can express the work dir as a relative StateDirectory=.";
     {
@@ -593,6 +599,8 @@ rec {
         # refresh the generated config (tfstate persists across runs).
         install -m 0600 ${confFile} ./main.tf.json
 
+      ''
+      + lib.optionalString (healthUrl != null) ''
         # wait for the service to actually answer before applying.
         for _ in $(seq 1 60); do
           if curl -fsS -o /dev/null "${healthUrl}"; then
@@ -600,6 +608,8 @@ rec {
           fi
           sleep 2
         done
+      ''
+      + ''
 
         # pass each credential to tofu as TF_VAR_<id>.
         for id in ${lib.escapeShellArgs (lib.attrNames allCredentials)}; do

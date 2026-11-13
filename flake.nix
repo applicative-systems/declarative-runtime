@@ -120,7 +120,7 @@
             options = libs.postgresql.resourceOptions // {
               port = urlOption 5432;
             };
-            tfConfig = libs.postgresql.postgresqlTfConfig;
+            tfConfig = libs.postgresql.postgresqlTfConfig { superUser = "postgres"; };
             fixtures = import ./services/postgresql/fixtures.nix;
           };
         };

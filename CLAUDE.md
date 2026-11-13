@@ -72,7 +72,7 @@ Provider reality verified against nixpkgs + the public registry:
 | **Forgejo**    | `forgejo` (svalabs/forgejo 1.5.0)         | vendored in `services/forgejo/pkg.nix` (not in nixpkgs) | **Implemented — the reference pairing.** Dedicated Forgejo provider on the Forgejo Go SDK, tracking Forgejo's API as it diverges from Gitea (hard fork since 2024). Chosen over the in-nixpkgs `gitea` provider. Vendored via `terraform-providers.mkProvider`. |
 | **Grafana**    | `grafana` (4.36.0)                        | `pkgs.terraform-providers.grafana`                      | Designed, not yet built. In-nixpkgs provider.                                                                                                                                                                                                                   |
 | **Keycloak**   | `keycloak` (5.8.0)                        | `pkgs.terraform-providers.keycloak`                     | **Implemented.** All 101 provider resources modelled, proven by six VM tests. Full admin REST API (realms/clients/roles/scopes). Heavy JVM service — VM tests need extra memory and a generous readiness wait.                                                  |
-| **PostgreSQL** | `postgresql` (cyrilgdn/postgresql 1.27.0) | `pkgs.terraform-providers.cyrilgdn_postgresql`          | **Implemented.** All 15 provider resources modelled. The provider logs in over TCP as a superuser role that the module makes (`declarative_postgresql`), with a password that a oneshot generates.                                                              |
+| **PostgreSQL** | `postgresql` (cyrilgdn/postgresql 1.27.0) | `pkgs.terraform-providers.cyrilgdn_postgresql`          | **Implemented.** All 15 provider resources modelled. The provider logs in as the `postgres` superuser over the Unix socket, by peer authentication: no credential at all.                                                                                       |
 
 ## Repository layout
 
@@ -300,7 +300,9 @@ readers are exercised in-tree:
   companion `declarative-<svc>-token` oneshot. Forgejo currently mints one
   maximal `all`-scoped token (mint-once); its least-privilege `requiredScopes`
   computation is kept dormant for Forgejo ≥16's admin token API. Pick what fits
-  the provider's auth model.
+  the provider's auth model. Where the reconciler can authenticate as the
+  service's own user without a secret (PostgreSQL's peer authentication on the
+  socket), pass neither `tokenVar` nor `tokenFile`.
 
 ### `checks.nix` — the VM test
 

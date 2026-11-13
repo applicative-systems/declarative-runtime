@@ -44,6 +44,8 @@ in
     };
 
     testScript = ''
+      import json
+
       def sql(query, db="postgres"):
           return machine.succeed(
               f"runuser -u postgres -- psql -d {db} -XtAc \"{query}\""
@@ -57,8 +59,7 @@ in
       machine.start()
 
       # The whole chain must converge at boot:
-      #   postgresql.target -> declarative-postgresql-password.service
-      #     -> declarative-postgresql.service
+      #   postgresql.target -> declarative-postgresql.service
       # wait_for_unit blocks until the run-once reconciler has applied every
       # declared resource successfully (a failed apply fails the unit).
       machine.wait_for_unit("declarative-postgresql.service")
@@ -123,9 +124,16 @@ in
       assert login("app", "${appPassword}", "app") == "app"
       assert login("replicator", "${replicatorPassword}", "postgres") == "replicator"
       tfjson = machine.succeed("cat /var/lib/postgresql/declarative-terraform/main.tf.json")
-      admin_password = machine.succeed("cat /var/lib/declarative-postgresql/admin-password").strip()
-      for secret in ["${appPassword}", "${replicatorPassword}", admin_password]:
+      for secret in ["${appPassword}", "${replicatorPassword}"]:
           assert secret not in tfjson, "secret value leaked into generated .tf.json"
+
+      # The provider logs in without a credential: as `postgres`, over the
+      # socket, by peer authentication. Over TCP the default pg_hba.conf asks
+      # for a password, which the config does not have, so the apply above
+      # could not have succeeded there.
+      provider = json.loads(tfjson)["provider"]["postgresql"]
+      assert provider["host"] == "" and provider["username"] == "postgres", f"provider block: {provider}"
+      assert "password" not in provider, f"provider block has a password: {provider}"
 
       owner = machine.succeed("stat -c %U /var/lib/postgresql/declarative-terraform/terraform.tfstate").strip()
       assert owner == "postgres", f"tfstate not owned by the reconciler: {owner}"

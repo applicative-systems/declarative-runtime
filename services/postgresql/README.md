@@ -48,13 +48,12 @@ step with the rest of your system.
 
 ### Requirements
 
-- **Nothing to mint.** The module adds a superuser role,
-  `declarative_postgresql`, through `services.postgresql.ensureUsers`. A
-  oneshot (`declarative-postgresql-password.service`) gives it a random
-  password, kept in `/var/lib/declarative-postgresql/admin-password` and
-  readable by `postgres` only. The provider logs in with it over TCP on
-  `127.0.0.1`, so the module puts `host` lines for that role first in
-  `services.postgresql.authentication`. Do not declare that role yourself.
+- **No credential.** The reconciler runs as the `postgres` OS user and the
+  provider connects over the Unix socket, where peer authentication makes it
+  the `postgres` superuser (the upstream module's default `pg_hba.conf` and
+  `identMap`). There is no role to make and no password to keep. Keep the
+  `local all postgres peer map=postgres` rule if you replace
+  `services.postgresql.authentication`.
 - **`wal_level = "logical"`** (`services.postgresql.settings.wal_level`) for
   publications, logical replication slots and subscriptions.
 
@@ -231,7 +230,7 @@ The secret-valued _resource_ attributes (`password` and `password_wo` of
 of the literal value. The file is read at apply time via systemd
 `LoadCredential=` into a sensitive Terraform variable and **never enters the
 Nix store**; the generated `.tf.json` holds only a `${var....}` reference (the
-same mechanism that protects the admin password). Setting the attribute
+same mechanism that the other pairings use for their admin token). Setting the attribute
 _literally_ still works, but renders the value verbatim into the
 **world-readable** `.tf.json` store path. An attribute and its `<attr>File`
 form are mutually exclusive.

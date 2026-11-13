@@ -137,7 +137,7 @@ services/              # one directory per service<->provider pairing
     checks.nix         #   1 VM + 4 nspawn-container tests, one per resource family
     README.md          #   usage docs
   postgresql/          # PostgreSQL <-> cyrilgdn/postgresql (in nixpkgs)
-    module.nix         #   services.postgresql.runtime + reconciler + admin password unit
+    module.nix         #   services.postgresql.runtime + reconciler
     lib.nix            #   provider specifics: wrapped executor + .tf.json generation
     checks.nix         #   NixOS VM test
     README.md          #   usage docs
