@@ -147,10 +147,11 @@ services.postgresql.runtime.role.backup = {
 
 ## Module options (`services.postgresql.runtime`)
 
-| Option   | Type | Default                             | Purpose                                                 |
-| -------- | ---- | ----------------------------------- | ------------------------------------------------------- |
-| `enable` | bool | `false`                             | Turn on the reconciler.                                 |
-| `port`   | port | `services.postgresql.settings.port` | Port of the local server that the provider connects to. |
+| Option     | Type | Default                             | Purpose                                                               |
+| ---------- | ---- | ----------------------------------- | --------------------------------------------------------------------- |
+| `enable`   | bool | `false`                             | Turn on the reconciler.                                               |
+| `stateDir` | str  | `/var/lib/postgresql`               | Directory whose `declarative-terraform` subdirectory holds the state. |
+| `port`     | port | `services.postgresql.settings.port` | Port of the local server that the provider connects to.               |
 
 Plus one collection option per provider resource (next section).
 
@@ -197,7 +198,8 @@ A subscription to a publication on this same server must use
 The reconciler runs as `postgres` and keeps its Terraform state inside
 PostgreSQL's state directory in `/var/lib/postgresql/declarative-terraform`.
 The state holds each `password` that a role sets, each secret option of a user
-mapping and each subscription's `conninfo`, but no `password_wo`.
+mapping and each subscription's `conninfo`, but no `password_wo`. Set `stateDir`
+to keep it elsewhere.
 
 ## Provider updates
 

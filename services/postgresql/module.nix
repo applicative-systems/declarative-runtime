@@ -33,7 +33,7 @@ let
 
   name = "declarative-postgresql";
   passwordServiceName = "${name}-password";
-  stateDir = "/var/lib/postgresql";
+  inherit (cfg) stateDir;
   workDir = "${stateDir}/declarative-terraform";
   passwordFile = "/var/lib/${name}/admin-password";
 
@@ -50,6 +50,17 @@ in
       "declarative PostgreSQL configuration, applied via OpenTofu and the "
       + "cyrilgdn/postgresql provider after postgresql.target starts"
     );
+
+    stateDir = mkOption {
+      type = types.str;
+      default = "/var/lib/postgresql";
+      example = "/srv/postgresql";
+      description = ''
+        Host path whose `declarative-terraform` subdirectory holds the
+        reconciler's Terraform state. Not the data directory itself: `initdb`
+        needs that empty, and a major upgrade moves to a new one.
+      '';
+    };
 
     port = mkOption {
       type = types.port;
@@ -92,8 +103,7 @@ in
       '';
     };
 
-    # The upstream service specifies no state dir if its dataDir is
-    # non-standard.
+    # `stateDir` need not exist, nor be writable by `postgres`.
     systemd.tmpfiles.settings.${name}.${workDir}.d = {
       user = "postgres";
       group = "postgres";
