@@ -53,7 +53,8 @@ step with the rest of your system.
   the `postgres` superuser (the upstream module's default `pg_hba.conf` and
   `identMap`). There is no role to make and no password to keep. Keep the
   `local all postgres peer map=postgres` rule if you replace
-  `services.postgresql.authentication`.
+  `services.postgresql.authentication`. To have the provider log in as a role
+  of your own instead, see [Your own login](#your-own-login).
 - **`wal_level = "logical"`** (`services.postgresql.settings.wal_level`) for
   publications, logical replication slots and subscriptions.
 
@@ -144,13 +145,38 @@ services.postgresql.runtime.role.backup = {
 };
 ```
 
+### Your own login
+
+By default the provider needs no credential (see
+[Requirements](#requirements)). To have it log in as a role of your own, for
+example one that you provision elsewhere, set `user` and `passwordFile`
+together:
+
+```nix
+services.postgresql.runtime = {
+  enable = true;
+  user = "terraform";
+  passwordFile = "/run/secrets/postgresql-terraform-password";
+};
+```
+
+The provider then connects over TCP on `127.0.0.1` with that password, which
+it reads through `LoadCredential=`, and the module makes no role of its own.
+The role must exist and be able to log in with a password from `127.0.0.1`,
+which the upstream default `pg_hba.conf` allows. It needs the privileges that
+the declared resources need: most of them, such as extensions, foreign
+servers, subscriptions and replication slots, need a superuser. The reconciler
+still runs as the `postgres` OS user, which owns its state directory.
+
 ## Module options (`services.postgresql.runtime`)
 
-| Option     | Type | Default                             | Purpose                                                               |
-| ---------- | ---- | ----------------------------------- | --------------------------------------------------------------------- |
-| `enable`   | bool | `false`                             | Turn on the reconciler.                                               |
-| `stateDir` | str  | `/var/lib/postgresql`               | Directory whose `declarative-terraform` subdirectory holds the state. |
-| `port`     | port | `services.postgresql.settings.port` | Port of the local server that the provider connects to.               |
+| Option         | Type        | Default                             | Purpose                                                                 |
+| -------------- | ----------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| `enable`       | bool        | `false`                             | Turn on the reconciler.                                                 |
+| `stateDir`     | str         | `/var/lib/postgresql`               | Directory whose `declarative-terraform` subdirectory holds the state.   |
+| `port`         | port        | `services.postgresql.settings.port` | Port of the local server that the provider connects to.                 |
+| `user`         | null or str | `null`                              | Role that the provider logs in as over TCP; null is `postgres` by peer. |
+| `passwordFile` | null or str | `null`                              | Host path to that role's password (`LoadCredential=`); set with `user`. |
 
 Plus one collection option per provider resource (next section).
 
@@ -230,7 +256,7 @@ The secret-valued _resource_ attributes (`password` and `password_wo` of
 of the literal value. The file is read at apply time via systemd
 `LoadCredential=` into a sensitive Terraform variable and **never enters the
 Nix store**; the generated `.tf.json` holds only a `${var....}` reference (the
-same mechanism that the other pairings use for their admin token). Setting the attribute
+same mechanism that protects `passwordFile`). Setting the attribute
 _literally_ still works, but renders the value verbatim into the
 **world-readable** `.tf.json` store path. An attribute and its `<attr>File`
 form are mutually exclusive.

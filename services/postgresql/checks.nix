@@ -15,6 +15,7 @@ let
   fixtures = import ./fixtures.nix;
   appPassword = "app-hackme";
   replicatorPassword = "replicator-hackme";
+  terraformPassword = "terraform-hackme";
 in
 {
   postgresql = pkgs.testers.runNixOSTest {
@@ -43,6 +44,30 @@ in
       virtualisation.memorySize = 2048;
     };
 
+    # The provider logs in as a role of the operator's, over TCP, with a
+    # password from a host file, in place of the peer login on the socket.
+    nodes.ownLogin =
+      { pkgs, ... }:
+      {
+        imports = [ self.nixosModules.default ];
+
+        environment.etc."postgresql-terraform-password".text = terraformPassword;
+
+        services.postgresql = {
+          enable = true;
+          # The operator's role, made by whatever means; a literal password
+          # in the store is fine for a test only.
+          initialScript = pkgs.writeText "terraform-role.sql" "CREATE ROLE terraform LOGIN SUPERUSER PASSWORD '${terraformPassword}';";
+
+          runtime = {
+            enable = true;
+            user = "terraform";
+            passwordFile = "/etc/postgresql-terraform-password";
+          }
+          // fixtures.ownLogin;
+        };
+      };
+
     testScript = ''
       import json
 
@@ -56,7 +81,19 @@ in
               f"PGPASSWORD='{password}' psql -h 127.0.0.1 -U {user} -d {db} -XtAc 'SELECT current_user'"
           ).strip()
 
-      machine.start()
+      def assert_noop_reapply(node):
+          # Re-applying must be idempotent: a second run must succeed *and*
+          # report 0/0/0 (the last 'Apply complete!' line in the journal).
+          node.succeed("systemctl restart declarative-postgresql.service")
+          apply_lines = node.succeed(
+              "journalctl -u declarative-postgresql.service --no-pager --output=cat "
+              "| grep 'Apply complete'"
+          ).strip().splitlines()
+          assert apply_lines, "no 'Apply complete!' line in journal"
+          assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
+              f"reapply was not a no-op: {apply_lines[-1]}"
+
+      start_all()
 
       # The whole chain must converge at boot:
       #   postgresql.target -> declarative-postgresql.service
@@ -140,16 +177,24 @@ in
       mode = machine.succeed("stat -c %a /var/lib/postgresql/declarative-terraform").strip()
       assert mode == "700", f"state directory readable by others: {mode}"
 
-      # Re-applying must be idempotent: a second run must succeed *and*
-      # report 0/0/0 (the last 'Apply complete!' line in the journal).
-      machine.succeed("systemctl restart declarative-postgresql.service")
-      apply_lines = machine.succeed(
-          "journalctl -u declarative-postgresql.service --no-pager --output=cat "
-          "| grep 'Apply complete'"
-      ).strip().splitlines()
-      assert apply_lines, "no 'Apply complete!' line in journal"
-      assert "0 added, 0 changed, 0 destroyed" in apply_lines[-1], \
-          f"reapply was not a no-op: {apply_lines[-1]}"
+      assert_noop_reapply(machine)
+
+      # An operator-supplied login: the provider logged in as `terraform`, so
+      # the schema without an owner belongs to it, and its password reached
+      # the provider from the host file and not from the generated config.
+      ownLogin.wait_for_unit("declarative-postgresql.service")
+      owner = ownLogin.succeed(
+          "runuser -u postgres -- psql -d postgres -XtAc "
+          "\"SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'own_login'\""
+      ).strip()
+      assert owner == "terraform", f"schema made by the wrong role: {owner}"
+      tfjson = ownLogin.succeed("cat /var/lib/postgresql/declarative-terraform/main.tf.json")
+      assert "${terraformPassword}" not in tfjson, "password leaked into generated .tf.json"
+      provider = json.loads(tfjson)["provider"]["postgresql"]
+      assert provider["host"] == "127.0.0.1" and provider["username"] == "terraform", \
+          f"provider block: {provider}"
+      assert provider["password"] == "''${var.postgresql_password}", f"provider block: {provider}"
+      assert_noop_reapply(ownLogin)
     '';
   };
 }

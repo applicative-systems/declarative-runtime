@@ -164,10 +164,17 @@ let
   };
   inherit (generated) resourceTypes;
 
+  # the password of an operator-supplied role (`services.postgresql.runtime.user`).
+  tokenVar = "postgresql_password";
+
   # `superUser` is the role that peer authentication on the socket maps the
-  # `postgres` OS user to.
+  # `postgres` OS user to. `user`, when set, is a role of the operator's
+  # that the provider logs in as instead, with the password in `tokenVar`.
   postgresqlTfConfig =
-    { superUser }:
+    {
+      superUser,
+      user ? null,
+    }:
     genlib.mkTfConfig {
       inherit
         resourceTypes
@@ -175,29 +182,48 @@ let
         providerSource
         runtimePrefix
         ;
+      tokenVar = if user == null then null else tokenVar;
       providerName = "postgresql";
-      providerBlock = cfg: {
-        # Empty, so that the driver (lib/pq) takes the host from PGHOST, which
-        # the reconciler unit sets to the socket directory: the provider puts
-        # `host` into a connection URL as it is, and a socket path breaks that
-        # URL. Left out, `host` defaults to PGHOST and breaks it all the same.
-        host = "";
-        # It also names the socket.
-        inherit (cfg) port;
-        database = "postgres";
-        username = superUser;
-        sslmode = "disable";
-        # With `superuser = true` the provider reads each role password back
-        # from `pg_authid`. A SCRAM hash then differs from the declared
-        # password, and every apply changes the role.
-        superuser = false;
-      };
+      providerBlock =
+        cfg:
+        (
+          if user == null then
+            {
+              # Empty, so that the driver (lib/pq) takes the host from PGHOST,
+              # which the reconciler unit sets to the socket directory: the
+              # provider puts `host` into a connection URL as it is, and a
+              # socket path breaks that URL. Left out, `host` defaults to
+              # PGHOST and breaks it all the same.
+              host = "";
+              username = superUser;
+            }
+          else
+            {
+              # Over TCP, as peer authentication on the socket only lets an OS
+              # user in as the role of the same name, and the reconciler runs
+              # as `postgres`.
+              host = "127.0.0.1";
+              username = user;
+              password = "\${var.${tokenVar}}";
+            }
+        )
+        // {
+          # It also names the socket.
+          inherit (cfg) port;
+          database = "postgres";
+          sslmode = "disable";
+          # With `superuser = true` the provider reads each role password back
+          # from `pg_authid`. A SCRAM hash then differs from the declared
+          # password, and every apply changes the role.
+          superuser = false;
+        };
     };
 in
 {
   inherit
     provider
     providerSource
+    tokenVar
     resourceTypes
     postgresqlTfConfig
     ;

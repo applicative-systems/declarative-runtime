@@ -129,4 +129,11 @@
       };
     };
   };
+
+  # The VM test's second node, where the provider logs in as an operator's
+  # role. A schema without an owner belongs to the role that makes it, so its
+  # owner names the role that the provider logged in as.
+  ownLogin = {
+    schema.own_login = { };
+  };
 }
